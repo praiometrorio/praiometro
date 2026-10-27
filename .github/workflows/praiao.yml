@@ -1,0 +1,38 @@
+# Robô do alerta de praião: todo dia no fim da tarde confere a previsão
+# e manda a notificação pelo OneSignal (3 dias antes e na véspera).
+name: Alerta de praião
+
+on:
+  schedule:
+    - cron: "41 21 * * *"     # todo dia, 18h41 em Brasília (o GitHub às vezes atrasa uns minutos)
+  workflow_dispatch:
+    inputs:
+      teste:
+        description: "Mandar só uma notificação de teste agora?"
+        type: choice
+        options: ["sim", "não"]
+        default: "sim"
+
+permissions:
+  contents: write
+
+jobs:
+  alertar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Conferir a previsão e avisar
+        env:
+          ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_KEY: ${{ secrets.ONESIGNAL_KEY }}
+          TESTE: ${{ github.event.inputs.teste }}
+        run: python scripts/praiao.py
+      - name: Guardar o que já foi avisado
+        run: |
+          git config user.name "robo-praiometro"
+          git config user.email "robo-praiometro@users.noreply.github.com"
+          git add data/alertas.json 2>/dev/null || true
+          git diff --cached --quiet || (git commit -m "Registra alerta de praião" && git pull --rebase && git push)
