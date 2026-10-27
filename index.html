@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Praiômetro Rio</title>
+  <meta name="description" content="A nota de cada praia do Rio e de Niterói: chuva, UV, vento, ondas, água e pôr do sol, num mapa só.">
+  <meta name="theme-color" content="#0a6f9c">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Praiômetro">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta property="og:title" content="Praiômetro Rio">
+  <meta property="og:description" content="Vai dar praia? A nota de cada praia do Rio, hora a hora.">
+  <meta property="og:image" content="icons/icon-512.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@500;600&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+  <link rel="stylesheet" href="css/estilo.css">
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <img src="icons/icon-192.png" width="44" height="44" alt="">
+      <div>
+        <h1>Praiô<span>metro</span> Rio</h1>
+        <p class="sub">A nota de cada praia, hora a hora</p>
+      </div>
+    </div>
+    <div class="seg" id="modo" role="group" aria-label="Perfil">
+      <button data-modo="familia" aria-pressed="true">Família</button>
+      <button data-modo="surfe" aria-pressed="false">Surfe</button>
+    </div>
+  </header>
+
+  <div class="instalar" id="instalar" hidden>
+    <span>Instale no iPhone: toque em <strong>Compartilhar</strong> e depois em <strong>Adicionar à Tela de Início</strong>.</span>
+    <button id="fecharInstalar" aria-label="Fechar">×</button>
+  </div>
+
+  <nav class="dias" id="dias" aria-label="Dia da previsão"></nav>
+
+  <section class="resumo" id="resumo" aria-live="polite"></section>
+
+  <section class="mapcard">
+    <div class="maptop">
+      <div class="seg" id="regioes" role="group" aria-label="Região"></div>
+      <div class="legenda"><span>0</span><span class="escala"><i style="background:var(--s1)"></i><i style="background:var(--s2)"></i><i style="background:var(--s3)"></i><i style="background:var(--s4)"></i><i style="background:var(--s5)"></i></span><span>10</span></div>
+    </div>
+    <div id="mapa" role="region" aria-label="Mapa das praias"></div>
+  </section>
+
+  <div class="grade">
+    <section class="painel" id="detalhe" aria-live="polite"></section>
+    <section class="painel">
+      <div class="rankhead"><h3 id="rankTitulo">Ranking do dia</h3><small id="rankSub"></small></div>
+      <ol class="rank" id="rank"></ol>
+    </section>
+  </div>
+
+  <footer>
+    <span id="atualizado"></span>
+    <span>A nota vai de 0 a 10 e combina chuva, nuvens, vento, mar, temperatura e qualidade da água. No perfil Surfe, ondas entre 1 e 2 metros pesam a favor.</span>
+    <span>Previsão: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Mapa: <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> e <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores do OpenStreetMap</a>. Balneabilidade: boletins do INEA.</span>
+  </footer>
+</div>
+
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="js/praias.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

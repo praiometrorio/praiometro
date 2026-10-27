@@ -1,0 +1,5 @@
+{
+  "_comoUsar": "Atualize com o boletim do INEA. Para cada praia, use true (própria) ou false (imprópria). Praias fora da lista aparecem como 'sem boletim'.",
+  "atualizadoEm": null,
+  "praias": {}
+}
