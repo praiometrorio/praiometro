@@ -1,6 +1,6 @@
 // Service worker: guarda os arquivos do site para abrir rápido e funcionar como app.
-const VERSAO = "praiometro-v1";
-const ARQUIVOS = ["./", "index.html", "css/estilo.css", "js/app.js", "js/praias.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
+const VERSAO = "praiometro-v2-1";
+const ARQUIVOS = ["./", "index.html", "css/estilo.css", "js/app.js", "js/praias.js", "js/sol.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSAO).then((c) => c.addAll(ARQUIVOS)).then(() => self.skipWaiting()));
@@ -11,7 +11,7 @@ self.addEventListener("activate", (e) => {
 });
 
 // Arquivos do próprio site: tenta a rede primeiro (para pegar atualizações) e usa o cache se estiver sem internet.
-// Mapa e previsão vêm de outros servidores e não passam por aqui.
+// Mapa, previsão e relevo vêm de outros servidores e não passam por aqui.
 self.addEventListener("fetch", (e) => {
   const url = new URL(e.request.url);
   if (e.request.method !== "GET" || url.origin !== self.location.origin) return;
