@@ -151,32 +151,50 @@
 
   // ---------- cena desenhada (muda com o tempo do dia) ----------
   function cena(a, x, p) {
-    const escura = a.ceu === "nublado" || a.ceu === "chuva";
-    const ceuCor = { sol: "#BFE6F7", parcial: "#D4E6EF", nublado: "#5F6E79", chuva: "#4B5862" }[a.ceu];
-    const morro = escura ? "#33423A" : "#2E6B4F", morro2 = escura ? "#2B3A33" : "#245A42";
-    const mar = escura ? "#34505E" : p.baia ? "#3DA9C9" : "#1C9AC4";
-    const espuma = escura ? "#A9BCC6" : "#8FD6EC";
-    const areia = escura ? "#A89C86" : "#F3DFB8";
+    // Só fica escuro quando é dia de chuva. Nublado sem chuva é cinza claro, calmo.
+    const escura = a.ceu === "chuva";
+    const cinza = a.ceu === "nublado";
+    const ceuCor = { sol: "#BFE6F7", parcial: "#D4E6EF", nublado: "#B4BEC6", chuva: "#4B5862" }[a.ceu];
+    const morro = escura ? "#33423A" : cinza ? "#566B5D" : "#2E6B4F", morro2 = escura ? "#2B3A33" : cinza ? "#4A5E51" : "#245A42";
+    const mar = escura ? "#34505E" : cinza ? "#6C8C99" : p.baia ? "#3DA9C9" : "#1C9AC4";
+    const espuma = escura ? "#A9BCC6" : cinza ? "#B5C7CF" : "#8FD6EC";
+    const areia = escura ? "#A89C86" : cinza ? "#D8CDB7" : "#F3DFB8";
     const o = p.baia ? 0.3 : x.ondas == null ? 0.8 : x.ondas;
     let s = `<svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="230" fill="${ceuCor}"/>`;
-    if (a.ceu === "sol") s += `<circle cx="318" cy="58" r="32" fill="#FFB627"/><g stroke="#FFB627" stroke-width="5" stroke-linecap="round"><path d="M318 10v-6M318 106v6M270 58h-6M366 58h6M284 24l-4-4M352 92l4 4M284 92l-4 4M352 24l4-4"/></g>`;
+    if (a.ceu === "sol") s += `<circle cx="330" cy="44" r="26" fill="#FFB627"/><g stroke="#FFB627" stroke-width="5" stroke-linecap="round"><path d="M330 8v-6M330 80v6M294 44h-6M366 44h6M305 19l-4-4M355 69l4 4M305 69l-4 4M355 19l4-4"/></g>`;
     if (a.ceu === "parcial") s += `<circle cx="300" cy="62" r="30" fill="#FFB627"/><path d="M250 98h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.95"/><path d="M40 70h80a18 18 0 0 0 1-36 24 24 0 0 0-45-4 16 16 0 0 0-36 40z" fill="#FFFFFF" opacity="0.85"/>`;
+    if (cinza) {
+      s += `<path d="M-20 64h150a30 30 0 0 0 2-60 40 40 0 0 0-76-6 28 28 0 0 0-76 66z" fill="#D3DAE0"/><path d="M200 90h170a28 28 0 0 0 2-56 38 38 0 0 0-72-8 26 26 0 0 0-100 64z" fill="#C7CFD6"/><path d="M100 114h110a22 22 0 0 0 1-44 30 30 0 0 0-56-5 20 20 0 0 0-55 49z" fill="#DDE3E8"/>`;
+    }
     if (escura) {
-      const c = a.ceu === "chuva" ? ["#45525B", "#3F4B54", "#38434B"] : ["#4C5A64", "#46535C", "#3E4A52"];
+      const c = ["#45525B", "#3F4B54", "#38434B"];
       s += `<path d="M-20 64h150a30 30 0 0 0 2-60 40 40 0 0 0-76-6 28 28 0 0 0-76 66z" fill="${c[0]}"/><path d="M200 90h170a28 28 0 0 0 2-56 38 38 0 0 0-72-8 26 26 0 0 0-100 64z" fill="${c[1]}"/><path d="M100 114h110a22 22 0 0 0 1-44 30 30 0 0 0-56-5 20 20 0 0 0-55 49z" fill="${c[2]}"/>`;
-      s += `<g stroke="#9AAAB5" stroke-width="2" stroke-linecap="round" opacity="${a.ceu === "chuva" ? 0.9 : 0.45}"><path d="M40 86l-6 14M72 90l-6 14M240 106l-6 14M274 102l-6 14M314 108l-6 14M140 126l-5 12M180 124l-5 12${a.ceu === "chuva" ? "M110 92l-6 14M350 96l-6 14M210 128l-5 12" : ""}"/></g>`;
+      s += `<g stroke="#9AAAB5" stroke-width="2" stroke-linecap="round" opacity="0.9"><path d="M40 86l-6 14M72 90l-6 14M240 106l-6 14M274 102l-6 14M314 108l-6 14M140 126l-5 12M180 124l-5 12M110 92l-6 14M350 96l-6 14M210 128l-5 12"/></g>`;
     }
-    if (x.vento > 15) s += `<g stroke="${escura ? "#C9D3DA" : "#FFFFFF"}" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"><path d="M236 100h70a10 10 0 1 0-10-10M256 116h90a10 10 0 1 1-10 10M226 132h50"/></g>`;
-    s += `<path d="M0 142 C 26 122, 50 108, 74 114 C 92 118, 102 102, 124 98 C 146 95, 164 124, 192 142 Z" fill="${morro}"/><path d="M36 142 C 66 130, 90 124, 110 128 C 128 132, 146 135, 168 142 Z" fill="${morro2}"/>`;
-    if (p.predios) {
-      const pc = escura ? "#55636C" : "#E9E3D6", pj = escura ? "#6E7C85" : "#C9D4DB";
-      let b = "";
-      [[200, 30, 26], [234, 24, 34], [262, 32, 22], [298, 26, 38], [328, 30, 28], [362, 34, 32]].forEach(([bx, bw, bh]) => {
-        b += `<rect x="${bx}" y="${142 - bh}" width="${bw}" height="${bh}" fill="${pc}"/>`;
-        for (let yy = 142 - bh + 6; yy < 136; yy += 9) b += `<rect x="${bx + 5}" y="${yy}" width="${bw - 10}" height="3" fill="${pj}"/>`;
+    // paisagem da praia: silhueta real dos morros vista da areia (calculada com o relevo por satélite)
+    const longeCor = escura ? "#3D4A45" : cinza ? "#7D8E86" : "#6F9C8C";
+    const perfil = (window.PAISAGENS || {})[p.id];
+    const desenho = (window.SILHUETAS || {})[p.id];
+    if (desenho) {
+      const pedraCor = escura ? "#4A4744" : cinza ? "#8C8781" : "#A39282";
+      desenho.camadas.forEach((c) => {
+        const cor = c.pedra ? pedraCor : c.longe ? longeCor : morro;
+        s += `<path d="M${c.pts.map((q) => q[0] + " " + q[1]).join(" L")} Z" fill="${cor}" stroke="${cor}" stroke-width="1.5" stroke-linejoin="round"${c.opac ? ` opacity="${c.opac}"` : ""}/>`;
       });
-      s += b;
+    } else if (perfil) {
+      const pxGrau = 400 / perfil.fov;
+      const maior = Math.max(...perfil.perto, ...perfil.longe, 0.1);
+      const k = Math.min(Math.max(pxGrau * 2, 55 / maior), 80 / maior);
+      const linha = (arr) => {
+        const n = arr.length - 1;
+        const suave = arr.map((v, i) => (arr[Math.max(0, i - 1)] + 2 * v + arr[Math.min(n, i + 1)]) / 4);
+        return "M-2 142 " + suave.map((v, i) => `L${(i * 404 / n - 2).toFixed(1)} ${(142 - v * k).toFixed(1)}`).join(" ") + " L402 142 Z";
+      };
+      s += `<path d="${linha(perfil.longe)}" fill="${longeCor}"/><path d="${linha(perfil.perto)}" fill="${morro}"/>`;
+    } else {
+      s += `<path d="M0 142 C 26 122, 50 108, 74 114 C 92 118, 102 102, 124 98 C 146 95, 164 124, 192 142 Z" fill="${morro}"/>`;
     }
+    if (x.vento > 15) s += `<g stroke="${escura ? "#C9D3DA" : cinza ? "#9AAAB5" : "#FFFFFF"}" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"><path d="M236 100h70a10 10 0 1 0-10-10M256 116h90a10 10 0 1 1-10 10M226 132h50"/></g>`;
     s += `<rect x="0" y="140" width="400" height="56" fill="${mar}"/>`;
     if (o < 0.6) s += `<path d="M0 154H400M30 170H130M210 176H330" stroke="${espuma}" stroke-width="2" stroke-linecap="round" opacity="0.8"/>`;
     else {
@@ -185,7 +203,37 @@
       s += `<path d="${onda(156)}" stroke="${espuma}" stroke-width="3" fill="none" stroke-linecap="round"/><path d="${onda(178)}" stroke="${espuma}" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.7"/>`;
     }
     s += `<rect x="0" y="192" width="400" height="38" fill="${areia}"/>`;
-    if (!escura) s += `<path d="M0 194 C 70 188, 130 198, 200 192 C 270 186, 330 196, 400 191 V200 H0 Z" fill="#FFFFFF" opacity="0.6"/>`;
+    if (desenho && desenho.barcos) {
+      const casco = escura ? "#8A949B" : "#FFFFFF", vela = escura ? "#AEB7BD" : "#F6F3EC", mastro = escura ? "#6E7C85" : "#5A6B78";
+      desenho.barcos.forEach(([bx, t]) => {
+        const by = 152 + t * 4;
+        s += `<g transform="translate(${bx},${by}) scale(${t})"><path d="M-12 0 L12 0 L8 5 L-8 5 Z" fill="${casco}"/><path d="M0 0 V-26" stroke="${mastro}" stroke-width="1.5"/><path d="M1 -24 L1 -2 L13 -2 Z" fill="${vela}"/><path d="M-1 -20 L-1 -2 L-9 -2 Z" fill="${vela}" opacity="0.85"/></g>`;
+      });
+    }
+    if (desenho && desenho.calcadao) {
+      // calçadão de Copacabana: ondas pretas sobre pedra portuguesa branca
+      const claro = escura ? "#BDB8AE" : cinza ? "#E4E1DA" : "#F4F1EA", preto = escura ? "#2A2D30" : cinza ? "#3E4144" : "#23262A";
+      s += `<rect x="0" y="198" width="400" height="32" fill="${claro}"/>`;
+      let ondas = "";
+      for (let k = 0; k < 3; k++) {
+        const y = 204 + k * 11;
+        let d = `M-20 ${y}`;
+        for (let xx = -20; xx < 420; xx += 40) d += ` q 10 -6 20 0 t 20 0`;
+        ondas += `<path d="${d}" stroke="${preto}" stroke-width="5" fill="none"/>`;
+      }
+      s += ondas;
+    }
+    if (desenho && desenho.palmeiras) {
+      const tronco = escura ? "#3B3530" : cinza ? "#6E6458" : "#8A6A45", folha = escura ? "#2B3A33" : cinza ? "#4A5E51" : "#2F7A4A";
+      desenho.palmeiras.forEach(([px, alt, inc, base = 214]) => {
+        const topoX = px + inc, topoY = base - alt;
+        s += `<path d="M${px} ${base} Q ${px + inc * 2} ${base - alt / 2} ${topoX} ${topoY}" stroke="${tronco}" stroke-width="5" fill="none" stroke-linecap="round"/>`;
+        s += `<g stroke="${folha}" stroke-width="6" fill="none" stroke-linecap="round">` +
+          [[-34, 14], [-26, 26], [-8, 30], [12, 28], [30, 22], [36, 8], [-38, 2]].map(([dx, dy]) =>
+            `<path d="M${topoX} ${topoY} q ${dx / 2} ${-12 + dy / 4} ${dx} ${dy}"/>`).join("") + `</g>`;
+      });
+    }
+    if (!escura && !cinza) s += `<path d="M0 194 C 70 188, 130 198, 200 192 C 270 186, 330 196, 400 191 V200 H0 Z" fill="#FFFFFF" opacity="0.6"/>`;
     return { svg: s + "</svg>", escura };
   }
 

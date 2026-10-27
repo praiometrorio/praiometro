@@ -151,3 +151,6 @@ h1 span{color:var(--accent)}
 .carregando{color:var(--muted);padding:24px}
 footer{color:var(--muted);font-size:12px;display:grid;gap:4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* nome da praia legível mesmo em cima dos morros */
+.cena h2,.cena .local{text-shadow:0 0 12px rgba(255,255,255,.95),0 0 3px rgba(255,255,255,.9)}
+.cena.escura h2,.cena.escura .local{text-shadow:0 0 12px rgba(0,0,0,.6),0 0 3px rgba(0,0,0,.5)}
