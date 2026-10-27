@@ -1,9 +1,9 @@
 /* Praiômetro Rio — estilos (versão 2: cartões e selos) */
 :root{
-  --bg:#F6EFE3; --surface:#FFFFFF; --ink:#10283A; --muted:#5A6B78; --line:#E2D6C2;
+  --bg:#F6EFE3; --fundo:#0E4C7A; --surface:#FFFFFF; --ink:#10283A; --muted:#5A6B78; --line:#E2D6C2;
   --accent:#0B7FA6; --sun:#FFB627;
   --c-sol:#FFB627; --c-parcial:#FFD98A; --c-nublado:#8C9AA5; --c-chuva:#5B7FA3;
-  --shadow:0 10px 30px rgba(16,40,58,.10);
+  --shadow:0 10px 30px rgba(0,20,40,.28);
   --f-display:"Unbounded","Arial Rounded MT Bold",system-ui,sans-serif;
   --f-body:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
   color-scheme:light;
@@ -11,7 +11,7 @@
 *{box-sizing:border-box}
 [hidden]{display:none!important}
 html{-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
+body{margin:0;background:var(--fundo);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45;
   padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
 a{color:var(--accent)}
 button{font:inherit;color:inherit}
@@ -23,16 +23,18 @@ button{font:inherit;color:inherit}
 header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
 .brand{display:flex;align-items:center;gap:10px}
 .brand img{border-radius:50%;flex:none}
-h1{font-family:var(--f-display);font-weight:700;font-size:22px;margin:0;letter-spacing:-.02em}
-h1 span{color:var(--accent)}
+h1{font-family:var(--f-display);font-weight:700;font-size:22px;margin:0;letter-spacing:-.02em;color:#fff}
+h1 span{color:#7FD3F0}
 .dias{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;max-width:100%;min-width:0;padding:2px}
 .dias::-webkit-scrollbar{display:none}
 .dia{flex:none;display:flex;align-items:center;gap:6px;font-weight:600;font-size:13px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:7px 12px 7px 9px;min-height:40px;cursor:pointer;white-space:nowrap}
 .dia svg{width:20px;height:20px;flex:none}
 .dia .dt{color:var(--muted);font-weight:600}
 .dia .pr{width:8px;height:8px;border-radius:50%;background:#FFB627;box-shadow:0 0 0 2px #fff}
-.dia[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.dia[aria-pressed="true"] .dt{color:#C9D6DF}
+.dia{border-color:transparent}
+.dia[aria-pressed="true"]{background:#FFB627;color:var(--ink);border-color:#FFB627}
+.dia[aria-pressed="true"] .dt{color:var(--ink)}
+.dia[aria-pressed="true"] .pr{background:#fff;box-shadow:0 0 0 2px #FFB627}
 
 .instalar{display:flex;gap:10px;align-items:center;justify-content:space-between;background:#FFF2D6;color:#6B4A0E;border-radius:14px;padding:10px 12px;font-size:14px}
 .instalar button{background:none;border:0;font-size:24px;line-height:1;cursor:pointer;color:inherit;padding:0 6px;min-height:40px}
@@ -149,7 +151,7 @@ h1 span{color:var(--accent)}
 .aviso{padding:24px;text-align:center;color:var(--muted)}
 .aviso button{margin-top:10px;background:var(--ink);color:#fff;border:0;border-radius:999px;padding:10px 18px;font-weight:700;cursor:pointer}
 .carregando{color:var(--muted);padding:24px}
-footer{color:var(--muted);font-size:12px;display:grid;gap:4px}
+footer{color:#CFE3EF;font-size:12px;display:grid;gap:4px}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 /* nome da praia legível mesmo em cima dos morros */
 .cena h2,.cena .local{text-shadow:0 0 12px rgba(255,255,255,.95),0 0 3px rgba(255,255,255,.9)}
@@ -162,3 +164,41 @@ footer{color:var(--muted);font-size:12px;display:grid;gap:4px}
 .acoes #compartilhar{background:var(--ink);color:#fff;border-color:var(--ink)}
 .acoes button:disabled{opacity:.6}
 .lista .fav{font-style:normal;color:#E0A100}
+
+/* faixa hora a hora logo abaixo da paisagem */
+.horario{display:flex;gap:6px;overflow-x:auto;padding:12px 14px 10px;background:var(--surface);border-bottom:1px solid var(--line);scroll-snap-type:x proximity;scrollbar-width:none}
+.horario::-webkit-scrollbar{display:none}
+.hr{flex:0 0 54px;display:grid;justify-items:center;gap:3px;padding:8px 0 6px;border-radius:14px;background:#F4F6F8;scroll-snap-align:start;position:relative;overflow:hidden}
+.hr .hh{font-size:12px;font-weight:700;color:var(--muted)}
+.hr svg{width:26px;height:26px}
+.hr b{font-size:14px}
+.hr small{font-size:11px;font-weight:700;color:#3C6E9E;min-height:13px}
+.hr.sol{background:#FFF1CC}.hr.sol svg{color:#E08A00}
+.hr.parcial{background:#FFF7E3}.hr.parcial svg{color:#C98A1E}
+.hr.nublado svg{color:#7D8C98}
+.hr.chuva{background:#E3ECF5}.hr.chuva svg{color:#3C6E9E}
+.hr.agora{outline:2px solid var(--ink);outline-offset:-2px}
+.hr.agora .hh{color:var(--ink)}
+.hr.passou{opacity:.45}
+.hr.sombra::after{content:"";position:absolute;left:0;right:0;bottom:0;height:5px;background:repeating-linear-gradient(135deg,#5A6B78 0 3px,transparent 3px 6px)}
+.veredito{font-size:18px}
+
+/* mini faixa do dia na lista (substitui "Xh de sol") */
+.lista .mini{display:grid;grid-template-columns:repeat(12,7px);gap:2px;align-items:center}
+.lista .mini i{height:18px;border-radius:3px;background:#E7EEF3}
+.lista .mini i.sol{background:#FFB627}
+.lista .mini i.parcial{background:#FFE7B3}
+.lista .mini i.nublado{background:#C9D3DA}
+.lista .mini i.chuva{background:#8FA9C4}
+
+footer a{color:#fff}
+
+/* alerta de praião */
+.alerta{display:flex;align-items:center;gap:10px;background:#FFFFFF;color:var(--ink);border-radius:16px;padding:12px 10px 12px 16px;box-shadow:var(--shadow)}
+.alertatxt{display:grid;gap:2px;flex:1;min-width:0;font-size:14px}
+.alertatxt span{color:var(--muted);font-size:13px}
+.alertatxt small:empty{display:none}
+.alertatxt small{font-size:13px;color:#7A5410;font-weight:600}
+#ativarAlerta{flex:none;min-height:44px;padding:0 16px;border-radius:999px;border:0;background:#FFB627;color:var(--ink);font-weight:800;cursor:pointer}
+.alerta .x{flex:none;background:none;border:0;font-size:24px;line-height:1;cursor:pointer;color:var(--muted);padding:0 6px;min-height:44px}
+.alertarodape button{background:none;border:0;padding:0;color:#fff;text-decoration:underline;cursor:pointer;font:inherit}

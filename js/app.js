@@ -147,10 +147,11 @@
 
     const tom = (horasSol >= 5 && x.vento <= 15 && (p.baia || o == null || o < 1.6) && x.chuvaMax < 40 && x.propria !== false) ? "bom"
       : ((horasSol <= 1 && (ceu === "nublado" || ceu === "chuva")) || (ceu === "chuva" && x.chuvaMax >= 70)) ? "ruim" : "medio";
-    const fecho = tom === "bom" ? "Dia de praia raiz." : tom === "ruim" ? "Melhor deixar a praia pra outro dia." : "Dá pra ir, de olho no céu.";
-    const junta = (a) => a.length <= 1 ? a.join("") : a.slice(0, -1).join(", ") + " e " + a[a.length - 1];
-    const chuvaTxt = ceu !== "chuva" && pancada ? `, mas pode cair uma pancada lá pelas ${pancada.h}h` : "";
-    const veredito = (resto.length ? `${ceuTxt}, ${junta(resto)}` : ceuTxt) + chuvaTxt + ". " + fecho;
+    // frase curta: o céu, a chuva e só o que for muito importante (o resto está nos selos)
+    const fecho = tom === "bom" ? " Dia de praia raiz!" : "";
+    const chuvaTxt = ceu !== "chuva" && pancada ? `, com chance de pancada às ${pancada.h}h` : "";
+    const alerta = x.propria === false ? " Água imprópria hoje." : x.vento > 20 ? " Ventania à tarde." : "";
+    const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
     const resumo = [ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       x.vento > 20 ? "ventania" : x.vento > 15 ? "vento à tarde" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
@@ -570,13 +571,23 @@
     const ultimaHora = x.horas.filter((y) => y.h >= 16 && y.h <= 18);
     const nuvensTarde = ultimaHora.length ? media(ultimaHora.map((y) => y.nuvens)) : 50;
     const porTxt = nuvensTarde >= 20 && nuvensTarde <= 60 ? "boa chance de céu colorido" : nuvensTarde < 20 ? "céu limpo, cores suaves" : "as nuvens devem esconder";
+    // faixa hora a hora: horário, ícone do céu e temperatura
+    const horaAgora = +relogio.format(new Date()).slice(0, 2);
+    const NOME_EST = { sol: "Sol", parcial: "Entre nuvens", nublado: "Nublado", chuva: "Chuva" };
     const horas = [];
-    for (let h = 7; h <= 18; h++) { const y = x.horas.find((q) => q.h === h); horas.push(`<i class="${y ? y.est : ""}" data-h="${h}" title="${h}h"></i>`); }
+    for (let h = 7; h <= 18; h++) {
+      const y = x.horas.find((q) => q.h === h);
+      if (!y) continue;
+      const passou = estado.dia === 0 && horaAgora <= 18 && h < horaAgora; // à noite mostra o dia inteiro normal
+      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}" data-h="${h}" title="${h}h: ${NOME_EST[y.est]}">
+        <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${IC[y.est]}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
+    }
 
     $("#cartao").innerHTML = `
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
       </div>
+      <div class="horario" id="horas" role="list" aria-label="Céu hora a hora">${horas.join("")}</div>
       <div class="corpo">
         <p class="veredito">${a.veredito}</p>
         <div class="acoes">
@@ -584,12 +595,6 @@
           <button id="compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
         </div>
         <div class="selos">${a.selos.map((s) => `<div class="selo ${s.cls}">${s.ic}<b>${s.t}</b><span>${s.s}</span></div>`).join("")}</div>
-        <div class="faixa">
-          <p class="rotulo">Sol ao longo do dia</p>
-          <div class="horas" id="horas">${horas.join("")}</div>
-          <div class="horasleg"><span>7h</span><span>12h</span><span>18h</span></div>
-          <div class="chaves"><span><i style="background:#FFB627"></i>Sol</span><span><i style="background:#FFE7B3"></i>Entre nuvens</span><span><i style="background:#C9D3DA"></i>Nublado</span><span><i style="background:#8FA9C4"></i>Chuva</span><span><i style="background:repeating-linear-gradient(135deg,#8C9AA5 0 3px,#E7EEF3 3px 6px)"></i>Areia na sombra</span></div>
-        </div>
         <div class="info sombra" id="sombra">${IC.sombra}<span>Calculando a sombra na areia…</span></div>
         <div class="relogio">
           <label for="minuto"><span>${IC.relogio.replace("<svg", '<svg width="18" height="18" style="vertical-align:-4px;margin-right:4px"')}Onde está o sol às <b id="minutoTxt">${textoMin(estado.minuto)}</b></span><span id="minutoSit"></span></label>
@@ -598,6 +603,8 @@
         </div>
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
+    const agoraEl = document.querySelector("#horas .agora");
+    if (agoraEl) $("#horas").scrollLeft = Math.max(0, agoraEl.offsetLeft - 8);
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     $("#compartilhar").onclick = () => compartilhar(l);
     $("#minuto").addEventListener("input", (e) => {
@@ -625,8 +632,9 @@
     const st = horizontes[l.p.id];
     if (st === "carregando" || st === undefined) { el.querySelector("span").textContent = "Calculando a sombra na areia…"; return; }
     const r = sombraDoDia(l.p, l.x);
-    el.querySelector("span").innerHTML = r.texto + (st === "erro" ? " <small>(sem dados do relevo agora; considerei só os prédios)</small>" : "");
-    document.querySelectorAll("#horas i").forEach((i) => i.classList.toggle("sombra", r.sombraHora[+i.dataset.h]));
+    const temSombra = Object.values(r.sombraHora).some(Boolean);
+    el.querySelector("span").innerHTML = r.texto + (temSombra ? " <small>Na faixa de horários, a listra embaixo marca a areia na sombra.</small>" : "") + (st === "erro" ? " <small>(sem dados do relevo agora; considerei só os prédios)</small>" : "");
+    document.querySelectorAll("#horas [data-h]").forEach((i) => i.classList.toggle("sombra", r.sombraHora[+i.dataset.h]));
     atualizarSituacao();
   }
 
@@ -668,6 +676,9 @@
     marcadorSol.getElement().classList.toggle("sombra", SOL.bloqueio(sA, hz, p.predios) !== null);
   }
 
+  // texto da mini faixa para leitores de tela
+  const miniTxt = (x) => x.horas.filter((y) => y.h >= 7 && y.h <= 18).map((y) => `${y.h}h ${({ sol: "sol", parcial: "entre nuvens", nublado: "nublado", chuva: "chuva" })[y.est]}`).join(", ");
+
   function desenharLista() {
     if (!linhas.length) return;
     const atual = praiaAtual();
@@ -678,7 +689,7 @@
     $("#lista").innerHTML = vis.map((l) => `<li><button data-id="${l.p.id}" aria-current="${l.p.id === atual.p.id}">
       <span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>
       <span class="nm"><b>${ehFavorita(l.p.id) ? '<i class="fav" aria-label="favorita">★</i> ' : ""}${l.p.nome}</b><span>${l.a.resumo}</span></span>
-      <span class="hs">${l.a.horasSol}h de sol</span></button></li>`).join("");
+      <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= 7 && y.h <= 18).map((y) => `<i class="${y.est}"></i>`).join("")}</span></button></li>`).join("");
     document.querySelectorAll("#lista button").forEach((b) => b.onclick = () => selecionar(b.dataset.id, true));
   }
 

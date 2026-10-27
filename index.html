@@ -5,28 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Praiômetro Rio</title>
   <meta name="description" content="Qual praia do Rio e de Niterói vale hoje: sol, mar, vento, água e sombra na areia, num mapa só.">
-  <meta name="theme-color" content="#F6EFE3">
+  <meta name="theme-color" content="#0E4C7A">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icons/icon-192.png" type="image/png">
-  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="icon" href="icons/icon-192.png?v=3" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png?v=3">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Praiômetro">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta property="og:title" content="Praiômetro Rio">
   <meta property="og:description" content="Vai dar praia? Sol, mar, vento e água de cada praia do Rio, hora a hora.">
-  <meta property="og:image" content="icons/icon-512.png">
+  <meta property="og:image" content="icons/icon-512.png?v=3">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=2.8">
+  <link rel="stylesheet" href="css/estilo.css?v=3.2">
 </head>
 <body>
 <div class="wrap">
   <header>
     <div class="brand">
-      <img src="icons/icon-192.png" width="40" height="40" alt="">
+      <img src="icons/icon-192.png?v=3" width="40" height="40" alt="">
       <h1>Praiô<span>metro</span></h1>
     </div>
     <nav class="dias" id="dias" aria-label="Dia da previsão"></nav>
@@ -38,6 +38,14 @@
   </div>
 
   <div class="praiao" id="praiao" hidden></div>
+
+  <div class="alerta" id="alerta" hidden>
+    <div class="alertatxt"><b>🔔 Quer saber quando vai ter praião?</b>
+      <span>A gente avisa 3 dias antes e confirma (ou cancela) na véspera.</span>
+      <small id="alertaMsg"></small></div>
+    <button id="ativarAlerta">Me avisa</button>
+    <button id="fecharAlerta" class="x" aria-label="Fechar">×</button>
+  </div>
 
   <main class="grade">
     <section class="cartao" id="cartao" aria-live="polite">
@@ -57,7 +65,7 @@
       </section>
 
       <section class="lista">
-        <div class="listahead"><h2 id="listaTitulo">Praias hoje</h2><small>ordenadas pelas horas de sol</small></div>
+        <div class="listahead"><h2 id="listaTitulo">Praias hoje</h2><small>as melhores primeiro · céu das 7h às 18h</small></div>
         <ol id="lista"></ol>
       </section>
     </div>
@@ -65,6 +73,7 @@
 
   <footer>
     <span id="atualizado"></span>
+    <span id="alertaRodape" class="alertarodape" hidden></span>
     <span>Previsão: <a href="https://open-meteo.com/" target="_blank" rel="noopener">Open-Meteo.com</a> (CC BY 4.0). Mapa: <a href="https://openfreemap.org/" target="_blank" rel="noopener">OpenFreeMap</a> e <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">colaboradores do OpenStreetMap</a>. Balneabilidade: boletins do INEA.</span>
     <span>Sombra na areia: estimativa com o relevo (Copernicus DEM, via Open-Meteo) e a altura média dos prédios da orla. Pode errar alguns minutos.</span>
   </footer>
@@ -74,6 +83,10 @@
 <script src="js/praias.js?v=2.1"></script>
 <script src="js/sol.js?v=2.1"></script>
 <script src="js/paisagens.js?v=2.7"></script>
-<script src="js/app.js?v=2.8"></script>
+<script src="js/app.js?v=3.0"></script>
+<!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
+<script>window.ONESIGNAL_APP_ID = "COLE_O_APP_ID_AQUI";</script>
+<script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
+<script src="js/alerta.js?v=1"></script>
 </body>
 </html>
