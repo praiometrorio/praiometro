@@ -1,0 +1,117 @@
+# Robô do Praiômetro: toda terça e sexta busca os dados brutos de balneabilidade do INEA,
+# calcula a nota da água (0 a 10) de cada praia e atualiza data/balneabilidade.json.
+name: Atualizar água (INEA)
+
+on:
+  schedule:
+    - cron: "17 13 * * 2,5"     # terças e sextas, 10h17 em Brasília
+  workflow_dispatch:            # botão "Run workflow" para rodar na hora
+
+permissions:
+  contents: write
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install openpyxl requests
+      - name: Calcular a nota da água
+        shell: python
+        run: |
+          import io, json, re, datetime, requests, openpyxl
+
+          PAGINA = "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/"
+          MAPA = {
+            "flamengo": ["FL00","FL04","FL08"], "botafogo": ["BT00","BT01"], "vermelha": ["VR00"],
+            "leme": ["LM02","LM03"], "copacabana": ["CP100","CP00","CP04","CP19","CP05","CP08","CP24"],
+            "arpoador": ["AR00"], "ipanema": ["IP03","IP10","IP06","IP09"], "leblon": ["LB00","LB01","LB03"],
+            "saoconrado": ["GV01","GV02","GV03","PP10"], "barra": ["BD00","BD01","BD02","BD03","BD11","BD04"],
+            "reserva": ["BD05","BD06","BD07","BD08","BD09","BD10"], "recreio": ["PS00","PS01","PS10"],
+            "prainha": ["PN00"], "grumari": ["GM00","GM01"], "icarai": ["IC03","IC00","IC02","IC01"],
+            "piratininga": ["PR00","PR01","PR02","PR03"], "itaipu": ["CM00","CM01","II00","II01"],
+            "itacoatiara": ["IA01","IA00"],
+          }
+          cab = {"User-Agent": "Mozilla/5.0 (Praiometro; +https://praiometrorio.github.io/praiometro/)"}
+          html = requests.get(PAGINA, headers=cab, timeout=60).text
+          links = re.findall(r'href="([^"]+\.xlsx)"', html)
+          if not links:
+              raise SystemExit("Não achei a planilha de dados brutos na página do INEA")
+          wb = openpyxl.load_workbook(io.BytesIO(requests.get(links[0], headers=cab, timeout=120).content), data_only=True, read_only=True)
+
+          def data_de(v):
+              if isinstance(v, datetime.datetime): return v.date()
+              if isinstance(v, datetime.date): return v
+              if isinstance(v, (int, float)) and v > 30000: return datetime.date(1899, 12, 30) + datetime.timedelta(days=int(v))
+              return None
+
+          series = {}
+          for nome in wb.sheetnames:
+              linhas = [list(r) for r in wb[nome].iter_rows(values_only=True)]
+              n = nome.lower()
+              if "enteroc" in n and ("sul" in n or "barra" in n):
+                  # formato largo: uma linha por data, uma coluna por ponto
+                  cabec = next((r for r in linhas[:6] if any(isinstance(c, str) and re.fullmatch(r"[A-Z]{2}\d{2,3}", c.strip()) for c in r if c)), None)
+                  if not cabec: continue
+                  for r in linhas:
+                      d = data_de(r[0]) if r else None
+                      if not d: continue
+                      for j, c in enumerate(cabec):
+                          if isinstance(c, str) and re.fullmatch(r"[A-Z]{2}\d{2,3}", c.strip()) and j < len(r) and isinstance(r[j], (int, float)):
+                              series.setdefault(c.strip(), []).append((d, r[j]))
+              elif "niter" in n:
+                  # formato por linha: uma linha por ponto, datas no cabeçalho da seção de enterococos
+                  cabec, secao = None, False
+                  for r in linhas:
+                      if not r: continue
+                      if any(isinstance(c, str) and "rococ" in c.lower() for c in r[:3]): secao = True
+                      datas = [data_de(c) for c in r[5:]]
+                      e_ponto = isinstance(r[4], str) and re.fullmatch(r"[A-Z]{2}\d{2,3}", r[4].strip())
+                      if sum(1 for x in datas if x) > 20 and not e_ponto:
+                          cabec = r
+                          continue
+                      if secao and cabec and isinstance(r[4], str) and re.fullmatch(r"[A-Z]{2}\d{2,3}", r[4].strip()):
+                          for j in range(5, min(len(r), len(cabec))):
+                              d = data_de(cabec[j])
+                              if d and isinstance(r[j], (int, float)):
+                                  series.setdefault(r[4].strip(), []).append((d, r[j]))
+
+          def pontua(v):
+              return 1 if v <= 25 else 0.85 if v <= 100 else 0.4 if v <= 400 else 0
+
+          praias, mais_recente = {}, None
+          for pid, codigos in MAPA.items():
+              notas, ok, total, ultima = [], 0, 0, None
+              for c in codigos:
+                  s = sorted(series.get(c, []))
+                  if len(s) < 5: continue
+                  ult10 = s[-10:]
+                  pesos = range(1, len(ult10) + 1)
+                  notas.append(sum(w * pontua(v) for w, (_, v) in zip(pesos, ult10)) / sum(pesos))
+                  ult5 = s[-5:]
+                  impropria = sum(1 for _, v in ult5 if v > 100) >= 2 or ult5[-1][1] > 400
+                  total += 1; ok += 0 if impropria else 1
+                  ultima = max(ultima, s[-1][0]) if ultima else s[-1][0]
+              if notas:
+                  praias[pid] = {"nota": round(10 * sum(notas) / len(notas), 1), "ok": ok, "total": total,
+                                 "propria": True if ok == total else False if ok == 0 else None, "data": ultima.isoformat()}
+                  mais_recente = max(mais_recente, ultima) if mais_recente else ultima
+
+          if len(praias) < 10:
+              raise SystemExit(f"Só achei {len(praias)} praias; o formato da planilha pode ter mudado")
+          saida = {
+            "_comoFunciona": "Gerado automaticamente a partir dos 'Dados Brutos - Balneabilidade' do INEA (enterococos). nota = 0 a 10 pelas últimas 10 análises de cada ponto (as mais recentes pesam mais). propria = regra CONAMA 274 nas últimas 5 análises: true se todos os pontos estão próprios, false se nenhum, null se parte.",
+            "fonte": PAGINA, "atualizadoEm": mais_recente.isoformat(), "praias": praias,
+          }
+          with open("data/balneabilidade.json", "w", encoding="utf-8") as f:
+              json.dump(saida, f, ensure_ascii=False, indent=2)
+          print(f"OK: {len(praias)} praias, dados até {mais_recente}")
+      - name: Salvar no site
+        run: |
+          git config user.name "robo-praiometro"
+          git config user.email "robo-praiometro@users.noreply.github.com"
+          git add data/balneabilidade.json
+          git diff --cached --quiet || (git commit -m "Atualiza qualidade da água (INEA)" && git push)
