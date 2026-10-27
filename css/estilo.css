@@ -154,3 +154,11 @@ footer{color:var(--muted);font-size:12px;display:grid;gap:4px}
 /* nome da praia legível mesmo em cima dos morros */
 .cena h2,.cena .local{text-shadow:0 0 12px rgba(255,255,255,.95),0 0 3px rgba(255,255,255,.9)}
 .cena.escura h2,.cena.escura .local{text-shadow:0 0 12px rgba(0,0,0,.6),0 0 3px rgba(0,0,0,.5)}
+/* favoritar e compartilhar */
+.acoes{display:flex;gap:8px;flex-wrap:wrap}
+.acoes button{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);font-weight:700;font-size:14px;cursor:pointer;color:var(--ink)}
+.acoes button svg{width:20px;height:20px}
+.acoes #favoritar[aria-pressed="true"]{background:#FFF2D0;border-color:#F2C14E;color:#7A5410}
+.acoes #compartilhar{background:var(--ink);color:#fff;border-color:var(--ink)}
+.acoes button:disabled{opacity:.6}
+.lista .fav{font-style:normal;color:#E0A100}

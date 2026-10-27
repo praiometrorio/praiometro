@@ -47,6 +47,9 @@
     prancha: svg('<path d="M18.5 3.5c2 2-1 9-5 13s-9 5.5-11 3.5 1.5-7 5.5-11 8.5-7.5 10.5-5.5z"/><path d="M6 18l12-12"/>'),
     porDoSol: svg('<path d="M17 18a5 5 0 0 0-10 0M2 18h20M12 4v5M4.2 10.2l1.4 1.4M19.8 10.2l-1.4 1.4"/>'),
     sombra: svg('<path d="M2 20l6-9 4 5 3-3 7 7z"/><path d="M16 4.5a2.5 2.5 0 1 0 0 .01"/>'),
+    estrela: svg('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'),
+    estrelaCheia: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
+    compartilhar: svg('<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'),
     relogio: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')
   };
 
@@ -112,7 +115,12 @@
     else if (x.vento <= 20) selos.push({ cls: "mexido", ic: IC.vento, t: "Pode ventar à tarde", s: "Finca bem o guarda-sol" });
     else selos.push({ cls: "ruim", ic: IC.vento, t: "Ventania", s: "Areia voando, guarda-sol indo embora" });
 
-    if (x.propria === true) selos.push({ cls: "ok", ic: IC.escudoOk, t: "Água própria", s: "Boletim do INEA" });
+    // nota da água (0 a 10) calculada com as últimas análises do INEA
+    if (x.aguaNota != null) {
+      const n = x.aguaNota, cls = n >= 8 ? "ok" : n >= 5 ? "sol" : "ruim";
+      const sit = x.propria === true ? "própria" : x.propria === false ? "imprópria" : `própria em ${x.aguaOk} de ${x.aguaTotal} pontos`;
+      selos.push({ cls, ic: n >= 5 ? IC.escudoOk : IC.escudoX, t: `Água limpa ${fmt(n)}/10`, s: `${sit[0].toUpperCase() + sit.slice(1)} · INEA` });
+    } else if (x.propria === true) selos.push({ cls: "ok", ic: IC.escudoOk, t: "Água própria", s: "Boletim do INEA" });
     else if (x.propria === false) selos.push({ cls: "ruim", ic: IC.escudoX, t: "Água imprópria", s: "Evite entrar no mar" });
     else selos.push({ cls: "neutro", ic: IC.escudo, t: "Água limpa?", s: "Ainda sem boletim" });
 
@@ -124,7 +132,8 @@
     if (ceu === "chuva") ceuTxt = pancada ? `Dia de chuva, a partir das ${pancada.h}h` : "Dia de chuva";
     else if (tam(janela) >= 5) ceuTxt = `Solzão das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janela) >= 2) ceuTxt = `Sol das ${janela.ini}h às ${janela.fim}h`;
-    else if (tam(janelaParcial) >= 2) ceuTxt = "Sol entre nuvens";
+    else if (tam(janelaParcial) >= 2) ceuTxt = tam(janelaParcial) <= 3 && ceu === "nublado"
+      ? `Sol só das ${janelaParcial.ini}h às ${janelaParcial.fim}h, depois fecha` : "Sol entre nuvens";
     else ceuTxt = "Céu fechado o dia todo";
 
     const resto = [];
@@ -134,6 +143,7 @@
     else if (x.vento > 15) resto.push("vento apertando à tarde");
     if (x.propria === true) resto.push("água própria");
     if (x.propria === false) resto.push("água imprópria");
+    if (x.propria == null && x.aguaNota != null && x.aguaNota < 5) resto.push("água com histórico ruim");
 
     const tom = (horasSol >= 5 && x.vento <= 15 && (p.baia || o == null || o < 1.6) && x.chuvaMax < 40 && x.propria !== false) ? "bom"
       : ((horasSol <= 1 && (ceu === "nublado" || ceu === "chuva")) || (ceu === "chuva" && x.chuvaMax >= 70)) ? "ruim" : "medio";
@@ -145,7 +155,7 @@
     const resumo = [ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       x.vento > 20 ? "ventania" : x.vento > 15 ? "vento à tarde" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
-    const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0);
+    const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.aguaNota != null ? (x.aguaNota - 6) * 0.25 : 0);
     return { horasSol, janela, ceu, tom, selos, veredito, resumo, score };
   }
 
@@ -324,7 +334,10 @@
           agua: aguaT == null ? null : Math.round(aguaT * 10) / 10,
           nascer: (t.daily.sunrise[d] || "").slice(11, 16) || "05:30",
           porDoSol: (t.daily.sunset[d] || "").slice(11, 16) || "18:30",
-          propria: prop === true ? true : prop === false ? false : null,
+          propria: prop && typeof prop === "object" ? prop.propria : prop === true ? true : prop === false ? false : null,
+          aguaNota: prop && typeof prop === "object" ? prop.nota : null,
+          aguaOk: prop && typeof prop === "object" ? prop.ok : null,
+          aguaTotal: prop && typeof prop === "object" ? prop.total : null,
           horas: idx.map((k) => {
             const chuva = h.precipitation_probability[k] || 0;
             const nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
@@ -566,6 +579,10 @@
       </div>
       <div class="corpo">
         <p class="veredito">${a.veredito}</p>
+        <div class="acoes">
+          <button id="favoritar" aria-pressed="${ehFavorita(p.id)}">${ehFavorita(p.id) ? IC.estrelaCheia : IC.estrela}<span>${ehFavorita(p.id) ? "Favorita" : "Favoritar"}</span></button>
+          <button id="compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
+        </div>
         <div class="selos">${a.selos.map((s) => `<div class="selo ${s.cls}">${s.ic}<b>${s.t}</b><span>${s.s}</span></div>`).join("")}</div>
         <div class="faixa">
           <p class="rotulo">Sol ao longo do dia</p>
@@ -581,6 +598,8 @@
         </div>
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
+    $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
+    $("#compartilhar").onclick = () => compartilhar(l);
     $("#minuto").addEventListener("input", (e) => {
       estado.minuto = +e.target.value;
       $("#minutoTxt").textContent = textoMin(estado.minuto);
@@ -653,13 +672,86 @@
     if (!linhas.length) return;
     const atual = praiaAtual();
     const ord = linhas.slice().sort((a, b) => b.a.score - a.a.score);
-    const vis = estado.regiao === "todas" ? ord : ord.filter((l) => l.p.regiao === estado.regiao);
+    const filtradas = estado.regiao === "todas" ? ord : ord.filter((l) => l.p.regiao === estado.regiao);
+    const vis = filtradas.filter((l) => ehFavorita(l.p.id)).concat(filtradas.filter((l) => !ehFavorita(l.p.id)));
     $("#listaTitulo").textContent = "Praias " + nomeDia(estado.dia) + (estado.regiao === "todas" ? "" : " · " + REGIOES[estado.regiao].nome);
     $("#lista").innerHTML = vis.map((l) => `<li><button data-id="${l.p.id}" aria-current="${l.p.id === atual.p.id}">
       <span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>
-      <span class="nm"><b>${l.p.nome}</b><span>${l.a.resumo}</span></span>
+      <span class="nm"><b>${ehFavorita(l.p.id) ? '<i class="fav" aria-label="favorita">★</i> ' : ""}${l.p.nome}</b><span>${l.a.resumo}</span></span>
       <span class="hs">${l.a.horasSol}h de sol</span></button></li>`).join("");
     document.querySelectorAll("#lista button").forEach((b) => b.onclick = () => selecionar(b.dataset.id, true));
+  }
+
+  // ---------- favoritas ----------
+  let favoritas = guarda.ler("pm-favoritas") || [];
+  const ehFavorita = (id) => favoritas.includes(id);
+  function alternarFavorita(id) {
+    favoritas = ehFavorita(id) ? favoritas.filter((f) => f !== id) : favoritas.concat(id);
+    guarda.gravar("pm-favoritas", favoritas);
+  }
+
+  // ---------- compartilhar: monta uma imagem do cartão no formato de story (1080 x 1920) ----------
+  const COR_SELO = { sol: ["#FFE7B3", "#5E3B00"], bronze: ["#FFD9C2", "#6E2A08"], mar: ["#CDEFF6", "#0A4A5C"], mexido: ["#CDE0EA", "#0A3A4D"],
+    quente: ["#D8F1E4", "#0C4F33"], frio: ["#D6E4F5", "#12345C"], neutro: ["#E7EEF3", "#1F3546"], ok: ["#D8F1E4", "#0C4F33"], ruim: ["#FBDAD5", "#7F1A10"] };
+  function quebrar(ctx, texto, larg) {
+    const palavras = texto.split(" "), linhasT = []; let atual = "";
+    palavras.forEach((w) => { const t = atual ? atual + " " + w : w; if (ctx.measureText(t).width > larg && atual) { linhasT.push(atual); atual = w; } else atual = t; });
+    if (atual) linhasT.push(atual);
+    return linhasT;
+  }
+  function arred(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+  async function gerarImagem(l) {
+    const { p, x, a } = l;
+    try { await document.fonts.ready; } catch (e) {}
+    const W = 1080, H = 1920, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d");
+    ctx.fillStyle = "#F6EFE3"; ctx.fillRect(0, 0, W, H);
+    // cena
+    const c = cena(a, x, p);
+    const svgTxt = c.svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="760" ');
+    const img = new Image();
+    await new Promise((ok, erro) => { img.onload = ok; img.onerror = erro; img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgTxt); });
+    ctx.save(); arred(ctx, 40, 40, W - 80, 760, 56); ctx.clip(); ctx.drawImage(img, 40, 40, W - 80, 760); ctx.restore();
+    const escuro = c.escura;
+    ctx.fillStyle = escuro ? "#FFFFFF" : "#10283A";
+    let tam = 96; ctx.font = `700 ${tam}px Unbounded, 'Arial Rounded MT Bold', sans-serif`;
+    while (ctx.measureText(p.nome).width > 640 && tam > 56) { tam -= 4; ctx.font = `700 ${tam}px Unbounded, 'Arial Rounded MT Bold', sans-serif`; }
+    ctx.fillText(p.nome, 90, 175);
+    ctx.font = "600 34px Figtree, sans-serif"; ctx.fillText(`${nomeDia(estado.dia).replace(/^./, (q) => q.toUpperCase())} · ${p.local}`, 92, 228);
+    // frase
+    ctx.fillStyle = "#10283A"; ctx.font = "600 52px Figtree, sans-serif";
+    let y = 900;
+    quebrar(ctx, a.veredito, W - 160).slice(0, 4).forEach((t) => { ctx.fillText(t, 80, y); y += 68; });
+    // selos (2 colunas)
+    y = Math.max(y + 20, 1180);
+    const sw = (W - 160 - 24) / 2, sh = 128;
+    a.selos.slice(0, 6).forEach((s, i) => {
+      const cx = 80 + (i % 2) * (sw + 24), cy = y + Math.floor(i / 2) * (sh + 24);
+      const [bg, fg] = COR_SELO[s.cls] || COR_SELO.neutro;
+      ctx.fillStyle = bg; arred(ctx, cx, cy, sw, sh, 28); ctx.fill();
+      ctx.fillStyle = fg; ctx.font = "800 40px Figtree, sans-serif"; ctx.fillText(s.t, cx + 30, cy + 56);
+      ctx.font = "500 30px Figtree, sans-serif"; ctx.fillText(quebrar(ctx, s.s, sw - 56)[0], cx + 30, cy + 98);
+    });
+    // rodapé
+    ctx.fillStyle = "#10283A"; ctx.font = "700 52px Unbounded, sans-serif"; ctx.textAlign = "center"; ctx.fillText("Praiômetro", W / 2, H - 130);
+    ctx.fillStyle = "#5A6B78"; ctx.font = "500 34px Figtree, sans-serif"; ctx.fillText("praiometrorio.github.io/praiometro", W / 2, H - 78); ctx.textAlign = "left";
+    return new Promise((ok) => cv.toBlob(ok, "image/png"));
+  }
+  async function compartilhar(l) {
+    const bt = $("#compartilhar"); bt.disabled = true;
+    try {
+      const blob = await gerarImagem(l);
+      const nome = `praiometro-${l.p.id}.png`;
+      const arq = new File([blob], nome, { type: "image/png" });
+      const texto = `${l.p.nome} ${nomeDia(estado.dia)}: ${l.a.veredito} https://praiometrorio.github.io/praiometro/`;
+      if (navigator.canShare && navigator.canShare({ files: [arq] })) {
+        await navigator.share({ files: [arq], text: texto, title: "Praiômetro" });
+      } else {
+        const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      }
+    } catch (e) { if (e && e.name !== "AbortError") console.error(e); }
+    bt.disabled = false;
   }
 
   // ---------- início ----------

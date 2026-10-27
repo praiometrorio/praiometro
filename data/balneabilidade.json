@@ -1,5 +1,25 @@
 {
-  "_comoUsar": "Atualize com o boletim do INEA. Para cada praia, use true (própria) ou false (imprópria). Praias fora da lista aparecem como 'sem boletim'.",
-  "atualizadoEm": null,
-  "praias": {}
+  "_comoFunciona": "Gerado automaticamente a partir dos 'Dados Brutos - Balneabilidade' do INEA (enterococos). nota = 0 a 10 pelas últimas 10 análises de cada ponto (as mais recentes pesam mais). propria = regra CONAMA 274 nas últimas 5 análises: true se todos os pontos estão próprios, false se nenhum, null se parte.",
+  "fonte": "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/",
+  "atualizadoEm": "2026-08-24",
+  "praias": {
+    "flamengo": {"nota": 6.9, "ok": 1, "total": 3, "propria": null, "data": "2026-08-19"},
+    "botafogo": {"nota": 4.1, "ok": 0, "total": 2, "propria": false, "data": "2026-08-19"},
+    "vermelha": {"nota": 8.7, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
+    "leme": {"nota": 9.4, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
+    "copacabana": {"nota": 8.5, "ok": 4, "total": 4, "propria": true, "data": "2026-08-19"},
+    "arpoador": {"nota": 8.0, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
+    "ipanema": {"nota": 5.8, "ok": 0, "total": 3, "propria": false, "data": "2026-08-19"},
+    "leblon": {"nota": 6.2, "ok": 1, "total": 3, "propria": null, "data": "2026-08-19"},
+    "saoconrado": {"nota": 8.4, "ok": 3, "total": 3, "propria": true, "data": "2026-08-19"},
+    "barra": {"nota": 9.7, "ok": 4, "total": 4, "propria": true, "data": "2026-08-19"},
+    "reserva": {"nota": 8.4, "ok": 3, "total": 4, "propria": null, "data": "2026-08-19"},
+    "recreio": {"nota": 5.2, "ok": 0, "total": 3, "propria": false, "data": "2026-08-19"},
+    "prainha": {"nota": 9.3, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
+    "grumari": {"nota": 9.4, "ok": 2, "total": 2, "propria": true, "data": "2026-08-19"},
+    "icarai": {"nota": 9.5, "ok": 4, "total": 4, "propria": true, "data": "2026-08-24"},
+    "piratininga": {"nota": 9.7, "ok": 4, "total": 4, "propria": true, "data": "2026-08-24"},
+    "itaipu": {"nota": 9.0, "ok": 3, "total": 4, "propria": null, "data": "2026-08-24"},
+    "itacoatiara": {"nota": 7.9, "ok": 0, "total": 2, "propria": false, "data": "2026-08-24"}
+  }
 }
