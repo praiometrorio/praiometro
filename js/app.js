@@ -508,7 +508,7 @@
       el.className = "posto";
       el.textContent = n;
       el.title = n === "QM" ? "Posto do Quebra-Mar" : `Posto ${n} · ${praia}`;
-      new maplibregl.Marker({ element: el, anchor: "top", offset: [0, 24] }).setLngLat([lon, lat]).addTo(mapa);   // um pouco para o lado do mar, para não ficar embaixo do pino da praia
+      new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(mapa);   // no lugar exato do posto (no calçadão)
     });
 
     // banheiros e chuveiros (aparecem com o mapa bem perto)

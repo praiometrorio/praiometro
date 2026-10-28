@@ -226,3 +226,5 @@ div.posto{display:none;min-width:22px;height:22px;padding:0 5px;border-radius:7p
 /* banheiros e chuveiros no mapa */
 div.servico{display:none;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #0B7FA6;font-size:13px;line-height:20px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25)}
 #mapa.mostrar-servicos div.servico{display:block}
+/* com o mapa perto, o pino da praia sobe um pouco (para o lado da terra) e deixa os postos à vista no calçadão */
+#mapa.mostrar-postos .pin{top:-34px}
