@@ -4,6 +4,7 @@
   const RAD = Math.PI / 180;
   const FOV_LONGO = 64;            // ângulo de visão da câmera traseira no lado maior da imagem (graus, aproximado)
   const FUSO = "-03:00";
+  let depurar = false;
   let el, video, canvas, ctx, stream = null, praia = null, rodando = false;
   let alphaRaw = null, beta = 0, gamma = 0, correcaoBussola = null, ajusteUsuario = 0, temBussola = false;
   let caminho = [], horas = [], nascer = null, por = null;
@@ -65,13 +66,21 @@
   //   (apontando para o alto a bússola do celular fica maluca). Com a câmera para cima, a correção congela.
   let ultimoRelativo = 0;
   const elevacaoCamera = (R) => Math.asin(Math.max(-1, Math.min(1, -R[2][2]))) / RAD;
+  // A bússola só vale com a câmera perto do horizonte (até 25° para cima ou para baixo).
+  // Mais inclinado que isso, o iPhone troca a referência da bússola e ela chega a virar 180°.
+  let ultimaBussola = null, foraSeguidas = 0;
   function corrigirNorte(rumoVerdadeiro) {
     if (alphaRaw == null) return;
+    ultimaBussola = rumoVerdadeiro;
     const R = matriz(alphaRaw);
-    if (Math.abs(elevacaoCamera(R)) > 45 && correcaoBussola != null) return;   // apontando para cima: congela
+    if (Math.abs(elevacaoCamera(R)) > 25) return;                                // inclinado: não confia, congela
     const dif = ang(rumoDaCamera(R) - rumoVerdadeiro + 180) - 180;              // quanto girar o alpha
-    if (correcaoBussola == null) correcaoBussola = dif;
-    else correcaoBussola += (ang(dif - correcaoBussola + 180) - 180) * 0.08;
+    if (correcaoBussola == null) { correcaoBussola = dif; temBussola = true; return; }
+    const delta = ang(dif - correcaoBussola + 180) - 180;
+    // um salto grande de uma vez é leitura ruim (ferro, eletrônico perto); só aceita se repetir por um tempo
+    if (Math.abs(delta) > 35 && ++foraSeguidas < 40) return;
+    foraSeguidas = 0;
+    correcaoBussola += delta * 0.06;
     temBussola = true;
   }
   function aoGirarRel(e) {
@@ -123,7 +132,11 @@
     const aA = alphaAbsoluto();
     const dica = el.querySelector(".ceu-dica");
     if (aA == null) { dica.textContent = "Mexa o celular devagar para ligar a bússola…"; return; }
+    if (correcaoBussola == null && typeof window.DeviceOrientationEvent !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
+      dica.textContent = "Aponte a câmera para o horizonte por 1 segundo para achar o norte…"; return;
+    }
     const R = suavizar(matriz(aA)), f = focal(), u = dpr;
+    if (depurar) el.querySelector(".ceu-dep").textContent = `β ${beta.toFixed(0)} γ ${gamma.toFixed(0)} α ${alphaRaw.toFixed(0)} · câmera ${elevacaoCamera(R).toFixed(0)}° · bússola ${ultimaBussola == null ? "-" : ultimaBussola.toFixed(0)} · correção ${(correcaoBussola || 0).toFixed(0)}`;
 
     // linha do horizonte
     ctx.setLineDash([8 * u, 8 * u]); ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1.5 * u;
@@ -248,7 +261,7 @@
 
   // ---------- abrir e fechar ----------
   async function abrir(p) {
-    praia = p; ajusteUsuario = 0; correcaoBussola = null; alphaRaw = null; temBussola = false; Rsuave = null; ultimoRelativo = 0;
+    praia = p; ajusteUsuario = 0; correcaoBussola = null; alphaRaw = null; temBussola = false; Rsuave = null; ultimoRelativo = 0; ultimaBussola = null; foraSeguidas = 0;
     calcular();
     if (!el) montar();
     el.querySelector(".ceu-nome").textContent = p.nome;
@@ -291,11 +304,15 @@
     el.className = "ceu"; el.hidden = true;
     el.innerHTML = `<video playsinline muted autoplay></video><canvas></canvas>
       <div class="ceu-topo"><div><b>Sol no céu</b><span class="ceu-nome"></span></div><button class="ceu-x" aria-label="Fechar">×</button></div>
+      <div class="ceu-dep" hidden></div>
       <div class="ceu-ok" hidden>Pronto, acertei o desenho ☀️</div>
       <div class="ceu-dica"></div>`;
     document.body.appendChild(el);
     video = el.querySelector("video"); canvas = el.querySelector("canvas"); ctx = canvas.getContext("2d");
     el.querySelector(".ceu-x").onclick = fechar;
+    // modo de teste: tocar 3 vezes no título mostra os números dos sensores
+    let toques = 0;
+    el.querySelector(".ceu-topo b").onclick = () => { if (++toques >= 3) { depurar = !depurar; toques = 0; el.querySelector(".ceu-dep").hidden = !depurar; } };
     canvas.addEventListener("click", aoTocar);
   }
 
