@@ -96,6 +96,10 @@ h1 span{color:#7FD3F0}
 .info.por{background:#FFF4E6;color:#6E2A08}
 .info.mare{background:#E3F2F7;color:#0A4A5C}
 .info.metro{background:#F1EEF8;color:#3B2F63}
+.metro-c{display:grid;gap:4px;flex:1}
+.metro-c small{opacity:.75}
+.metro-c ul{margin:2px 0 0;padding:0;list-style:none;display:grid;gap:3px}
+.metro-c li span{opacity:.75}
 .info.mare small{opacity:.75}
 .info.dica{background:#E3F2F7;color:#0A4A5C}
 
@@ -180,6 +184,7 @@ footer{color:#CFE3EF;font-size:12px;display:grid;gap:4px}
 .hr.parcial{background:#FFF7E3}.hr.parcial svg{color:#C98A1E}
 .hr.nublado svg{color:#7D8C98}
 .hr.chuva{background:#E3ECF5}.hr.chuva svg{color:#3C6E9E}
+.hr.noite{background:#E6E9F2}.hr.noite svg{color:#4A5A7A}
 .hr.agora{outline:2px solid var(--ink);outline-offset:-2px}
 .hr.agora .hh{color:var(--ink)}
 .hr.passou{opacity:.45}
@@ -187,12 +192,13 @@ footer{color:#CFE3EF;font-size:12px;display:grid;gap:4px}
 .veredito{font-size:18px}
 
 /* mini faixa do dia na lista (substitui "Xh de sol") */
-.lista .mini{display:grid;grid-template-columns:repeat(12,7px);gap:2px;align-items:center}
+.lista .mini{display:grid;grid-template-columns:repeat(15,6px);gap:2px;align-items:center}
 .lista .mini i{height:18px;border-radius:3px;background:#E7EEF3}
 .lista .mini i.sol{background:#FFB627}
 .lista .mini i.parcial{background:#FFE7B3}
 .lista .mini i.nublado{background:#C9D3DA}
 .lista .mini i.chuva{background:#8FA9C4}
+.lista .mini i.noite{background:#B9C0D4}
 
 footer a{color:#fff}
 

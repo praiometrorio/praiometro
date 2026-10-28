@@ -7,7 +7,7 @@
   const SOL = window.SOL;
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
-  const HORA_INI = 6, HORA_FIM = 19;           // janela de praia considerada
+  const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
   const CACHE_CHAVE = "pm-previsao-v4";
   const CACHE_MIN = 60;                        // minutos que a previsão fica guardada
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
@@ -34,6 +34,7 @@
   const IC = {
     sol: svg('<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
     parcial: svg('<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 10.5A3.5 3.5 0 0 1 11.3 6.6"/><path d="M8 20h10a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.4A2.8 2.8 0 0 0 8 20z"/>'),
+    noite: svg('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
     nublado: svg('<path d="M7 19h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 11.6 3.8 3.8 0 0 0 7 19z"/>'),
     chuva: svg('<path d="M7 15h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 7.6 3.8 3.8 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>'),
     gota: svg('<path d="M12 3s5 5.5 5 9.5a5 5 0 0 1-10 0C7 8.5 12 3 12 3z"/><path d="M10 14a2 2 0 0 0 2 2"/>'),
@@ -59,20 +60,20 @@
   // Cada hora vira um "estado": sol, parcial (entre nuvens), nublado ou chuva
   const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= 35 ? "parcial" : "sol";
 
-  // Maior sequência de horas seguidas (entre 7h e 18h) que satisfazem a condição
+  // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
   function maiorSequencia(horas, cond) {
     let melhor = null, ini = null;
     const fim = (h) => { if (ini != null && (!melhor || h - ini > melhor.fim - melhor.ini)) melhor = { ini, fim: h }; ini = null; };
-    for (let h = 7; h <= 18; h++) {
+    for (let h = HORA_INI; h <= HORA_FIM; h++) {
       const x = horas.find((y) => y.h === h);
       if (x && cond(x)) { if (ini == null) ini = h; } else fim(h);
     }
-    fim(19);
+    fim(HORA_FIM + 1);
     return melhor;
   }
 
   function analisar(x, p) {
-    const dia = x.horas.filter((y) => y.h >= 7 && y.h <= 18);
+    const dia = x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM);
     const conta = (e) => dia.filter((y) => y.est === e).length;
     const horasSol = conta("sol"), horasParcial = conta("parcial"), horasChuva = conta("chuva");
     const janela = maiorSequencia(x.horas, (y) => y.est === "sol");
@@ -299,16 +300,39 @@
     const k = Math.PI / 180, x = (o2 - o1) * k * Math.cos((a1 + a2) / 2 * k), y = (a2 - a1) * k;
     return Math.hypot(x, y) * 6371;
   }
+  // Todas as estações a até ~20 min a pé da praia. Para cada estação, o posto mais perto dela.
+  // Praias longas (Copacabana, Ipanema, Barra…) têm várias; a lista vem na ordem da praia.
   function metroPerto(p) {
-    const pontos = [{ lat: p.lat, lon: p.lon, posto: null }].concat((window.POSTOS || [])
-      .filter((q) => (POSTOS_DA_PRAIA[p.id] || []).includes(q[3])).map((q) => ({ lat: q[1], lon: q[2], posto: q[0] })));
-    let melhor = null;
-    for (const e of window.METRO || []) for (const pt of pontos) {
-      const d = distKm(pt.lat, pt.lon, e[1], e[2]);
-      if (!melhor || d < melhor.d - 0.05 || (Math.abs(d - melhor.d) <= 0.05 && !pt.posto)) melhor = { nome: e[0], d, posto: pt.posto };
+    const postos = (window.POSTOS || []).map((q, i) => ({ lat: q[1], lon: q[2], posto: q[0], ordem: i }))
+      .filter((q, i) => (POSTOS_DA_PRAIA[p.id] || []).includes(window.POSTOS[i][3]));
+    // pontos extras de acesso que não são postos (ex.: o Leme começa na Av. Princesa Isabel)
+    const EXTRAS = { leme: [{ lat: -22.9653, lon: -43.1724, posto: "Av. Princesa Isabel", ordem: -1 }] };
+    const pontos = (EXTRAS[p.id] || []).concat(postos.length ? postos : [{ lat: p.lat, lon: p.lon, posto: null, ordem: 0 }]);
+    const lista = [];
+    for (const e of window.METRO || []) {
+      let melhor = null;
+      for (const pt of pontos) { const d = distKm(pt.lat, pt.lon, e[1], e[2]); if (!melhor || d < melhor.d) melhor = { nome: e[0], d, posto: pt.posto, ordem: pt.ordem }; }
+      melhor.min = Math.max(2, Math.round(melhor.d * 1200 / 80));
+      lista.push(melhor);
     }
-    if (!melhor || melhor.d > 1.8) return null;
-    return { ...melhor, min: Math.max(2, Math.round(melhor.d * 1200 / 80)) };
+    lista.sort((a, b) => a.min - b.min);
+    // fica com as que dão até 20 min a pé, uma estação por posto (a mais perto dele);
+    // se nenhuma, a mais perto se for até ~27 min
+    const usados = new Set();
+    let perto = lista.filter((m) => m.min <= 20).filter((m) => { const k = m.posto ?? m.nome; if (usados.has(k)) return false; usados.add(k); return true; });
+    if (!perto.length && lista[0] && lista[0].min <= 27) perto = [lista[0]];
+    return perto.sort((a, b) => a.ordem - b.ordem || a.min - b.min);
+  }
+  function htmlMetro(p) {
+    const ms = metroPerto(p);
+    if (!ms.length) return "";
+    const nomePosto = (n) => n === "QM" ? "Quebra-Mar" : /^\d+$/.test(n) ? "Posto " + n : n;
+    if (ms.length === 1) {
+      const m = ms[0];
+      return `<div class="info metro">${IC.metro}<span><b>Metrô ${m.nome}</b>, uns ${m.min} min a pé${m.posto ? ` até ${/^\d+$|^QM$/.test(m.posto) ? "o " : "a "}${nomePosto(m.posto)}` : ""}.</span></div>`;
+    }
+    return `<div class="info metro">${IC.metro}<div class="metro-c"><b>Metrô</b> <small>escolha pelo pedaço da praia</small>
+      <ul>${ms.map((m) => `<li><b>${m.nome}</b>${m.posto ? ` → ${nomePosto(m.posto)}` : ""} <span>· ${m.min} min</span></li>`).join("")}</ul></div></div>`;
   }
 
   // ---------- maré ----------
@@ -340,7 +364,7 @@
     const ns = hs.map((q) => q.n), lo = Math.min(...ns), hi = Math.max(...ns), amp = hi - lo || 1;
     const agoraH = estado.dia === 0 ? +relogio.format(new Date()).slice(0, 2) : -1;
     const W = 320, topo = 16, base = 84, H = 104, larg = W / hs.length, gap = 4, alto = base - topo;
-    const dia = (x.mares || []).filter((e) => e.min >= 6 * 60 - 30 && e.min <= 19 * 60 + 30);
+    const dia = (x.mares || []).filter((e) => e.min >= 6 * 60 - 30 && e.min <= 20 * 60 + 30);
     const horaDe = (e) => Math.round(e.min / 60);
     const colunas = hs.map((q, i) => {
       const x0 = i * larg + gap / 2, w = larg - gap;
@@ -352,22 +376,22 @@
         <rect x="${x0}" y="${topo}" width="${w}" height="${alto}" rx="5" fill="#F3DFB5"/>
         <rect x="${x0}" y="${ya}" width="${w}" height="${base - ya}" rx="5" fill="url(#mareAgua)"/>
         ${ag ? `<rect x="${x0 - 1.5}" y="${topo - 1.5}" width="${w + 3}" height="${alto + 3}" rx="6" fill="none" stroke="#10283A" stroke-width="2"/>` : ""}
-        ${marca ? `<text x="${x0 + w / 2}" y="${topo - 4}" text-anchor="middle" class="m-${marca.tipo}">${marca.tipo === "alta" ? "▲" : "▼"}</text>` : ""}
-        ${ag || (q.h % 2 === 0 && Math.abs(q.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' class="t-ag"' : ""}>${ag ? "agora" : q.h + "h"}</text>` : ""}
+        ${marca ? `<text x="${x0 + w / 2}" y="${topo - 4}" text-anchor="middle" class="m-${marca.tipo}" font-size="11" fill="${marca.tipo === "alta" ? "#1F6F9F" : "#B08A3A"}">${marca.tipo === "alta" ? "▲" : "▼"}</text>` : ""}
+        ${ag || (q.h % 2 === 0 && Math.abs(q.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' class="t-ag" fill="#10283A" font-weight="800"' : ""}>${ag ? "agora" : q.h + "h"}</text>` : ""}
       </g>`;
     }).join("");
-    const baixa = dia.find((e) => e.tipo === "baixa" && e.min >= 6 * 60 && e.min <= 19 * 60), alta = dia.find((e) => e.tipo === "alta" && e.min >= 6 * 60 && e.min <= 19 * 60);
+    const baixa = dia.find((e) => e.tipo === "baixa" && e.min >= 6 * 60 && e.min <= 20 * 60), alta = dia.find((e) => e.tipo === "alta" && e.min >= 6 * 60 && e.min <= 20 * 60);
     const muita = hs.filter((q) => q.n - lo <= amp * 0.35).map((q) => q.h);
     let faixa = "";
     if (muita.length) {
       const grupos = []; muita.forEach((h) => { const g = grupos[grupos.length - 1]; if (g && h === g[1] + 1) g[1] = h; else grupos.push([h, h]); });
-      faixa = grupos.filter(([a, b]) => b > a).map(([a, b]) => b >= 19 ? `a partir das ${a}h` : a <= 6 ? `até as ${b + 1}h` : `das ${a}h às ${b + 1}h`).join(" e ");
+      faixa = grupos.filter(([a, b]) => b > a).map(([a, b]) => b >= 20 ? `a partir das ${a}h` : a <= 6 ? `até as ${b + 1}h` : `das ${a}h às ${b + 1}h`).join(" e ");
     }
-    const chips = [baixa ? `<span class="chip baixa">▼ Baixa ${hh(baixa.min)}</span>` : "", alta ? `<span class="chip alta">▲ Alta ${hh(alta.min)}</span>` : ""].join("");
-    return `<div class="info mare"><div class="mare-c">
-      <div class="mare-t"><b>${IC.onda}Maré</b><small>horários aprox.</small></div>
-      <div class="chips">${chips}</div>
-      <svg viewBox="0 0 ${W} ${H}" class="mare-g" role="img" aria-label="Maré de hora em hora.${baixa ? " Baixa às " + hh(baixa.min) + "." : ""}${alta ? " Alta às " + hh(alta.min) + "." : ""}${faixa ? " Mais areia " + faixa + "." : ""}">
+    const chips = [baixa ? `<span class="chip baixa" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:#F3DFB5;color:#6B4F12">▼ Baixa ${hh(baixa.min)}</span>` : "", alta ? `<span class="chip alta" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:#1F6F9F;color:#fff">▲ Alta ${hh(alta.min)}</span>` : ""].join("");
+    return `<div class="info mare" style="display:block"><div class="mare-c" style="display:grid;gap:8px">
+      <div class="mare-t" style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.onda.replace("<svg", '<svg style="width:22px;height:22px"')}Maré</b><small style="opacity:.7;font-size:12px">horários aprox.</small></div>
+      <div class="chips" style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
+      <svg viewBox="0 0 ${W} ${H}" class="mare-g" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#4A6A7A" role="img" aria-label="Maré de hora em hora.${baixa ? " Baixa às " + hh(baixa.min) + "." : ""}${alta ? " Alta às " + hh(alta.min) + "." : ""}${faixa ? " Mais areia " + faixa + "." : ""}">
         <defs><linearGradient id="mareAgua" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9"/><stop offset="1" stop-color="#1F6F9F"/></linearGradient></defs>
         ${colunas}
       </svg>
@@ -378,7 +402,7 @@
   function textoMare(mares) {
     if (!mares || mares.length < 2) return null;
     const hh = (m) => { m = Math.round(m / 5) * 5; return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
-    const ini = 7 * 60, fim = 18 * 60;
+    const ini = 6 * 60, fim = 20 * 60;
     const dia = mares.filter((e) => e.min >= ini - 120 && e.min <= fim + 120);
     const partes = [];
     const baixa = mares.find((e) => e.tipo === "baixa" && e.min >= ini && e.min <= fim);
@@ -456,12 +480,17 @@
           aguaNota: prop && typeof prop === "object" ? prop.nota : null,
           aguaOk: prop && typeof prop === "object" ? prop.ok : null,
           aguaTotal: prop && typeof prop === "object" ? prop.total : null,
-          mareHoras: Array.from({ length: 14 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
+          mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
             const chuva = h.precipitation_probability[k] || 0;
             const nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
-            return { h: +h.time[k].slice(11, 13), t: Math.round(h.temperature_2m[k]), chuva, nuvens, est: estadoHora(chuva, nuvens) };
+            const hr = +h.time[k].slice(11, 13);
+            // hora sem sol (antes do nascer ou depois do pôr): mostra noite, a não ser que chova
+            const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
+            const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
+            const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
+            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est };
           })
         };
       });
@@ -657,7 +686,7 @@
     }
     // sombra em cada hora (olhando a meia hora)
     const sombraHora = {};
-    for (let h = 7; h <= 18; h++) {
+    for (let h = HORA_INI; h <= HORA_FIM; h++) {
       const q = pontos.find((y) => y.m === h * 60 + 30) || pontos.find((y) => Math.abs(y.m - (h * 60 + 30)) < 5);
       sombraHora[h] = !!(q && q.b && q.b !== "noite");
     }
@@ -710,12 +739,12 @@
     const porTxt = nuvensTarde >= 20 && nuvensTarde <= 60 ? "boa chance de céu colorido" : nuvensTarde < 20 ? "céu limpo, cores suaves" : "as nuvens devem esconder";
     // faixa hora a hora: horário, ícone do céu e temperatura
     const horaAgora = +relogio.format(new Date()).slice(0, 2);
-    const NOME_EST = { sol: "Sol", parcial: "Entre nuvens", nublado: "Nublado", chuva: "Chuva" };
+    const NOME_EST = { sol: "Sol", parcial: "Entre nuvens", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
     const horas = [];
-    for (let h = 7; h <= 18; h++) {
+    for (let h = HORA_INI; h <= HORA_FIM; h++) {
       const y = x.horas.find((q) => q.h === h);
       if (!y) continue;
-      const passou = estado.dia === 0 && horaAgora <= 18 && h < horaAgora; // à noite mostra o dia inteiro normal
+      const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
       horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}" data-h="${h}" title="${h}h: ${NOME_EST[y.est]}">
         <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${IC[y.est]}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
@@ -739,7 +768,7 @@
           <input type="range" id="minuto" min="${ini}" max="${fim}" step="5" value="${estado.minuto}">
           <small>Arraste para ver o sol andando no mapa</small>
         </div>
-        ${(() => { const m = metroPerto(p); return m ? `<div class="info metro">${IC.metro}<span><b>Metrô ${m.nome}</b>, uns ${m.min} min a pé${m.posto ? ` até o ${m.posto === "QM" ? "Quebra-Mar" : "Posto " + m.posto}` : ""}.</span></div>` : ""; })()}
+        ${htmlMetro(p)}
         ${graficoMare(x)}
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
@@ -818,7 +847,7 @@
   }
 
   // texto da mini faixa para leitores de tela
-  const miniTxt = (x) => x.horas.filter((y) => y.h >= 7 && y.h <= 18).map((y) => `${y.h}h ${({ sol: "sol", parcial: "entre nuvens", nublado: "nublado", chuva: "chuva" })[y.est]}`).join(", ");
+  const miniTxt = (x) => x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `${y.h}h ${({ sol: "sol", parcial: "entre nuvens", nublado: "nublado", chuva: "chuva", noite: "sem sol" })[y.est]}`).join(", ");
 
   function desenharLista() {
     if (!linhas.length) return;
@@ -830,7 +859,7 @@
     $("#lista").innerHTML = vis.map((l) => `<li><button data-id="${l.p.id}" aria-current="${l.p.id === atual.p.id}">
       <span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>
       <span class="nm"><b>${ehFavorita(l.p.id) ? '<i class="fav" aria-label="favorita">★</i> ' : ""}${l.p.nome}</b><span>${l.a.resumo}</span></span>
-      <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= 7 && y.h <= 18).map((y) => `<i class="${y.est}"></i>`).join("")}</span></button></li>`).join("");
+      <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `<i class="${y.est}"></i>`).join("")}</span></button></li>`).join("");
     document.querySelectorAll("#lista button").forEach((b) => b.onclick = () => selecionar(b.dataset.id, true));
   }
 
