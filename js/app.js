@@ -330,6 +330,51 @@
     }
     return out;
   }
+  // Gráfico de barras da maré (6h às 19h) + resumo bem curto.
+  // Cada coluna é um pedaço de praia: a areia (bege) por cima e a água (azul) subindo por baixo.
+  // Quanto mais azul, maré mais cheia e menos areia.
+  function graficoMare(x) {
+    const hs = x.mareHoras || [];
+    if (hs.length < 6) return "";
+    const hh = (m) => { m = Math.round(m / 5) * 5; return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
+    const ns = hs.map((q) => q.n), lo = Math.min(...ns), hi = Math.max(...ns), amp = hi - lo || 1;
+    const agoraH = estado.dia === 0 ? +relogio.format(new Date()).slice(0, 2) : -1;
+    const W = 320, topo = 16, base = 84, H = 104, larg = W / hs.length, gap = 4, alto = base - topo;
+    const dia = (x.mares || []).filter((e) => e.min >= 6 * 60 - 30 && e.min <= 19 * 60 + 30);
+    const horaDe = (e) => Math.round(e.min / 60);
+    const colunas = hs.map((q, i) => {
+      const x0 = i * larg + gap / 2, w = larg - gap;
+      const agua = 0.18 + 0.72 * (q.n - lo) / amp;              // fração da coluna coberta de água
+      const ya = base - alto * agua;
+      const marca = dia.find((e) => horaDe(e) === q.h);
+      const ag = q.h === agoraH;
+      return `<g${ag ? ' class="ag"' : ""}>
+        <rect x="${x0}" y="${topo}" width="${w}" height="${alto}" rx="5" fill="#F3DFB5"/>
+        <rect x="${x0}" y="${ya}" width="${w}" height="${base - ya}" rx="5" fill="url(#mareAgua)"/>
+        ${ag ? `<rect x="${x0 - 1.5}" y="${topo - 1.5}" width="${w + 3}" height="${alto + 3}" rx="6" fill="none" stroke="#10283A" stroke-width="2"/>` : ""}
+        ${marca ? `<text x="${x0 + w / 2}" y="${topo - 4}" text-anchor="middle" class="m-${marca.tipo}">${marca.tipo === "alta" ? "▲" : "▼"}</text>` : ""}
+        ${ag || (q.h % 2 === 0 && Math.abs(q.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' class="t-ag"' : ""}>${ag ? "agora" : q.h + "h"}</text>` : ""}
+      </g>`;
+    }).join("");
+    const baixa = dia.find((e) => e.tipo === "baixa" && e.min >= 6 * 60 && e.min <= 19 * 60), alta = dia.find((e) => e.tipo === "alta" && e.min >= 6 * 60 && e.min <= 19 * 60);
+    const muita = hs.filter((q) => q.n - lo <= amp * 0.35).map((q) => q.h);
+    let faixa = "";
+    if (muita.length) {
+      const grupos = []; muita.forEach((h) => { const g = grupos[grupos.length - 1]; if (g && h === g[1] + 1) g[1] = h; else grupos.push([h, h]); });
+      faixa = grupos.filter(([a, b]) => b > a).map(([a, b]) => b >= 19 ? `a partir das ${a}h` : a <= 6 ? `até as ${b + 1}h` : `das ${a}h às ${b + 1}h`).join(" e ");
+    }
+    const chips = [baixa ? `<span class="chip baixa">▼ Baixa ${hh(baixa.min)}</span>` : "", alta ? `<span class="chip alta">▲ Alta ${hh(alta.min)}</span>` : ""].join("");
+    return `<div class="info mare"><div class="mare-c">
+      <div class="mare-t"><b>${IC.onda}Maré</b><small>horários aprox.</small></div>
+      <div class="chips">${chips}</div>
+      <svg viewBox="0 0 ${W} ${H}" class="mare-g" role="img" aria-label="Maré de hora em hora.${baixa ? " Baixa às " + hh(baixa.min) + "." : ""}${alta ? " Alta às " + hh(alta.min) + "." : ""}${faixa ? " Mais areia " + faixa + "." : ""}">
+        <defs><linearGradient id="mareAgua" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9"/><stop offset="1" stop-color="#1F6F9F"/></linearGradient></defs>
+        ${colunas}
+      </svg>
+      ${faixa ? `<div class="mare-dica">🏖️ <b>Mais areia ${faixa}</b></div>` : ""}
+    </div></div>`;
+  }
+
   function textoMare(mares) {
     if (!mares || mares.length < 2) return null;
     const hh = (m) => { m = Math.round(m / 5) * 5; return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
@@ -371,6 +416,13 @@
         });
       }
       const todasMares = extremosMare(m);
+      // nível do mar hora a hora, já com a correção de horário (valor do modelo 45 min antes)
+      const nivelEm = (data, h) => {
+        if (!m || !m.hourly || !m.hourly.sea_level_height_msl) return null;
+        const t = m.hourly.time, v = m.hourly.sea_level_height_msl;
+        const k = t.indexOf(`${data}T${pad(h)}:00`); if (k < 1 || v[k] == null || v[k - 1] == null) return null;
+        const f = MARE_ATRASO / 60; return v[k] * (1 - f) + v[k - 1] * f;
+      };
       out[p.id] = datas.map((data, d) => {
         const idx = [];
         h.time.forEach((ts, k) => {
@@ -404,6 +456,7 @@
           aguaNota: prop && typeof prop === "object" ? prop.nota : null,
           aguaOk: prop && typeof prop === "object" ? prop.ok : null,
           aguaTotal: prop && typeof prop === "object" ? prop.total : null,
+          mareHoras: Array.from({ length: 14 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
             const chuva = h.precipitation_probability[k] || 0;
@@ -687,7 +740,7 @@
           <small>Arraste para ver o sol andando no mapa</small>
         </div>
         ${(() => { const m = metroPerto(p); return m ? `<div class="info metro">${IC.metro}<span><b>Metrô ${m.nome}</b>, uns ${m.min} min a pé${m.posto ? ` até o ${m.posto === "QM" ? "Quebra-Mar" : "Posto " + m.posto}` : ""}.</span></div>` : ""; })()}
-        ${(() => { const t = textoMare(x.mares); return t && t.linhas.length ? `<div class="info mare">${IC.onda}<span><b>Maré</b> <small>(horários aproximados)</small><br>${t.linhas.join("<br>")}</span></div>` : ""; })()}
+        ${graficoMare(x)}
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
     const agoraEl = document.querySelector("#horas .agora");
