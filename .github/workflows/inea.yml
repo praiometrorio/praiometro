@@ -1,10 +1,12 @@
-# Robô do Praiômetro: toda terça e sexta busca os dados brutos de balneabilidade do INEA,
-# calcula a nota da água (0 a 10) de cada praia e atualiza data/balneabilidade.json.
+# Robô do Praiômetro: busca a balneabilidade do INEA e atualiza data/balneabilidade.json.
+# 1) dados brutos (planilha): base para todas as praias, mas chega com atraso;
+# 2) boletim semanal (PDF com mapas): o resultado mais recente das praias do Rio, lido pelas cores dos alfinetes.
 name: Atualizar água (INEA)
 
 on:
   schedule:
     - cron: "17 13 * * 2,5"     # terças e sextas, 10h17 em Brasília
+    - cron: "17 21 * * 4"       # quintas, 18h17 (o boletim semanal costuma sair na quinta)
   workflow_dispatch:            # botão "Run workflow" para rodar na hora
 
 permissions:
@@ -18,7 +20,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install openpyxl requests
+      - run: pip install openpyxl requests pymupdf numpy pillow
       - name: Calcular a nota da água
         shell: python
         run: |
@@ -109,7 +111,11 @@ jobs:
           with open("data/balneabilidade.json", "w", encoding="utf-8") as f:
               json.dump(saida, f, ensure_ascii=False, indent=2)
           print(f"OK: {len(praias)} praias, dados até {mais_recente}")
+      - name: Ler o boletim semanal (mapas do PDF)
+        if: always()
+        run: python scripts/boletim_inea.py
       - name: Salvar no site
+        if: always()
         run: |
           git config user.name "robo-praiometro"
           git config user.email "robo-praiometro@users.noreply.github.com"
