@@ -50,6 +50,7 @@
     estrela: svg('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'),
     estrelaCheia: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
     compartilhar: svg('<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'),
+    camera: svg('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>'),
     relogio: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')
   };
 
@@ -420,7 +421,7 @@
     mapa.touchZoomRotate.disableRotation();
     mapa.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     mapa.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), "top-right");
-    const nomes = () => $("#mapa").classList.toggle("mostrar-nomes", mapa.getZoom() >= 12.4);
+    const nomes = () => { $("#mapa").classList.toggle("mostrar-nomes", mapa.getZoom() >= 12.4); $("#mapa").classList.toggle("mostrar-postos", mapa.getZoom() >= 13.3); };
     mapa.on("zoom", nomes);
     mapa.on("load", () => {
       nomes();
@@ -434,6 +435,15 @@
         paint: { "line-color": ["case", ["get", "sombra"], "#8C9AA5", "#FFB627"], "line-width": 6, "line-opacity": 0.95 } });
       mapaPronto = true;
       desenharSolNoMapa();
+    });
+
+    // postos de guarda-vidas (aparecem quando o mapa está mais perto)
+    (window.POSTOS || []).forEach(([n, lat, lon, praia]) => {
+      const el = document.createElement("div");
+      el.className = "posto";
+      el.textContent = n;
+      el.title = n === "QM" ? "Posto do Quebra-Mar" : `Posto ${n} · ${praia}`;
+      new maplibregl.Marker({ element: el, anchor: "top", offset: [0, 24] }).setLngLat([lon, lat]).addTo(mapa);   // um pouco para o lado do mar, para não ficar embaixo do pino da praia
     });
 
     PRAIAS.forEach((p) => {
@@ -593,6 +603,7 @@
         <div class="acoes">
           <button id="favoritar" aria-pressed="${ehFavorita(p.id)}">${ehFavorita(p.id) ? IC.estrelaCheia : IC.estrela}<span>${ehFavorita(p.id) ? "Favorita" : "Favoritar"}</span></button>
           <button id="compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
+          ${window.CEU && CEU.suportado() ? `<button id="verCeu">${IC.camera}<span>Ver o sol</span></button>` : ""}
         </div>
         <div class="selos">${a.selos.map((s) => `<div class="selo ${s.cls}">${s.ic}<b>${s.t}</b><span>${s.s}</span></div>`).join("")}</div>
         <div class="info sombra" id="sombra">${IC.sombra}<span>Calculando a sombra na areia…</span></div>
@@ -607,6 +618,7 @@
     if (agoraEl) $("#horas").scrollLeft = Math.max(0, agoraEl.offsetLeft - 8);
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     $("#compartilhar").onclick = () => compartilhar(l);
+    if ($("#verCeu")) $("#verCeu").onclick = () => CEU.abrir(p);
     $("#minuto").addEventListener("input", (e) => {
       estado.minuto = +e.target.value;
       $("#minutoTxt").textContent = textoMin(estado.minuto);
