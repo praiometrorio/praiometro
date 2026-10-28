@@ -94,6 +94,9 @@ h1 span{color:#7FD3F0}
 .info svg{width:22px;height:22px;flex:none;margin-top:1px}
 .info.sombra{background:#EEF1F4;color:#1F3546}
 .info.por{background:#FFF4E6;color:#6E2A08}
+.info.mare{background:#E3F2F7;color:#0A4A5C}
+.info.metro{background:#F1EEF8;color:#3B2F63}
+.info.mare small{opacity:.75}
 .info.dica{background:#E3F2F7;color:#0A4A5C}
 
 .relogio{display:grid;gap:8px;background:#FFF9EF;border-radius:16px;padding:12px 14px}
@@ -219,3 +222,7 @@ footer a{color:#fff}
 div.posto{display:none;min-width:22px;height:22px;padding:0 5px;border-radius:7px;background:#E63B2E;color:#fff;font-weight:800;font-size:11px;line-height:22px;text-align:center;border:2px solid #FFD43B;box-shadow:0 1px 4px rgba(0,0,0,.3);font-family:var(--f-body)}
 #mapa.mostrar-postos div.posto{display:block}
 .lg.posto{border-radius:4px;background:#E63B2E;color:#fff;font-style:normal;font-size:8px;font-weight:800;text-align:center;line-height:12px;border:1px solid #FFD43B;width:14px;height:14px}
+
+/* banheiros e chuveiros no mapa */
+div.servico{display:none;width:24px;height:24px;border-radius:50%;background:#fff;border:2px solid #0B7FA6;font-size:13px;line-height:20px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.25)}
+#mapa.mostrar-servicos div.servico{display:block}

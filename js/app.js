@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 19;           // janela de praia considerada
-  const CACHE_CHAVE = "pm-previsao-v3";
+  const CACHE_CHAVE = "pm-previsao-v4";
   const CACHE_MIN = 60;                        // minutos que a previsão fica guardada
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -50,6 +50,7 @@
     estrela: svg('<path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/>'),
     estrelaCheia: '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>',
     compartilhar: svg('<path d="M12 3v12M7 8l5-5 5 5"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/>'),
+    metro: svg('<rect x="5" y="3" width="14" height="14" rx="3"/><path d="M5 11h14M9 21l-2-4M15 21l2-4"/><circle cx="9" cy="14" r=".6"/><circle cx="15" cy="14" r=".6"/>'),
     camera: svg('<path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.5" r="3.5"/>'),
     relogio: svg('<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>')
   };
@@ -274,7 +275,7 @@
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=cloud_cover&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=wave_height,sea_surface_temperature&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
   async function buscarJSON(url) {
     const r = await fetch(url);
@@ -288,6 +289,68 @@
     const novo = { t: Date.now(), tempo, mar, nuvens };
     guarda.gravar(CACHE_CHAVE, novo);
     return novo;
+  }
+
+  // ---------- metrô mais perto ----------
+  // Compara a praia e os postos dela com as estações; a pé ~ 80 m por minuto, com 20% a mais pelas ruas.
+  const POSTOS_DA_PRAIA = { flamengo: ["Flamengo"], leme: ["Leme"], copacabana: ["Copacabana"], arpoador: ["Arpoador"], ipanema: ["Ipanema"],
+    leblon: ["Leblon"], saoconrado: ["São Conrado"], barra: ["Barra", "Quebra-Mar"], recreio: ["Recreio"] };
+  function distKm(a1, o1, a2, o2) {
+    const k = Math.PI / 180, x = (o2 - o1) * k * Math.cos((a1 + a2) / 2 * k), y = (a2 - a1) * k;
+    return Math.hypot(x, y) * 6371;
+  }
+  function metroPerto(p) {
+    const pontos = [{ lat: p.lat, lon: p.lon, posto: null }].concat((window.POSTOS || [])
+      .filter((q) => (POSTOS_DA_PRAIA[p.id] || []).includes(q[3])).map((q) => ({ lat: q[1], lon: q[2], posto: q[0] })));
+    let melhor = null;
+    for (const e of window.METRO || []) for (const pt of pontos) {
+      const d = distKm(pt.lat, pt.lon, e[1], e[2]);
+      if (!melhor || d < melhor.d - 0.05 || (Math.abs(d - melhor.d) <= 0.05 && !pt.posto)) melhor = { nome: e[0], d, posto: pt.posto };
+    }
+    if (!melhor || melhor.d > 1.8) return null;
+    return { ...melhor, min: Math.max(2, Math.round(melhor.d * 1200 / 80)) };
+  }
+
+  // ---------- maré ----------
+  // O modelo do Open-Meteo (nível do mar com maré) adianta uns 45 min em relação à tábua de marés
+  // do Rio (comparado em out/2026). Corrigimos aqui.
+  const MARE_ATRASO = 45;
+  function extremosMare(m) {
+    if (!m || !m.hourly || !m.hourly.sea_level_height_msl) return [];
+    const t = m.hourly.time, v = m.hourly.sea_level_height_msl, out = [];
+    for (let k = 1; k < v.length - 1; k++) {
+      const a = v[k - 1], b = v[k], c = v[k + 1];
+      if (a == null || b == null || c == null) continue;
+      const alta = b > a && b >= c, baixa = b < a && b <= c;
+      if (!alta && !baixa) continue;
+      const den = a - 2 * b + c, d = den ? 0.5 * (a - c) / den : 0;      // ajuste fino entre as horas
+      const ts = t[k], min = (+ts.slice(11, 13)) * 60 + Math.round(d * 60) + MARE_ATRASO;
+      const dia = new Date(ts.slice(0, 10) + "T12:00:00Z"); dia.setUTCDate(dia.getUTCDate() + Math.floor(min / 1440));
+      out.push({ data: dia.toISOString().slice(0, 10), min: ((min % 1440) + 1440) % 1440, tipo: alta ? "alta" : "baixa", nivel: b });
+    }
+    return out;
+  }
+  function textoMare(mares) {
+    if (!mares || mares.length < 2) return null;
+    const hh = (m) => { m = Math.round(m / 5) * 5; return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
+    const ini = 7 * 60, fim = 18 * 60;
+    const dia = mares.filter((e) => e.min >= ini - 120 && e.min <= fim + 120);
+    const partes = [];
+    const baixa = mares.find((e) => e.tipo === "baixa" && e.min >= ini && e.min <= fim);
+    const alta = mares.find((e) => e.tipo === "alta" && e.min >= ini && e.min <= fim);
+    // trechos entre um extremo e outro que caem no horário de praia
+    const linhas = [];
+    for (let i = 0; i < mares.length - 1; i++) {
+      const a = mares[i], b = mares[i + 1];
+      const de = Math.max(a.min, ini), ate = Math.min(b.min, fim);
+      if (ate - de < 45) continue;
+      linhas.push(a.tipo === "baixa"
+        ? `⬆️ <b>${hh(de)} às ${hh(ate)}</b>: maré sobe, menos areia`
+        : `⬇️ <b>${hh(de)} às ${hh(ate)}</b>: maré desce, mais areia`);
+    }
+    if (baixa) partes.push(`Maré baixa às <b>${hh(baixa.min)}</b>: areia mais larga.`);
+    if (alta) partes.push(`Maré alta às <b>${hh(alta.min)}</b>: menos areia.`);
+    return { resumo: partes.join(" "), linhas, dia };
   }
 
   function montar({ tempo, mar, nuvens }) {
@@ -307,6 +370,7 @@
           if (xs.length >= 3) nuvemMedia[ts] = media(xs);
         });
       }
+      const todasMares = extremosMare(m);
       out[p.id] = datas.map((data, d) => {
         const idx = [];
         h.time.forEach((ts, k) => {
@@ -340,6 +404,7 @@
           aguaNota: prop && typeof prop === "object" ? prop.nota : null,
           aguaOk: prop && typeof prop === "object" ? prop.ok : null,
           aguaTotal: prop && typeof prop === "object" ? prop.total : null,
+          mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
             const chuva = h.precipitation_probability[k] || 0;
             const nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
@@ -421,7 +486,7 @@
     mapa.touchZoomRotate.disableRotation();
     mapa.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
     mapa.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), "top-right");
-    const nomes = () => { $("#mapa").classList.toggle("mostrar-nomes", mapa.getZoom() >= 12.4); $("#mapa").classList.toggle("mostrar-postos", mapa.getZoom() >= 13.3); };
+    const nomes = () => { $("#mapa").classList.toggle("mostrar-nomes", mapa.getZoom() >= 12.4); $("#mapa").classList.toggle("mostrar-postos", mapa.getZoom() >= 13.3); $("#mapa").classList.toggle("mostrar-servicos", mapa.getZoom() >= 14.2); };
     mapa.on("zoom", nomes);
     mapa.on("load", () => {
       nomes();
@@ -444,6 +509,15 @@
       el.textContent = n;
       el.title = n === "QM" ? "Posto do Quebra-Mar" : `Posto ${n} · ${praia}`;
       new maplibregl.Marker({ element: el, anchor: "top", offset: [0, 24] }).setLngLat([lon, lat]).addTo(mapa);   // um pouco para o lado do mar, para não ficar embaixo do pino da praia
+    });
+
+    // banheiros e chuveiros (aparecem com o mapa bem perto)
+    (window.SERVICOS || []).forEach(([tipo, lat, lon, pago]) => {
+      const el = document.createElement("div");
+      el.className = "servico " + tipo;
+      el.textContent = tipo === "chuveiro" ? "🚿" : "🚻";
+      el.title = (tipo === "chuveiro" ? "Chuveiro" : "Banheiro") + (pago === "yes" ? " (pago)" : pago === "no" ? " (grátis)" : "");
+      new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(mapa);
     });
 
     PRAIAS.forEach((p) => {
@@ -612,6 +686,8 @@
           <input type="range" id="minuto" min="${ini}" max="${fim}" step="5" value="${estado.minuto}">
           <small>Arraste para ver o sol andando no mapa</small>
         </div>
+        ${(() => { const m = metroPerto(p); return m ? `<div class="info metro">${IC.metro}<span><b>Metrô ${m.nome}</b>, uns ${m.min} min a pé${m.posto ? ` até o ${m.posto === "QM" ? "Quebra-Mar" : "Posto " + m.posto}` : ""}.</span></div>` : ""; })()}
+        ${(() => { const t = textoMare(x.mares); return t && t.linhas.length ? `<div class="info mare">${IC.onda}<span><b>Maré</b> <small>(horários aproximados)</small><br>${t.linhas.join("<br>")}</span></div>` : ""; })()}
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
     const agoraEl = document.querySelector("#horas .agora");
