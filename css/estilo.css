@@ -228,3 +228,7 @@ div.servico{display:none;width:24px;height:24px;border-radius:50%;background:#ff
 #mapa.mostrar-servicos div.servico{display:block}
 /* com o mapa perto, o pino da praia sobe um pouco (para o lado da terra) e deixa os postos à vista no calçadão */
 #mapa.mostrar-postos .pin{top:-34px}
+/* ordem de empilhamento no mapa: serviços embaixo, postos no meio, pino da praia por cima */
+div.servico{z-index:1}
+div.posto{z-index:2}
+.pin{z-index:3}

@@ -36,8 +36,8 @@
   // ---------- orientação do celular ----------
   // Matriz que leva as coordenadas do celular (x direita, y topo, z para fora da tela)
   // para as da Terra (x leste, y norte, z para cima). Convenção da W3C (Z-X'-Y'').
-  function matriz(alpha) {
-    const a = alpha * RAD, b = beta * RAD, g = gamma * RAD;
+  function matriz(alpha, be = beta, ga = gamma) {
+    const a = alpha * RAD, b = be * RAD, g = ga * RAD;
     const ca = Math.cos(a), sa = Math.sin(a), cb = Math.cos(b), sb = Math.sin(b), cg = Math.cos(g), sg = Math.sin(g);
     let R = [
       [ca * cg - sa * sb * sg, -cb * sa, ca * sg + cg * sa * sb],
@@ -59,23 +59,38 @@
     return alphaRaw + (correcaoBussola || 0) - ajusteUsuario;
   }
 
-  function aoGirar(e) {
+  // Para não "perder" o desenho quando a câmera aponta para cima:
+  // - o giro do celular vem do giroscópio (estável em qualquer posição);
+  // - a bússola só serve para dizer onde fica o norte, e só é lida com a câmera perto do horizonte
+  //   (apontando para o alto a bússola do celular fica maluca). Com a câmera para cima, a correção congela.
+  let ultimoRelativo = 0;
+  const elevacaoCamera = (R) => Math.asin(Math.max(-1, Math.min(1, -R[2][2]))) / RAD;
+  function corrigirNorte(rumoVerdadeiro) {
+    if (alphaRaw == null) return;
+    const R = matriz(alphaRaw);
+    if (Math.abs(elevacaoCamera(R)) > 45 && correcaoBussola != null) return;   // apontando para cima: congela
+    const dif = ang(rumoDaCamera(R) - rumoVerdadeiro + 180) - 180;              // quanto girar o alpha
+    if (correcaoBussola == null) correcaoBussola = dif;
+    else correcaoBussola += (ang(dif - correcaoBussola + 180) - 180) * 0.08;
+    temBussola = true;
+  }
+  function aoGirarRel(e) {
     if (e.alpha == null) return;
-    alphaRaw = e.alpha; beta = e.beta || 0; gamma = e.gamma || 0;
-    if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) {
-      // iPhone: o alpha não aponta para o norte; a bússola vem à parte. Ajusta suavemente.
-      temBussola = true;
+    if (e.absolute === true && typeof e.webkitCompassHeading !== "number") return aoGirarAbs(e);
+    alphaRaw = e.alpha; beta = e.beta || 0; gamma = e.gamma || 0; ultimoRelativo = Date.now();
+    // iPhone: a bússola vem junto, à parte
+    if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) corrigirNorte(e.webkitCompassHeading);
+  }
+  function aoGirarAbs(e) {
+    if (e.alpha == null) return;
+    const rumo = rumoDaCamera(matriz(e.alpha, e.beta || 0, e.gamma || 0));
+    if (Date.now() - ultimoRelativo > 500) {
+      // sem giroscópio separado: usa a orientação absoluta direto
+      alphaRaw = e.alpha; beta = e.beta || 0; gamma = e.gamma || 0;
       const R = matriz(alphaRaw);
-      const rumoCru = rumoDaCamera(R);
-      let dif = ang(rumoCru - e.webkitCompassHeading + 180) - 180;   // quanto girar o alpha
-      if (correcaoBussola == null) correcaoBussola = dif;
-      else {
-        let delta = ang(dif - correcaoBussola + 180) - 180;
-        correcaoBussola += delta * 0.1;
-      }
-    } else if (e.absolute || e.type === "deviceorientationabsolute") {
-      temBussola = true; correcaoBussola = 0;
-    }
+      if (correcaoBussola == null || Math.abs(elevacaoCamera(R)) <= 45) correcaoBussola = 0;
+      temBussola = true;
+    } else corrigirNorte(rumo);
   }
 
   // ---------- projeção na tela ----------
@@ -108,7 +123,7 @@
     const aA = alphaAbsoluto();
     const dica = el.querySelector(".ceu-dica");
     if (aA == null) { dica.textContent = "Mexa o celular devagar para ligar a bússola…"; return; }
-    const R = matriz(aA), f = focal(), u = dpr;
+    const R = suavizar(matriz(aA)), f = focal(), u = dpr;
 
     // linha do horizonte
     ctx.setLineDash([8 * u, 8 * u]); ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1.5 * u;
@@ -164,7 +179,21 @@
     const rumo = rumoDaCamera(R);
     const sit = s.alt < -1 ? "O sol já se pôs. A linha mostra o caminho de hoje." :
       naTela ? "Toque no sol de verdade para acertar o desenho." : "Siga a seta para achar o sol.";
-    dica.textContent = `Olhando para o ${DIRS[Math.round(rumo / 45) % 8]} · ${sit}`;
+    const onde = Math.abs(elevacaoCamera(R)) > 60 ? "Olhando para o alto" : `Olhando para o ${DIRS[Math.round(rumo / 45) % 8]}`;
+    dica.textContent = `${onde} · ${sit}`;
+  }
+  // Suaviza a tremedeira dos sensores: média com o quadro anterior e reajusta os eixos
+  let Rsuave = null;
+  function suavizar(R) {
+    if (!Rsuave) { Rsuave = R; return R; }
+    const k = 0.35;
+    const c = [0, 1, 2].map((j) => [0, 1, 2].map((i) => Rsuave[i][j] * (1 - k) + R[i][j] * k));   // colunas
+    const norm = (v) => { const n = Math.hypot(...v) || 1; return v.map((x) => x / n); };
+    const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    const x = norm(c[0]); let y = c[1].map((v, i) => v - dot(c[1], x) * x[i]); y = norm(y);
+    const z = [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+    Rsuave = [0, 1, 2].map((i) => [x[i], y[i], z[i]]);
+    return Rsuave;
   }
   const hm = (m) => `${Math.floor(m / 60)}h${pad(m % 60)}`;
 
@@ -219,7 +248,7 @@
 
   // ---------- abrir e fechar ----------
   async function abrir(p) {
-    praia = p; ajusteUsuario = 0; correcaoBussola = null; alphaRaw = null; temBussola = false;
+    praia = p; ajusteUsuario = 0; correcaoBussola = null; alphaRaw = null; temBussola = false; Rsuave = null; ultimoRelativo = 0;
     calcular();
     if (!el) montar();
     el.querySelector(".ceu-nome").textContent = p.nome;
@@ -244,10 +273,6 @@
     rodando = true; requestAnimationFrame(desenhar);
     setTimeout(() => { if (rodando && !temBussola) el.querySelector(".ceu-dica").textContent = "Não achei a bússola deste celular. Sem ela o desenho pode sair no lugar errado."; }, 4000);
   }
-  // no Android a versão "absoluta" (com norte) é a certa; se ela existir, ignora a outra
-  let usandoAbs = false;
-  function aoGirarAbs(e) { if (e.alpha != null) { usandoAbs = true; aoGirar(e); } }
-  function aoGirarRel(e) { if (!usandoAbs) aoGirar(e); }
 
   function erro(t) { el.querySelector(".ceu-dica").textContent = t; }
 
@@ -257,7 +282,7 @@
     stream = null;
     window.removeEventListener("deviceorientationabsolute", aoGirarAbs, true);
     window.removeEventListener("deviceorientation", aoGirarRel, true);
-    usandoAbs = false;
+    ultimoRelativo = 0; Rsuave = null;
     el.hidden = true; document.body.style.overflow = "";
   }
 
