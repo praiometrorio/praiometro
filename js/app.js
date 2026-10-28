@@ -811,8 +811,12 @@
         <div class="acoes">
           <button id="favoritar" aria-pressed="${ehFavorita(p.id)}">${ehFavorita(p.id) ? IC.estrelaCheia : IC.estrela}<span>${ehFavorita(p.id) ? "Favorita" : "Favoritar"}</span></button>
           <button id="compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
-          ${window.CEU && CEU.suportado() ? `<button id="verCeu">${IC.camera}<span>Ver o sol</span></button>` : ""}
         </div>
+        ${window.CEU && CEU.suportado() ? `<button id="verCeu" class="ver-ceu">
+          <span class="vc-ic">${IC.camera}</span>
+          <span class="vc-txt"><b>Veja o trajeto do sol</b><small>Aponte a câmera para o céu</small></span>
+          <span class="vc-novo">NOVO</span>
+        </button>` : ""}
         <div class="selos">${a.selos.map((s) => `<div class="selo ${s.cls}">${s.ic}<b>${s.t}</b><span>${s.s}</span></div>`).join("")}</div>
         <div class="info sombra" id="sombra">${IC.sombra}<span>Calculando a sombra na areia…</span></div>
         <div class="relogio">

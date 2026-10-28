@@ -133,8 +133,9 @@
     const dica = el.querySelector(".ceu-dica");
     if (aA == null) { dica.textContent = "Mexa o celular devagar para ligar a bússola…"; return; }
     if (correcaoBussola == null && typeof window.DeviceOrientationEvent !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent)) {
-      dica.textContent = "Aponte a câmera para o horizonte por 1 segundo para achar o norte…"; return;
+      dica.textContent = "Calibrando a bússola…"; el.querySelector(".ceu-calib").hidden = false; return;
     }
+    el.querySelector(".ceu-calib").hidden = true;
     const R = suavizar(matriz(aA)), f = focal(), u = dpr;
     if (depurar) el.querySelector(".ceu-dep").textContent = `β ${beta.toFixed(0)} γ ${gamma.toFixed(0)} α ${alphaRaw.toFixed(0)} · câmera ${elevacaoCamera(R).toFixed(0)}° · bússola ${ultimaBussola == null ? "-" : ultimaBussola.toFixed(0)} · correção ${(correcaoBussola || 0).toFixed(0)}`;
 
@@ -305,6 +306,12 @@
     el.innerHTML = `<video playsinline muted autoplay></video><canvas></canvas>
       <div class="ceu-topo"><div><b>Sol no céu</b><span class="ceu-nome"></span></div><button class="ceu-x" aria-label="Fechar">×</button></div>
       <div class="ceu-dep" hidden></div>
+      <div class="ceu-calib" hidden>
+        <svg viewBox="0 0 120 80" aria-hidden="true"><line x1="6" y1="56" x2="114" y2="56" stroke="#fff" stroke-width="3" stroke-dasharray="6 6"/>
+          <g class="ceu-fone"><rect x="44" y="14" width="32" height="54" rx="7" fill="none" stroke="#FFB627" stroke-width="4"/><circle cx="60" cy="24" r="3" fill="#FFB627"/></g></svg>
+        <b>Aponte para o horizonte</b>
+        <span>Segure o celular em pé, mirando o mar, por 1 segundo. Depois é só subir para o céu.</span>
+      </div>
       <div class="ceu-ok" hidden>Pronto, acertei o desenho ☀️</div>
       <div class="ceu-dica"></div>`;
     document.body.appendChild(el);
