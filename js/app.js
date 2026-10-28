@@ -992,8 +992,57 @@
     bt.disabled = false;
   }
 
+  // ---------- busca de praia ----------
+  const semAcento = (t) => t.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  // apelidos e pontos conhecidos para achar a praia por outro nome
+  const APELIDOS = {
+    copacabana: "copa posto 2 posto 3 posto 4 posto 5 posto 6 forte", ipanema: "posto 8 posto 9 posto 10",
+    leblon: "posto 11 posto 12 baixo leblon", arpoador: "posto 7 pedra do arpoador", leme: "posto 1 pedra do leme",
+    barra: "barra da tijuca quebra-mar pepe pepê jardim oceanico", saoconrado: "pepino asa delta", reserva: "reserva",
+    recreio: "recreio dos bandeirantes macumba pontal", flamengo: "aterro", vermelha: "urca", itaipu: "camboinhas",
+    icarai: "niteroi", diabo: "diabo", joatinga: "joa", grumari: "grumari", prainha: "prainha"
+  };
+  function buscarPraias(q) {
+    q = semAcento(q.trim());
+    if (!q) return [];
+    return PRAIAS.map((p) => {
+      const nome = semAcento(p.nome), extra = semAcento(`${p.local} ${APELIDOS[p.id] || ""}`);
+      const pontos = nome.startsWith(q) ? 3 : (" " + nome).includes(" " + q) ? 2 : (" " + extra).includes(" " + q) ? 1 : 0;   // só começo de palavra
+      return { p, pontos };
+    }).filter((r) => r.pontos).sort((a, b) => b.pontos - a.pontos || a.p.nome.localeCompare(b.p.nome)).slice(0, 6).map((r) => r.p);
+  }
+  function abrirPraia(id) {
+    const p = PRAIAS.find((x) => x.id === id);
+    if (estado.regiao !== "todas" && estado.regiao !== p.regiao) irParaRegiao(p.regiao);
+    $("#busca").value = ""; $("#buscaRes").hidden = true; $("#busca").blur();
+    selecionar(id, true);
+  }
+  function ligarBusca() {
+    const inp = $("#busca"), res = $("#buscaRes");
+    if (!inp) return;
+    const mostrar = () => {
+      const achadas = buscarPraias(inp.value);
+      if (!inp.value.trim()) { res.hidden = true; return; }
+      res.innerHTML = achadas.length ? achadas.map((p) => {
+        const l = linhas.find((q) => q.p.id === p.id);
+        const ic = l ? `<span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>` : "";
+        return `<li role="option"><button data-id="${p.id}">${ic}<span><b>${p.nome}</b><small>${l ? l.a.resumo : p.local}</small></span></button></li>`;
+      }).join("") : `<li class="vazio">Não achei essa praia. Tente outro nome.</li>`;
+      res.hidden = false;
+      res.querySelectorAll("button").forEach((b) => b.onclick = () => abrirPraia(b.dataset.id));
+    };
+    inp.addEventListener("input", mostrar);
+    inp.addEventListener("focus", mostrar);
+    inp.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { const p = buscarPraias(inp.value)[0]; if (p) abrirPraia(p.id); }
+      if (e.key === "Escape") { inp.value = ""; res.hidden = true; }
+    });
+    document.addEventListener("click", (e) => { if (!e.target.closest(".busca")) res.hidden = true; });
+  }
+
   // ---------- início ----------
   function controles() {
+    ligarBusca();
     $("#regioes").innerHTML = Object.entries(REGIOES).map(([k, v]) => `<button data-r="${k}" aria-pressed="${k === estado.regiao}">${v.nome}</button>`).join("");
     document.querySelectorAll("#regioes button").forEach((b) => b.onclick = () => irParaRegiao(b.dataset.r));
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
