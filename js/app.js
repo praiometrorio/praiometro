@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v4";
+  const CACHE_CHAVE = "pm-previsao-v5";
   const CACHE_MIN = 60;                        // minutos que a previsão fica guardada
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -92,11 +92,17 @@
     else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol entre nuvens", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
     else selos.push({ cls: "neutro", ic: IC.nublado, t: "Céu fechado", s: "Sem sol firme hoje" });
 
-    const uv = x.uv;
-    if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: "Bronze rápido: foge do sol das 11h às 15h" });
-    else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de pegar cor", s: `UV ${uv} · protetor a cada 2h` });
-    else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `UV ${uv} · passa protetor` });
-    else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: "Queima mesmo nublado" });
+    // UV: pico do dia (com o horário) e, se for hoje, o de agora
+    const comUv = x.horas.filter((y) => y.uv != null);
+    const pico = comUv.length ? comUv.reduce((m, y) => (y.uv > m.uv ? y : m)) : null;
+    const uv = pico ? Math.round(pico.uv) : x.uv;
+    const horaJa = +relogio.format(new Date()).slice(0, 2);
+    const agoraUv = x.hoje ? comUv.find((y) => y.h === horaJa) : null;
+    const uvTxt = (pico ? `pico ${uv} às ${pico.h}h` : `UV ${uv}`) + (agoraUv ? ` · agora ${Math.round(agoraUv.uv)}` : "");
+    if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: `${uvTxt} · evite o sol do meio-dia` });
+    else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de pegar cor", s: `${uvTxt} · protetor a cada 2h` });
+    else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `${uvTxt} · passa protetor` });
+    else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: `${uvTxt} · queima mesmo nublado` });
     else selos.push({ cls: "neutro", ic: IC.gota, t: "UV baixo", s: "Pouco risco de queimar" });
 
     if (p.baia) selos.push({ cls: "mar", ic: IC.calmo, t: "Mar de baía", s: "Calminho, sem onda" });
@@ -268,7 +274,7 @@
   // ---------- busca da previsão ----------
   const listaLat = () => PRAIAS.map((p) => p.lat).join(","), listaLon = () => PRAIAS.map((p) => p.lon).join(",");
   const urlPrevisao = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=temperature_2m,precipitation_probability,cloud_cover,wind_speed_10m" +
+    "&hourly=temperature_2m,precipitation_probability,cloud_cover,wind_speed_10m,uv_index" +
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
@@ -354,6 +360,51 @@
     }
     return out;
   }
+  // Gráfico de barras do UV hora a hora (6h às 20h), cada barra com a cor da faixa de risco (escala da OMS)
+  const FAIXAS_UV = [
+    { ate: 2, nome: "Leve", cor: "#4CAF50" },
+    { ate: 5, nome: "Moderado", cor: "#F2C12E" },
+    { ate: 7, nome: "Alto", cor: "#F28C28" },
+    { ate: 10, nome: "Muito alto", cor: "#E0412E" },
+    { ate: 99, nome: "Extremo", cor: "#8E44AD" }
+  ];
+  const faixaUv = (v) => FAIXAS_UV.find((f) => v <= f.ate + 0.49);
+  function graficoUv(x) {
+    const hs = x.horas.filter((y) => y.uv != null && y.h >= HORA_INI && y.h <= HORA_FIM);
+    if (hs.length < 6) return "";
+    const W = 320, topo = 18, base = 84, H = 102, larg = W / hs.length, gap = 4, alto = base - topo, max = 12;
+    const agoraH = x.hoje ? +relogio.format(new Date()).slice(0, 2) : -1;
+    const pico = hs.reduce((m, y) => (y.uv > m.uv ? y : m));
+    const agora = hs.find((y) => y.h === agoraH);
+    const barras = hs.map((y, i) => {
+      const v = Math.round(y.uv), f = faixaUv(y.uv);
+      const x0 = i * larg + gap / 2, w = larg - gap, alt = Math.max(3, Math.min(v, max) / max * alto), y0 = base - alt;
+      const ag = y.h === agoraH;
+      return `<rect x="${x0}" y="${y0}" width="${w}" height="${alt}" rx="4" fill="${f.cor}"${ag ? ' stroke="#10283A" stroke-width="2"' : ""}/>
+        ${v >= 1 ? `<text x="${x0 + w / 2}" y="${y0 - 4}" text-anchor="middle" font-size="10" font-weight="800" fill="#10283A">${v}</text>` : ""}
+        ${ag || (y.h % 2 === 0 && Math.abs(y.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' font-weight="800" fill="#10283A"' : ""}>${ag ? "agora" : y.h + "h"}</text>` : ""}`;
+    }).join("");
+    // recomendação de saúde conforme o pico do dia
+    const SAUDE = {
+      "Leve": "Risco baixo para a pele.",
+      "Moderado": "Use protetor solar.",
+      "Alto": "Protetor, chapéu e óculos.",
+      "Muito alto": "Protetor FPS 50 e reaplique sempre.",
+      "Extremo": "Queima rápido: proteção máxima."
+    };
+    const dica = SAUDE[faixaUv(pico.uv).nome];
+    const chip = (t, f, cl) => `<span class="chip" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:${f.cor};color:${cl}">${t}</span>`;
+    const corTexto = (f) => (f.nome === "Moderado" ? "#3D2E00" : "#fff");
+    const legenda = FAIXAS_UV.map((f) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:${f.cor};display:inline-block"></i>${f.nome}</span>`).join("");
+    return `<div class="info uv" style="display:block;background:#FFF3EC;color:#5A2410"><div style="display:grid;gap:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b>${agora ? `<span style="display:flex;align-items:center;gap:8px;background:${faixaUv(agora.uv).cor};color:${corTexto(faixaUv(agora.uv))};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right">AGORA<br>${faixaUv(agora.uv).nome}</small><b style="font-size:26px;line-height:1">${Math.round(agora.uv)}</b></span>` : '<small style="opacity:.7;font-size:12px">hora a hora</small>'}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${chip(`Pico ${Math.round(pico.uv)} às ${pico.h}h · ${faixaUv(pico.uv).nome}`, faixaUv(pico.uv), corTexto(faixaUv(pico.uv)))}</div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico ${Math.round(pico.uv)} às ${pico.h}h.">${barras}</svg>
+      <div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:10.5px;opacity:.85">${legenda}</div>
+      <div style="font-size:14px;line-height:1.35">${dica}</div>
+    </div></div>`;
+  }
+
   // Gráfico de barras da maré (6h às 19h) + resumo bem curto.
   // Cada coluna é um pedaço de praia: a areia (bege) por cima e a água (azul) subindo por baixo.
   // Quanto mais azul, maré mais cheia e menos areia.
@@ -472,6 +523,7 @@
           chuvaMax: chuvas.length ? Math.max(...chuvas) : 0,
           vento: ventos.length ? Math.round(Math.max(...ventos)) : 0,
           uv: Math.round(t.daily.uv_index_max[d] || 0),
+          hoje: d === 0,
           ondas: ondas == null ? null : Math.round(ondas * 10) / 10,
           agua: aguaT == null ? null : Math.round(aguaT * 10) / 10,
           nascer: (t.daily.sunrise[d] || "").slice(11, 16) || "05:30",
@@ -490,7 +542,7 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
-            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est };
+            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est, uv: h.uv_index ? h.uv_index[k] : null };
           })
         };
       });
@@ -769,6 +821,7 @@
           <small>Arraste para ver o sol andando no mapa</small>
         </div>
         ${htmlMetro(p)}
+        ${graficoUv(x)}
         ${graficoMare(x)}
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
