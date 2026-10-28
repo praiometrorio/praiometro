@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v5";
+  const CACHE_CHAVE = "pm-previsao-v6";
   const CACHE_MIN = 60;                        // minutos que a previsão fica guardada
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -119,10 +119,21 @@
 
     // No teste, os modelos previram vento ~3 km/h mais fraco que o real e quase nunca a ventania da tarde.
     // Por isso os limites aqui são mais baixos do que o vento "de verdade" que eles representam.
-    if (x.vento <= 10) selos.push({ cls: "neutro", ic: IC.vento, t: "Vento fraco", s: "Dia de altinha" });
-    else if (x.vento <= 15) selos.push({ cls: "neutro", ic: IC.vento, t: "Brisa", s: "Guarda-sol firme" });
-    else if (x.vento <= 20) selos.push({ cls: "mexido", ic: IC.vento, t: "Pode ventar à tarde", s: "Finca bem o guarda-sol" });
-    else selos.push({ cls: "ruim", ic: IC.vento, t: "Ventania", s: "Areia voando, guarda-sol indo embora" });
+    // vento: hoje mostra o de agora e o mais forte que ainda vem; outros dias, o pico e a hora
+    const horaV = +relogio.format(new Date()).slice(0, 2);
+    const comV = x.horas.filter((y) => y.v != null && y.h >= 9 && y.h <= 17);
+    const agoraV = x.hoje ? x.horas.find((y) => y.h === horaV && y.v != null) : null;
+    const frente = x.hoje ? comV.filter((y) => y.h >= horaV) : comV;
+    const picoV = (frente.length ? frente : comV).reduce((m, y) => (!m || y.v > m.v ? y : m), null);
+    const ventoRef = picoV ? Math.max(picoV.v, agoraV ? agoraV.v : 0) : x.vento;
+    const depois = picoV && agoraV && picoV.h > horaV + 1 && picoV.v - agoraV.v >= 5;
+    const quandoV = depois ? ` às ${picoV.h}h` : "";
+    const subV = agoraV ? `Agora ${agoraV.v} km/h` + (depois ? ` · chega a ${picoV.v} às ${picoV.h}h` : "")
+      : picoV ? `Até ${picoV.v} km/h${picoV.h ? ` (${picoV.h}h)` : ""}` : `${x.vento} km/h`;
+    if (ventoRef <= 10) selos.push({ cls: "neutro", ic: IC.vento, t: "Vento fraco", s: `${subV} · dia de altinha` });
+    else if (ventoRef <= 15) selos.push({ cls: "neutro", ic: IC.vento, t: depois ? `Brisa${quandoV}` : "Brisa", s: `${subV} · guarda-sol firme` });
+    else if (ventoRef <= 20) selos.push({ cls: "mexido", ic: IC.vento, t: depois ? `Vento aumenta${quandoV}` : "Vento moderado", s: `${subV} · finca bem o guarda-sol` });
+    else selos.push({ cls: "ruim", ic: IC.vento, t: depois ? `Ventania${quandoV}` : "Ventania", s: `${subV} · areia voando` });
 
     // água: o último boletim do INEA como ele é (própria ou imprópria), com a data
     const dataBol = x.aguaData ? x.aguaData.slice(8, 10) + "/" + x.aguaData.slice(5, 7) : null;
@@ -147,8 +158,8 @@
     const resto = [];
     const marTxt = p.baia ? "mar calminho" : o == null ? null : o < 0.6 ? "mar piscininha" : o < 1.2 ? "mar tranquilo" : o < 2 ? "mar mexido" : "mar pesado";
     if (marTxt) resto.push(marTxt);
-    if (x.vento > 20) resto.push("ventania");
-    else if (x.vento > 15) resto.push("vento apertando à tarde");
+    if (ventoRef > 20) resto.push(depois ? `ventania a partir das ${picoV.h}h` : "ventania");
+    else if (ventoRef > 15) resto.push(depois ? `vento aumentando lá pelas ${picoV.h}h` : "vento moderado");
     if (x.propria === true) resto.push("água própria");
     if (x.propria === false) resto.push("água imprópria");
 
@@ -157,11 +168,11 @@
     // frase curta: o céu, a chuva e só o que for muito importante (o resto está nos selos)
     const fecho = tom === "bom" ? " Dia de praia raiz!" : "";
     const chuvaTxt = ceu !== "chuva" && pancada ? `, com chance de pancada às ${pancada.h}h` : "";
-    const alerta = x.propria === false ? " Água imprópria hoje." : x.vento > 20 ? " Ventania à tarde." : "";
+    const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 20 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
     const resumo = [ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
-      x.vento > 20 ? "ventania" : x.vento > 15 ? "vento à tarde" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
+      ventoRef > 20 ? "ventania" : ventoRef > 15 ? "ventando" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
     const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.propria == null && x.aguaTotal ? (x.aguaOk / x.aguaTotal - 0.5) * 2 : 0);
     return { horasSol, janela, ceu, tom, selos, veredito, resumo, score };
@@ -278,7 +289,7 @@
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=cloud_cover&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=cloud_cover,wind_speed_10m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
@@ -480,12 +491,15 @@
     PRAIAS.forEach((p, i) => {
       const t = T[i], m = M[i], h = t.hourly;
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
-      const nuvemMedia = {};
+      const nuvemMedia = {}, ventoMeio = {};
       if (N[i] && N[i].hourly) {
         const nh = N[i].hourly;
         nh.time.forEach((ts, k) => {
           const xs = MODELOS_NUVEM.map((md) => (nh["cloud_cover_" + md] || [])[k]).filter((v) => v != null);
           if (xs.length >= 3) nuvemMedia[ts] = media(xs);
+          // vento: o valor do meio entre os modelos (um modelo exagerado sozinho não manda mais)
+          const vs = MODELOS_NUVEM.map((md) => (nh["wind_speed_10m_" + md] || [])[k]).filter((v) => v != null).sort((a, b) => a - b);
+          if (vs.length >= 3) ventoMeio[ts] = vs.length % 2 ? vs[(vs.length - 1) / 2] : (vs[vs.length / 2 - 1] + vs[vs.length / 2]) / 2;
         });
       }
       const todasMares = extremosMare(m);
@@ -503,7 +517,8 @@
           if (ts.slice(0, 10) === data && hr >= HORA_INI && hr <= HORA_FIM) idx.push(k);
         });
         const val = (arr) => idx.map((k) => arr[k]).filter((v) => v != null);
-        const temps = val(h.temperature_2m), chuvas = val(h.precipitation_probability), ventos = val(h.wind_speed_10m);
+        const ventoEm = (k) => { const v = ventoMeio[h.time[k]] ?? h.wind_speed_10m[k]; return v == null ? null : Math.round(v); };
+        const temps = val(h.temperature_2m), chuvas = val(h.precipitation_probability), ventos = idx.map(ventoEm).filter((v) => v != null);
         let ondas = null, aguaT = null;
         if (m && m.hourly) {
           const mi = [];
@@ -519,7 +534,8 @@
           data,
           temp: temps.length ? Math.round(Math.max(...temps)) : 0,
           chuvaMax: chuvas.length ? Math.max(...chuvas) : 0,
-          vento: ventos.length ? Math.round(Math.max(...ventos)) : 0,
+          // vento do dia: o mais forte no horário de praia (9h às 17h), não o do dia inteiro
+          vento: (() => { const vs = idx.filter((k) => { const hr = +h.time[k].slice(11, 13); return hr >= 9 && hr <= 17; }).map(ventoEm).filter((v) => v != null); return vs.length ? Math.round(Math.max(...vs)) : (ventos.length ? Math.round(Math.max(...ventos)) : 0); })(),
           uv: Math.round(t.daily.uv_index_max[d] || 0),
           hoje: d === 0,
           ondas: ondas == null ? null : Math.round(ondas * 10) / 10,
@@ -540,7 +556,7 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
-            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est, uv: h.uv_index ? h.uv_index[k] : null };
+            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est, uv: h.uv_index ? h.uv_index[k] : null, v: ventoEm(k) };
           })
         };
       });
@@ -630,8 +646,16 @@
                  "line-width": ["match", ["get", "tipo"], "agora", 2, 3], "line-dasharray": [1.5, 1.5] } });
       mapa.addLayer({ id: "sol-arco", type: "line", source: "sol-arco", layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": ["case", ["get", "sombra"], "#8C9AA5", "#FFB627"], "line-width": 6, "line-opacity": 0.95 } });
+      // sombra dos prédios: fica por baixo dos prédios do mapa
+      mapa.addSource("sombras", { type: "geojson", data: vazio });
+      mapa.addLayer({ id: "sombras", type: "fill", source: "sombras", minzoom: 13,
+        paint: { "fill-color": "#1E2A3A", "fill-opacity": 0.18, "fill-antialias": false } }, mapa.getLayer("building") ? "building" : undefined);
       mapaPronto = true;
       desenharSolNoMapa();
+      let espera = null;
+      const refazer = () => { clearTimeout(espera); espera = setTimeout(desenharSombrasPredios, 150); };
+      mapa.on("moveend", refazer);
+      mapa.on("sourcedata", (e) => { if (e.sourceId === "openmaptiles" && e.isSourceLoaded) refazer(); });
     });
 
     // postos de guarda-vidas (aparecem quando o mapa está mais perto)
@@ -865,8 +889,69 @@
     atualizarSituacao();
   }
 
+  // ---------- sombra dos prédios no mapa ----------
+  // Para cada prédio na tela: estica a planta dele na direção oposta ao sol, com o comprimento
+  // altura / tan(altura do sol). A altura vem do mapa (OpenStreetMap); onde não tem, usa a altura
+  // média dos prédios da orla daquela praia (perto dos postos) ou uma casa baixa.
+  const ALTURA_ORLA = {};
+  PRAIAS.forEach((p) => { if (p.predios) ALTURA_ORLA[p.id] = p.predios.altura; });
+  const PRAIA_DO_POSTO = { Leme: "leme", Copacabana: "copacabana", Arpoador: "arpoador", Ipanema: "ipanema", Leblon: "leblon", Barra: "barra", "Quebra-Mar": "barra", Flamengo: "botafogo" };
+  function alturaPadrao(lon, lat) {
+    let melhor = null;
+    (window.POSTOS || []).forEach(([, plat, plon, praia]) => {
+      const id = PRAIA_DO_POSTO[praia]; if (!id || !ALTURA_ORLA[id]) return;
+      const d = distKm(lat, lon, plat, plon);
+      if (d < 0.32 && (!melhor || d < melhor.d)) melhor = { d, h: ALTURA_ORLA[id] };
+    });
+    PRAIAS.forEach((p) => { if (p.predios) { const d = distKm(lat, lon, p.lat, p.lon); if (d < 0.32 && (!melhor || d < melhor.d)) melhor = { d, h: p.predios.altura }; } });
+    return melhor ? melhor.h : 6;
+  }
+  function casco(pts) {     // contorno convexo (envolve a planta e a planta deslocada)
+    pts = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cruz = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], hi = [];
+    for (const p of pts) { while (lo.length >= 2 && cruz(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop(); lo.push(p); }
+    for (let i = pts.length - 1; i >= 0; i--) { const p = pts[i]; while (hi.length >= 2 && cruz(hi[hi.length - 2], hi[hi.length - 1], p) <= 0) hi.pop(); hi.push(p); }
+    return lo.slice(0, -1).concat(hi.slice(0, -1));
+  }
+  function desenharSombrasPredios() {
+    if (!mapaPronto || !linhas.length || !mapa.getSource("sombras")) return;
+    const vazio = { type: "FeatureCollection", features: [] };
+    if (mapa.getZoom() < 13) { mapa.getSource("sombras").setData(vazio); return; }
+    const { x } = praiaAtual();
+    const c = mapa.getCenter();
+    const s = SOL.posicao(quando(x.data, estado.minuto ?? 12 * 60), c.lat, c.lng);
+    if (s.alt <= 1) { mapa.getSource("sombras").setData(vazio); return; }
+    const comp = Math.min(600, 1 / Math.tan(s.alt * Math.PI / 180));      // metros de sombra por metro de altura
+    const dir = (s.az + 180) * Math.PI / 180;
+    const mLat = 110540, mLon = 111320 * Math.cos(c.lat * Math.PI / 180);
+    const dx = Math.sin(dir) / mLon, dy = Math.cos(dir) / mLat;           // graus por metro na direção da sombra
+    let feats = [];
+    try { feats = mapa.querySourceFeatures("openmaptiles", { sourceLayer: "building" }); } catch (e) { return; }
+    const b = mapa.getBounds(), vistos = new Set(), saida = [];
+    for (const f of feats) {
+      const g = f.geometry; if (!g) continue;
+      const aneis = g.type === "Polygon" ? [g.coordinates[0]] : g.type === "MultiPolygon" ? g.coordinates.map((pp) => pp[0]) : [];
+      for (const anel of aneis) {
+        if (!anel || anel.length < 3) continue;
+        const k = anel[0][0].toFixed(6) + "," + anel[0][1].toFixed(6);
+        if (vistos.has(k)) continue; vistos.add(k);
+        if (!b.contains(anel[0])) continue;
+        let h = +f.properties.render_height || 0;
+        if (h <= 6) h = alturaPadrao(anel[0][0], anel[0][1]);
+        const L = Math.min(h * comp, 600);
+        if (L < 1) continue;
+        const pts = anel.concat(anel.map(([lo, la]) => [lo + dx * L, la + dy * L]));
+        const cont = casco(pts); cont.push(cont[0]);
+        saida.push({ type: "Feature", properties: {}, geometry: { type: "Polygon", coordinates: [cont] } });
+      }
+    }
+    mapa.getSource("sombras").setData({ type: "FeatureCollection", features: saida });
+  }
+
   function desenharSolNoMapa(soAgora) {
     if (!mapaPronto || !linhas.length) return;
+    desenharSombrasPredios();
     const { p, x } = praiaAtual();
     const hz = horizonteDe(p);
     const ponto = (az, km) => SOL.destino(p.lat, p.lon, az, km);
