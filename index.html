@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=4.5">
+  <link rel="stylesheet" href="css/estilo.css?v=4.6">
 </head>
 <body>
 <div class="wrap">
@@ -60,6 +60,7 @@
             <span><i class="lg sol"></i>Sol</span><span><i class="lg parcial"></i>Entre nuvens</span><span><i class="lg nublado"></i>Nublado</span><span><i class="lg chuva"></i>Chuva</span><span class="lg-posto"><i class="lg posto">P</i>Posto</span>
           </div>
         </div>
+        <div id="relogioMapa"></div>
         <div id="mapa" role="region" aria-label="Mapa das praias"></div>
         <div class="mapdica">Toque numa praia para ver o caminho do sol: <b class="t-nascer">nascer</b>, <b class="t-arco">sol na areia</b>, <b class="t-sombra">sombra</b> e <b class="t-por">pôr do sol</b>. Dê zoom para ver postos, banheiros 🚻 e chuveiros 🚿.</div>
       </section>
@@ -80,14 +81,14 @@
 </div>
 
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
-<script src="js/praias.js?v=2.1"></script>
+<script src="js/praias.js?v=2.3"></script>
 <script src="js/sol.js?v=2.1"></script>
-<script src="js/paisagens.js?v=2.7"></script>
+<script src="js/paisagens.js?v=2.8"></script>
 <script src="js/postos.js?v=1"></script>
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=4"></script>
-<script src="js/app.js?v=4.5"></script>
+<script src="js/app.js?v=4.7"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>

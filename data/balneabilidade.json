@@ -3,23 +3,156 @@
   "fonte": "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/",
   "atualizadoEm": "2026-08-24",
   "praias": {
-    "flamengo": {"nota": 6.9, "ok": 1, "total": 3, "propria": null, "data": "2026-08-19"},
-    "botafogo": {"nota": 4.1, "ok": 0, "total": 2, "propria": false, "data": "2026-08-19"},
-    "vermelha": {"nota": 8.7, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
-    "leme": {"nota": 9.4, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
-    "copacabana": {"nota": 8.5, "ok": 4, "total": 4, "propria": true, "data": "2026-08-19"},
-    "arpoador": {"nota": 8.0, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
-    "ipanema": {"nota": 5.8, "ok": 0, "total": 3, "propria": false, "data": "2026-08-19"},
-    "leblon": {"nota": 6.2, "ok": 1, "total": 3, "propria": null, "data": "2026-08-19"},
-    "saoconrado": {"nota": 8.4, "ok": 3, "total": 3, "propria": true, "data": "2026-08-19"},
-    "barra": {"nota": 9.7, "ok": 4, "total": 4, "propria": true, "data": "2026-08-19"},
-    "reserva": {"nota": 8.4, "ok": 3, "total": 4, "propria": null, "data": "2026-08-19"},
-    "recreio": {"nota": 5.2, "ok": 0, "total": 3, "propria": false, "data": "2026-08-19"},
-    "prainha": {"nota": 9.3, "ok": 1, "total": 1, "propria": true, "data": "2026-08-19"},
-    "grumari": {"nota": 9.4, "ok": 2, "total": 2, "propria": true, "data": "2026-08-19"},
-    "icarai": {"nota": 9.5, "ok": 4, "total": 4, "propria": true, "data": "2026-08-24"},
-    "piratininga": {"nota": 9.7, "ok": 4, "total": 4, "propria": true, "data": "2026-08-24"},
-    "itaipu": {"nota": 9.0, "ok": 3, "total": 4, "propria": null, "data": "2026-08-24"},
-    "itacoatiara": {"nota": 7.9, "ok": 0, "total": 2, "propria": false, "data": "2026-08-24"}
+    "flamengo": {
+      "ok": 2,
+      "total": 2,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "botafogo": {
+      "ok": 0,
+      "total": 2,
+      "propria": false,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "vermelha": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "leme": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "copacabana": {
+      "ok": 4,
+      "total": 4,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "arpoador": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "ipanema": {
+      "ok": 1,
+      "total": 3,
+      "propria": null,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "leblon": {
+      "ok": 3,
+      "total": 3,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "saoconrado": {
+      "ok": 3,
+      "total": 3,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "barra": {
+      "ok": 2,
+      "total": 4,
+      "propria": null,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "reserva": {
+      "ok": 2,
+      "total": 2,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "recreio": {
+      "ok": 2,
+      "total": 2,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "prainha": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "grumari": {
+      "ok": 2,
+      "total": 2,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "icarai": {
+      "nota": 9.5,
+      "ok": 4,
+      "total": 4,
+      "propria": true,
+      "data": "2026-08-24"
+    },
+    "piratininga": {
+      "nota": 9.7,
+      "ok": 4,
+      "total": 4,
+      "propria": true,
+      "data": "2026-08-24"
+    },
+    "itaipu": {
+      "nota": 9.0,
+      "ok": 3,
+      "total": 4,
+      "propria": null,
+      "data": "2026-08-24"
+    },
+    "itacoatiara": {
+      "nota": 7.9,
+      "ok": 0,
+      "total": 2,
+      "propria": false,
+      "data": "2026-08-24"
+    },
+    "joatinga": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "diabo": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    },
+    "vidigal": {
+      "ok": 1,
+      "total": 1,
+      "propria": true,
+      "data": "2026-10-21",
+      "fonte": "boletim semanal INEA"
+    }
+  },
+  "boletimSemanal": {
+    "url": "https://www.inea.rj.gov.br/wp-content/uploads/2026/10/Boletim-Semanal-de-Balneabilidade-22_10_2026.pdf",
+    "lidoEm": "2026-10-28"
   }
 }

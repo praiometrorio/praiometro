@@ -124,14 +124,13 @@
     else if (x.vento <= 20) selos.push({ cls: "mexido", ic: IC.vento, t: "Pode ventar à tarde", s: "Finca bem o guarda-sol" });
     else selos.push({ cls: "ruim", ic: IC.vento, t: "Ventania", s: "Areia voando, guarda-sol indo embora" });
 
-    // nota da água (0 a 10) calculada com as últimas análises do INEA
-    if (x.aguaNota != null) {
-      const n = x.aguaNota, cls = n >= 8 ? "ok" : n >= 5 ? "sol" : "ruim";
-      const sit = x.propria === true ? "própria" : x.propria === false ? "imprópria" : `própria em ${x.aguaOk} de ${x.aguaTotal} pontos`;
-      selos.push({ cls, ic: n >= 5 ? IC.escudoOk : IC.escudoX, t: `Água limpa ${fmt(n)}/10`, s: `${sit[0].toUpperCase() + sit.slice(1)} · INEA` });
-    } else if (x.propria === true) selos.push({ cls: "ok", ic: IC.escudoOk, t: "Água própria", s: "Boletim do INEA" });
-    else if (x.propria === false) selos.push({ cls: "ruim", ic: IC.escudoX, t: "Água imprópria", s: "Evite entrar no mar" });
-    else selos.push({ cls: "neutro", ic: IC.escudo, t: "Água limpa?", s: "Ainda sem boletim" });
+    // água: o último boletim do INEA como ele é (própria ou imprópria), com a data
+    const dataBol = x.aguaData ? x.aguaData.slice(8, 10) + "/" + x.aguaData.slice(5, 7) : null;
+    const bol = dataBol ? `Último boletim INEA · ${dataBol}` : "Boletim do INEA";
+    if (x.propria === true) selos.push({ cls: "ok", ic: IC.escudoOk, t: "Água própria", s: bol });
+    else if (x.propria === false) selos.push({ cls: "ruim", ic: IC.escudoX, t: "Água imprópria", s: bol });
+    else if (x.aguaTotal) selos.push({ cls: "sol", ic: IC.escudo, t: `Própria em ${x.aguaOk} de ${x.aguaTotal} pontos`, s: bol });
+    else selos.push({ cls: "neutro", ic: IC.escudo, t: "Água", s: "Sem boletim do INEA" });
 
     if (!p.baia && o != null && o >= 1 && o <= 2.4 && x.vento <= 15)
       selos.push({ cls: "mar", ic: IC.prancha, t: "Onda pra surfar", s: `${fmt(o)} m · vento ${x.vento} km/h` });
@@ -152,7 +151,6 @@
     else if (x.vento > 15) resto.push("vento apertando à tarde");
     if (x.propria === true) resto.push("água própria");
     if (x.propria === false) resto.push("água imprópria");
-    if (x.propria == null && x.aguaNota != null && x.aguaNota < 5) resto.push("água com histórico ruim");
 
     const tom = (horasSol >= 5 && x.vento <= 15 && (p.baia || o == null || o < 1.6) && x.chuvaMax < 40 && x.propria !== false) ? "bom"
       : ((horasSol <= 1 && (ceu === "nublado" || ceu === "chuva")) || (ceu === "chuva" && x.chuvaMax >= 70)) ? "ruim" : "medio";
@@ -165,7 +163,7 @@
     const resumo = [ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       x.vento > 20 ? "ventania" : x.vento > 15 ? "vento à tarde" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
-    const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.aguaNota != null ? (x.aguaNota - 6) * 0.25 : 0);
+    const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.propria == null && x.aguaTotal ? (x.aguaOk / x.aguaTotal - 0.5) * 2 : 0);
     return { horasSol, janela, ceu, tom, selos, veredito, resumo, score };
   }
 
@@ -529,7 +527,7 @@
           nascer: (t.daily.sunrise[d] || "").slice(11, 16) || "05:30",
           porDoSol: (t.daily.sunset[d] || "").slice(11, 16) || "18:30",
           propria: prop && typeof prop === "object" ? prop.propria : prop === true ? true : prop === false ? false : null,
-          aguaNota: prop && typeof prop === "object" ? prop.nota : null,
+          aguaData: prop && typeof prop === "object" ? prop.data : null,
           aguaOk: prop && typeof prop === "object" ? prop.ok : null,
           aguaTotal: prop && typeof prop === "object" ? prop.total : null,
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
@@ -819,11 +817,6 @@
         </button>` : ""}
         <div class="selos">${a.selos.map((s) => `<div class="selo ${s.cls}">${s.ic}<b>${s.t}</b><span>${s.s}</span></div>`).join("")}</div>
         <div class="info sombra" id="sombra">${IC.sombra}<span>Calculando a sombra na areia…</span></div>
-        <div class="relogio">
-          <label for="minuto"><span>${IC.relogio.replace("<svg", '<svg width="18" height="18" style="vertical-align:-4px;margin-right:4px"')}Onde está o sol às <b id="minutoTxt">${textoMin(estado.minuto)}</b></span><span id="minutoSit"></span></label>
-          <input type="range" id="minuto" min="${ini}" max="${fim}" step="5" value="${estado.minuto}">
-          <small>Arraste para ver o sol andando no mapa</small>
-        </div>
         ${htmlMetro(p)}
         ${graficoUv(x)}
         ${graficoMare(x)}
@@ -831,6 +824,13 @@
       </div>`;
     const agoraEl = document.querySelector("#horas .agora");
     if (agoraEl) $("#horas").scrollLeft = Math.max(0, agoraEl.offsetLeft - 8);
+    // controle do horário do sol: fica junto do mapa (logo acima dele)
+    $("#relogioMapa").innerHTML = `
+        <div class="relogio">
+          <label for="minuto"><span>${IC.relogio.replace("<svg", '<svg width="18" height="18" style="vertical-align:-4px;margin-right:4px"')}Onde está o sol às <b id="minutoTxt">${textoMin(estado.minuto)}</b></span><span id="minutoSit"></span></label>
+          <input type="range" id="minuto" min="${ini - (ini % 5)}" max="${fim}" step="5" value="${estado.minuto}">
+          <small>Arraste para ver o sol andando no mapa</small>
+        </div>`;
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     $("#compartilhar").onclick = () => compartilhar(l);
     if ($("#verCeu")) $("#verCeu").onclick = () => CEU.abrir(p);

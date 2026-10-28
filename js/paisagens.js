@@ -63,6 +63,15 @@ window.PAISAGENS = {
 // Cada camada é uma lista de pontos [x, y] no desenho (largura 400, horizonte em y = 142).
 // Extras: palmeiras [x, altura, inclinação, base], barcos [x, tamanho], calcadao (ondas de Copacabana).
 window.SILHUETAS = {
+  // Joatinga: enseada pequena entre dois costões de pedra (o do Joá à esquerda e a ponta da Joatinga à direita)
+  joatinga: { camadas: [
+    { longe: true, pts: [[-2,142],[-2,96],[30,90],[60,96],[86,112],[104,128],[118,142]] },
+    { pedra: true, pts: [[-2,142],[-2,70],[18,64],[40,70],[58,84],[74,100],[90,118],[104,134],[112,142]] },
+    { pts: [[-2,98],[16,88],[34,90],[50,100],[60,110],[40,112],[14,108],[-2,110]] },
+    { longe: true, pts: [[300,142],[318,118],[340,102],[366,96],[402,92],[402,142]] },
+    { pedra: true, pts: [[318,142],[330,126],[346,110],[362,100],[380,92],[402,88],[402,142]] },
+    { pts: [[350,104],[366,96],[384,92],[402,90],[402,104],[380,108],[362,110]] }
+  ] },
   flamengo: {
     camadas: [
       { longe: true, pts: [[0,142],[3.9,135.8],[15.5,126.6],[34.8,120.4],[77.3,121.6],[100.5,124.7],[116,132.7],[120.6,142]] },
