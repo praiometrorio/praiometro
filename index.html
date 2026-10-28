@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=4.7">
+  <link rel="stylesheet" href="css/estilo.css?v=4.9">
 </head>
 <body>
 <div class="wrap">
@@ -36,6 +36,19 @@
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
     <input id="busca" type="search" placeholder="Busque sua praia" autocomplete="off" aria-label="Busque sua praia" aria-controls="buscaRes">
     <ul id="buscaRes" class="busca-res" role="listbox" hidden></ul>
+  </div>
+
+  <button id="abrirFav" class="btn-fav-grande" aria-label="Minhas praias favoritas">
+    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor"/></svg>
+    <span>Minhas praias favoritas</span><b id="favQtd"></b><i aria-hidden="true">›</i>
+  </button>
+
+  <div class="fav-tela" id="favTela" hidden role="dialog" aria-modal="true" aria-labelledby="favTitulo">
+    <div class="fav-topo">
+      <div><h2 id="favTitulo">Minhas praias</h2><small id="favDia"></small></div>
+      <button id="fecharFav" class="fav-x" aria-label="Fechar">×</button>
+    </div>
+    <div class="fav-lista" id="favLista"></div>
   </div>
 
   <div class="instalar" id="instalar" hidden>
@@ -94,7 +107,7 @@
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=4"></script>
-<script src="js/app.js?v=5.2"></script>
+<script src="js/app.js?v=5.4"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>

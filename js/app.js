@@ -1011,7 +1011,30 @@
   function alternarFavorita(id) {
     favoritas = ehFavorita(id) ? favoritas.filter((f) => f !== id) : favoritas.concat(id);
     guarda.gravar("pm-favoritas", favoritas);
+    contarFavoritas();
   }
+  function contarFavoritas() { const q = $("#favQtd"); if (q) q.textContent = favoritas.length ? favoritas.length : ""; }
+
+  // ---------- tela das favoritas: previsão resumida de cada uma; tocando, abre a completa ----------
+  function desenharFavoritas() {
+    const dia = nomeDia(estado.dia);
+    $("#favDia").textContent = `Previsão de ${dia}`;
+    const minhas = favoritas.map((id) => linhas.find((l) => l.p.id === id)).filter(Boolean)
+      .sort((a, b) => b.a.score - a.a.score);
+    if (!minhas.length) {
+      $("#favLista").innerHTML = `<div class="fav-vazio">${IC.estrela}<b>Nenhuma praia favorita ainda</b>
+        <span>Abra uma praia e toque em <b>Favoritar</b>. Ela aparece aqui, com a previsão resumida, sempre que você abrir.</span></div>`;
+      return;
+    }
+    $("#favLista").innerHTML = minhas.map(({ p, a }) => `<button class="fav-card simples" data-id="${p.id}">
+        <span class="ic ${a.ceu}">${IC[a.ceu]}</span>
+        <span class="fav-nome"><b>${p.nome}</b></span>
+        <span class="fav-abrir">Previsão completa ›</span>
+      </button>`).join("");
+    document.querySelectorAll(".fav-card").forEach((b) => b.onclick = () => { fecharFavoritas(); abrirPraia(b.dataset.id); });
+  }
+  function abrirFavoritas() { desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function fecharFavoritas() { $("#favTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- compartilhar: monta uma imagem do cartão no formato de story (1080 x 1920) ----------
   const COR_SELO = { sol: ["#FFE7B3", "#5E3B00"], bronze: ["#FFD9C2", "#6E2A08"], mar: ["#CDEFF6", "#0A4A5C"], mexido: ["#CDE0EA", "#0A3A4D"],
@@ -1128,6 +1151,10 @@
   // ---------- início ----------
   function controles() {
     ligarBusca();
+    contarFavoritas();
+    $("#abrirFav").onclick = abrirFavoritas;
+    $("#fecharFav").onclick = fecharFavoritas;
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); });
     $("#regioes").innerHTML = Object.entries(REGIOES).map(([k, v]) => `<button data-r="${k}" aria-pressed="${k === estado.regiao}">${v.nome}</button>`).join("");
     document.querySelectorAll("#regioes button").forEach((b) => b.onclick = () => irParaRegiao(b.dataset.r));
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
