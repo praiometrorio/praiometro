@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=5.1">
+  <link rel="stylesheet" href="css/estilo.css?v=5.3">
 </head>
 <body>
 <div class="wrap">
@@ -55,6 +55,13 @@
       <button id="fecharSurfe" class="fav-x" aria-label="Fechar">×</button>
     </div>
     <nav class="surfe-dias" id="surfeDias" aria-label="Dia"></nav>
+    <div class="surfe-modo" id="surfeModo" role="group" aria-label="Ver como"><button data-m="lista">Lista</button><button data-m="mapa">Mapa</button></div>
+    <div class="surfe-mapa-box" id="surfeMapaBox" hidden>
+      <nav class="surfe-areas" id="surfeAreas" aria-label="Trecho do litoral"></nav>
+      <div id="surfeMapa" role="region" aria-label="Mapa do mar com a previsão de cada pico"></div>
+      <div class="surfe-hora" id="surfeHoraBox"></div>
+      <div class="pico-leg claro"><span><i class="terral"></i>Terral</span><span><i class="lateral"></i>Lateral</span><span><i class="maral"></i>Maral</span><small>Seta azul: ondulação · número: altura e período</small></div>
+    </div>
     <div class="fav-lista" id="surfeLista"></div>
   </div>
 
@@ -100,7 +107,7 @@
       </section>
 
       <section class="lista">
-        <div class="listahead"><h2 id="listaTitulo">Praias hoje</h2><small>as melhores primeiro · céu das 6h às 20h</small></div>
+        <div class="listahead"><h2 id="listaTitulo">Praias hoje</h2><small>As melhores primeiro · céu das 6h às 20h</small></div>
         <ol id="lista"></ol>
       </section>
     </div>
@@ -122,7 +129,7 @@
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=4"></script>
-<script src="js/app.js?v=5.8"></script>
+<script src="js/app.js?v=6.0"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>

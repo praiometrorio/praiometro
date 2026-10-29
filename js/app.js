@@ -98,7 +98,7 @@
     const uv = pico ? Math.round(pico.uv) : x.uv;
     const horaJa = +relogio.format(new Date()).slice(0, 2);
     const agoraUv = x.hoje ? comUv.find((y) => y.h === horaJa) : null;
-    const uvTxt = (pico ? `pico ${uv} às ${pico.h}h` : `UV ${uv}`) + (agoraUv ? ` · agora ${Math.round(agoraUv.uv)}` : "");
+    const uvTxt = (pico ? `Pico ${uv} às ${pico.h}h` : `UV ${uv}`) + (agoraUv ? ` · agora ${Math.round(agoraUv.uv)}` : "");
     if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: `${uvTxt} · evite o sol do meio-dia` });
     else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de pegar cor", s: `${uvTxt} · protetor a cada 2h` });
     else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `${uvTxt} · passa protetor` });
@@ -346,7 +346,7 @@
       const m = ms[0];
       return `<div class="info metro">${IC.metro}<span><b>Metrô ${m.nome}</b>, uns ${m.min} min a pé${m.posto ? ` até ${/^\d+$|^QM$/.test(m.posto) ? "o " : "a "}${nomePosto(m.posto)}` : ""}.</span></div>`;
     }
-    return `<div class="info metro">${IC.metro}<div class="metro-c"><b>Metrô</b> <small>escolha pelo pedaço da praia</small>
+    return `<div class="info metro">${IC.metro}<div class="metro-c"><b>Metrô</b> <small>Escolha pelo pedaço da praia</small>
       <ul>${ms.map((m) => `<li><b>${m.nome}</b>${m.posto ? ` → ${nomePosto(m.posto)}` : ""} <span>· ${m.min} min</span></li>`).join("")}</ul></div></div>`;
   }
 
@@ -391,7 +391,7 @@
       const ag = y.h === agoraH;
       return `<rect x="${x0}" y="${y0}" width="${w}" height="${alt}" rx="4" fill="${f.cor}"${ag ? ' stroke="#10283A" stroke-width="2"' : ""}/>
         ${v >= 1 ? `<text x="${x0 + w / 2}" y="${y0 - 4}" text-anchor="middle" font-size="10" font-weight="800" fill="#10283A">${v}</text>` : ""}
-        ${ag || (y.h % 2 === 0 && Math.abs(y.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' font-weight="800" fill="#10283A"' : ""}>${ag ? "agora" : y.h + "h"}</text>` : ""}`;
+        ${ag || (y.h % 2 === 0 && Math.abs(y.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' font-weight="800" fill="#10283A"' : ""}>${ag ? "Agora" : y.h + "h"}</text>` : ""}`;
     }).join("");
     // recomendação de saúde conforme o pico do dia
     const SAUDE = {
@@ -406,7 +406,7 @@
     const corTexto = (f) => (f.nome === "Moderado" ? "#3D2E00" : "#fff");
     const legenda = FAIXAS_UV.map((f) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:${f.cor};display:inline-block"></i>${f.nome}</span>`).join("");
     return `<div class="info uv" style="display:block;background:#FFF3EC;color:#5A2410"><div style="display:grid;gap:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b>${agora ? `<span style="display:flex;align-items:center;gap:8px;background:${faixaUv(agora.uv).cor};color:${corTexto(faixaUv(agora.uv))};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right">AGORA<br>${faixaUv(agora.uv).nome}</small><b style="font-size:26px;line-height:1">${Math.round(agora.uv)}</b></span>` : '<small style="opacity:.7;font-size:12px">hora a hora</small>'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b>${agora ? `<span style="display:flex;align-items:center;gap:8px;background:${faixaUv(agora.uv).cor};color:${corTexto(faixaUv(agora.uv))};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right">AGORA<br>${faixaUv(agora.uv).nome}</small><b style="font-size:26px;line-height:1">${Math.round(agora.uv)}</b></span>` : '<small style="opacity:.7;font-size:12px">Hora a hora</small>'}</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap">${chip(`Pico ${Math.round(pico.uv)} às ${pico.h}h · ${faixaUv(pico.uv).nome}`, faixaUv(pico.uv), corTexto(faixaUv(pico.uv)))}</div>
       <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico ${Math.round(pico.uv)} às ${pico.h}h.">${barras}</svg>
       <div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:10.5px;opacity:.85">${legenda}</div>
@@ -437,7 +437,7 @@
         <rect x="${x0}" y="${ya}" width="${w}" height="${base - ya}" rx="5" fill="url(#mareAgua)"/>
         ${ag ? `<rect x="${x0 - 1.5}" y="${topo - 1.5}" width="${w + 3}" height="${alto + 3}" rx="6" fill="none" stroke="#10283A" stroke-width="2"/>` : ""}
         ${marca ? `<text x="${x0 + w / 2}" y="${topo - 4}" text-anchor="middle" class="m-${marca.tipo}" font-size="11" fill="${marca.tipo === "alta" ? "#1F6F9F" : "#B08A3A"}">${marca.tipo === "alta" ? "▲" : "▼"}</text>` : ""}
-        ${ag || (q.h % 2 === 0 && Math.abs(q.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' class="t-ag" fill="#10283A" font-weight="800"' : ""}>${ag ? "agora" : q.h + "h"}</text>` : ""}
+        ${ag || (q.h % 2 === 0 && Math.abs(q.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' class="t-ag" fill="#10283A" font-weight="800"' : ""}>${ag ? "Agora" : q.h + "h"}</text>` : ""}
       </g>`;
     }).join("");
     const baixa = dia.find((e) => e.tipo === "baixa" && e.min >= 6 * 60 && e.min <= 20 * 60), alta = dia.find((e) => e.tipo === "alta" && e.min >= 6 * 60 && e.min <= 20 * 60);
@@ -449,7 +449,7 @@
     }
     const chips = [baixa ? `<span class="chip baixa" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:#F3DFB5;color:#6B4F12">▼ Baixa ${hh(baixa.min)}</span>` : "", alta ? `<span class="chip alta" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:#1F6F9F;color:#fff">▲ Alta ${hh(alta.min)}</span>` : ""].join("");
     return `<div class="info mare" style="display:block"><div class="mare-c" style="display:grid;gap:8px">
-      <div class="mare-t" style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.onda.replace("<svg", '<svg style="width:22px;height:22px"')}Maré</b><small style="opacity:.7;font-size:12px">horários aprox.</small></div>
+      <div class="mare-t" style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.onda.replace("<svg", '<svg style="width:22px;height:22px"')}Maré</b><small style="opacity:.7;font-size:12px">Horários aprox.</small></div>
       <div class="chips" style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
       <svg viewBox="0 0 ${W} ${H}" class="mare-g" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#4A6A7A" role="img" aria-label="Maré de hora em hora.${baixa ? " Baixa às " + hh(baixa.min) + "." : ""}${alta ? " Alta às " + hh(alta.min) + "." : ""}${faixa ? " Mais areia " + faixa + "." : ""}">
         <defs><linearGradient id="mareAgua" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9"/><stop offset="1" stop-color="#1F6F9F"/></linearGradient></defs>
@@ -917,7 +917,7 @@
     if (st === "carregando" || st === undefined) { el.querySelector("span").textContent = "Calculando a sombra na areia…"; return; }
     const r = sombraDoDia(l.p, l.x);
     const temSombra = Object.values(r.sombraHora).some(Boolean);
-    el.querySelector("span").innerHTML = r.texto + (temSombra ? " <small>Na faixa de horários, a listra embaixo marca a areia na sombra.</small>" : "") + (st === "erro" ? " <small>(sem dados do relevo agora; considerei só os prédios)</small>" : "");
+    el.querySelector("span").innerHTML = r.texto + (temSombra ? " <small>Na faixa de horários, a listra embaixo marca a areia na sombra.</small>" : "") + (st === "erro" ? " <small>(Sem dados do relevo agora; considerei só os prédios)</small>" : "");
     document.querySelectorAll("#horas [data-h]").forEach((i) => i.classList.toggle("sombra", r.sombraHora[+i.dataset.h]));
     atualizarSituacao();
   }
@@ -1113,16 +1113,89 @@
   const seta = (g, cor) => g == null ? "" : `<svg class="seta" viewBox="0 0 24 24" style="transform:rotate(${(g + 180) % 360}deg)" aria-hidden="true"><path d="M12 3l6 9h-4v9h-4v-9H6z" fill="${cor || "currentColor"}"/></svg>`;
   const swP = (q) => (q.sw && q.sw.a != null ? q.sw : { a: q.alt, p: q.per, d: q.dir });
   const PICOS = () => PRAIAS.filter((p) => p.mar != null);
-  let surfeDia = 0, surfeAberta = null;
+  let surfeDia = 0, surfeAberta = null, surfeModo = "lista", surfeHora = null;
+  // ---------- mapa do mar: a previsão de todos os picos no mapa, com régua de horário ----------
+  let mapaSurfe = null, mapaSurfePronto = false, marcasSurfe = [];
+  const PRIORIDADE_SURFE = ["arpoador", "leblon", "ipanema", "copacabana", "saoconrado", "barra", "joatinga", "recreio", "prainha", "grumari", "reserva", "leme", "vidigal", "diabo", "itacoatiara", "itaipu", "piratininga"];
+  // ponto no mar, 1,3 km em frente à praia (na direção para onde ela está virada)
+  const noMar = (p, km = 1.3) => { const r = p.mar * Math.PI / 180; return [p.lon + Math.sin(r) * km / (111.32 * Math.cos(p.lat * Math.PI / 180)), p.lat + Math.cos(r) * km / 110.57]; };
+  const AREAS_SURFE = [
+    { id: "zs", nome: "Zona Sul", caixa: [-43.29, -23.02, -43.155, -22.955] },
+    { id: "barra", nome: "Barra e Recreio", caixa: [-43.49, -23.06, -43.27, -22.99] },
+    { id: "grumari", nome: "Prainha e Grumari", caixa: [-43.55, -23.07, -43.45, -23.02] },
+    { id: "nit", nome: "Niterói", caixa: [-43.11, -23.0, -43.0, -22.94] },
+    { id: "tudo", nome: "Tudo", caixa: [-43.56, -23.09, -43.0, -22.93] }];
+  let areaSurfe = "zs";
+  async function desenharSurfeMapa() {
+    $("#surfeAreas").innerHTML = AREAS_SURFE.map((a) => `<button data-a="${a.id}" aria-pressed="${a.id === areaSurfe}">${a.nome}</button>`).join("");
+    document.querySelectorAll("#surfeAreas button").forEach((b) => b.onclick = () => {
+      areaSurfe = b.dataset.a; const c = AREAS_SURFE.find((a) => a.id === areaSurfe).caixa;
+      document.querySelectorAll("#surfeAreas button").forEach((o) => o.setAttribute("aria-pressed", o === b));
+      if (mapaSurfe) mapaSurfe.fitBounds([[c[0], c[1]], [c[2], c[3]]], { padding: 16, duration: 800 });
+    });
+    if (surfeHora == null) surfeHora = horaLista();
+    $("#surfeHoraBox").innerHTML = `<label for="surfeHoraR"><span>Previsão às <b>${surfeHora}h</b></span>${surfeDia === 0 && surfeHora !== horaLista() ? '<button id="surfeAgora">Agora</button>' : ""}</label>
+      <input type="range" id="surfeHoraR" min="${HORA_INI}" max="${HORA_FIM}" step="1" value="${surfeHora}">`;
+    $("#surfeHoraR").oninput = (e) => { surfeHora = +e.target.value; $("#surfeHoraBox b").textContent = surfeHora + "h"; colocarSurfe(); };
+    $("#surfeHoraR").onchange = () => desenharSurfeMapa();
+    if ($("#surfeAgora")) $("#surfeAgora").onclick = () => { surfeHora = horaLista(); desenharSurfeMapa(); };
+    if (mapaSurfe) { mapaSurfe.resize(); if (mapaSurfePronto) colocarSurfe(); return; }
+    if (!window.maplibregl) return;
+    let estilo = ESTILO_URL;
+    try { estilo = estiloPraiometro(await buscarJSON(ESTILO_URL)); } catch (e) { console.warn("Estilo padrão do mapa", e); }
+    mapaSurfe = new maplibregl.Map({ container: "surfeMapa", style: estilo, bounds: (() => { const c = AREAS_SURFE.find((a) => a.id === areaSurfe).caixa; return [[c[0], c[1]], [c[2], c[3]]]; })(), fitBoundsOptions: { padding: 16 },
+      attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
+    mapaSurfe.touchZoomRotate.disableRotation();
+    mapaSurfe.on("load", () => { mapaSurfePronto = true; colocarSurfe(); });
+    mapaSurfe.on("move", arrumarSurfe);
+  }
+  function colocarSurfe() {
+    if (!mapaSurfe) return;
+    marcasSurfe.forEach((m) => m.mk.remove()); marcasSurfe = [];
+    PICOS().forEach((p) => {
+      const x = previsao[p.id][surfeDia], q = x.surfe && x.surfe.find((y) => y.h === surfeHora);
+      if (!q) return;
+      const s = swP(q), tv = tipoVento(q.v, q.vd, p.mar);
+      const el = document.createElement("button");
+      el.className = "smk v-" + tv.cls;
+      el.setAttribute("aria-label", `${p.nome}: ondas ${fmt1(s.a)} m, ${int(s.p)} s, ${rumo(s.d)}; vento ${rumo(q.vd)} ${int(q.v)} km/h, ${tv.tipo}`);
+      el.innerHTML = `<span class="smk-n">${p.nome}</span>
+        <span class="smk-o">${seta(s.d)}<b>${fmt1(s.a)}</b><small>m</small><em>${int(s.p)}s</em></span>
+        <span class="smk-v ${tv.cls}">${seta(q.vd)}${int(q.v)}</span>`;
+      el.onclick = (ev) => { ev.stopPropagation(); surfeAberta = p.id; desenharSurfe(); $("#surfeTela").scrollTop = 0; };
+      const mk = new maplibregl.Marker({ element: el, anchor: "center" }).setLngLat(noMar(p)).addTo(mapaSurfe);
+      marcasSurfe.push({ id: p.id, mk, el, ll: noMar(p) });
+    });
+    arrumarSurfe();
+  }
+  // quando os balões se encostam, esconde os menos importantes (aparecem ao dar zoom)
+  function arrumarSurfe() {
+    if (!mapaSurfe || !marcasSurfe.length) return;
+    const z = mapaSurfe.getZoom(), compacto = z < 10.2;
+    const L = compacto ? 58 : 82, A = compacto ? 30 : 58;
+    const ord = marcasSurfe.slice().sort((a, b) => PRIORIDADE_SURFE.indexOf(a.id) - PRIORIDADE_SURFE.indexOf(b.id));
+    const mostrados = [];
+    ord.forEach((m) => {
+      const pt = mapaSurfe.project(m.ll);
+      const bate = mostrados.some((o) => Math.abs(o.x - pt.x) < L && Math.abs(o.y - pt.y) < A);
+      m.el.classList.toggle("compacto", compacto);
+      m.el.style.visibility = bate ? "hidden" : "visible";
+      if (!bate) mostrados.push(pt);
+    });
+  }
   // hora mostrada na lista: hoje, a hora atual; outros dias, 8h
   const horaLista = () => surfeDia === 0 ? Math.min(HORA_FIM, Math.max(HORA_INI, +relogio.format(new Date()).slice(0, 2))) : 8;
   function desenharSurfe() {
     const nomes = datas.map((dt, d) => d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[new Date(dt + "T12:00:00").getDay()]);
     $("#surfeDias").innerHTML = nomes.map((n, d) => `<button data-d="${d}" aria-pressed="${d === surfeDia}">${n}</button>`).join("");
     document.querySelectorAll("#surfeDias button").forEach((b) => b.onclick = () => { surfeDia = +b.dataset.d; desenharSurfe(); });
-    if (surfeAberta) return desenharPico(surfeAberta);
+    if (surfeAberta) { $("#surfeModo").hidden = true; $("#surfeMapaBox").hidden = true; $("#surfeLista").hidden = false; return desenharPico(surfeAberta); }
     $("#surfeTitulo").textContent = "Surfe";
     $("#surfeVoltar").hidden = true;
+    $("#surfeModo").hidden = false;
+    document.querySelectorAll("#surfeModo button").forEach((b) => { b.setAttribute("aria-pressed", b.dataset.m === surfeModo); b.onclick = () => { surfeModo = b.dataset.m; desenharSurfe(); }; });
+    if (surfeModo === "mapa") { $("#surfeLista").hidden = true; $("#surfeMapaBox").hidden = false; desenharSurfeMapa(); return; }
+    $("#surfeLista").hidden = false; $("#surfeMapaBox").hidden = true;
     const hL = horaLista();
     const lista = PICOS().map((p) => { const x = previsao[p.id][surfeDia]; return { p, q: x.surfe && x.surfe.find((y) => y.h === hL) }; }).filter((r) => r.q);
     if (!lista.length) { $("#surfeLista").innerHTML = `<div class="fav-vazio"><b>Sem previsão de ondas agora</b><span>Tente de novo daqui a pouco.</span></div>`; return; }
@@ -1173,19 +1246,19 @@
         <text x="${cx}" y="${ty}" text-anchor="${anc}" font-size="10" font-weight="800" fill="#10283A">${hhmm(e.min)}</text>
         <text x="${cx}" y="${ty + 10}" text-anchor="${anc}" font-size="9" fill="#5A6B78">${fmt1(e.nivel)} m</text>`;
     }).join("");
-    let agora = "", estadoTxt = "";
-    if (surfeDia === 0) {
-      const t = new Date(), mA = +relogio.format(t).slice(0, 2) * 60 + +relogio.format(t).slice(3, 5);
-      const k = Math.floor(mA / 60), a0 = pts.find((q) => q.h === k), a1 = pts.find((q) => q.h === k + 1);
-      if (a0) {
-        const f = (mA % 60) / 60, nA = a1 ? a0.n + (a1.n - a0.n) * f : a0.n, cx = X(mA), cy = Y(nA);
-        agora = `<line x1="${cx}" x2="${cx}" y1="${topo - 10}" y2="${base}" stroke="#E8A400" stroke-width="1.5" stroke-dasharray="4 3"/><circle cx="${cx}" cy="${cy}" r="5" fill="#E8A400" stroke="#fff" stroke-width="2"/>`;
-        const prox = ext.find((e) => e.min > mA);
-        estadoTxt = `<p class="mare-agora"><b>Agora ${fmt1(nA)} m</b> · ${prox ? (prox.tipo === "alta" ? "enchendo até " : "secando até ") + hhmm(prox.min) : ""}</p>`;
-      }
-    }
+    // linha amarela: começa no agora (outros dias: mesma hora de agora) e pode ser arrastada
+    const tA = new Date(), mAgora = +relogio.format(tA).slice(0, 2) * 60 + +relogio.format(tA).slice(3, 5);
+    const minIni = pts[0].h * 60, minFim = pts[pts.length - 1].h * 60;
+    const nivelMin = (m) => { const k = Math.floor(m / 60), a0 = pts.find((q) => q.h === k), a1 = pts.find((q) => q.h === k + 1); return a0 ? (a1 ? a0.n + (a1.n - a0.n) * (m % 60) / 60 : a0.n) : null; };
+    mareCursor = { X, Y, esq, dir, W, minIni, minFim, nivelMin, ext, hhmm, agora: surfeDia === 0 ? mAgora : null, topo, base };
+    const m0 = Math.min(minFim, Math.max(minIni, mAgora));
+    const agora = `<g id="mCursor" style="pointer-events:none"><line id="mcL" x1="0" x2="0" y1="${topo - 12}" y2="${base}" stroke="#E8A400" stroke-width="2" stroke-dasharray="4 3"/>
+        <circle id="mcP" cx="0" cy="0" r="5.5" fill="#E8A400" stroke="#fff" stroke-width="2"/>
+        <rect id="mcA" x="-9" y="${base - 7}" width="18" height="14" rx="7" fill="#E8A400"/><path id="mcS" d="M-4 ${base} l-2.5 0 m9 0 l-2.5 0 M-4.5 ${base - 3} l-3 3 l3 3 M4.5 ${base - 3} l3 3 l-3 3" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>`;
+    const estadoTxt = `<p class="mare-agora" id="mcTxt"></p>`;
+    setTimeout(() => moverCursorMare(m0), 0);
     return `<div class="mare-surf">${estadoTxt}
-      <svg viewBox="0 0 ${W} ${H - 22}" role="img" aria-label="Maré do dia">
+      <svg viewBox="0 0 ${W} ${H - 22}" role="img" aria-label="Maré do dia, arraste a linha amarela" id="mareSvg">
         <defs><linearGradient id="gMare" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9" stop-opacity=".55"/><stop offset="1" stop-color="#4FB3D9" stop-opacity=".08"/></linearGradient></defs>
         <rect x="${X(0)}" y="${topo - 14}" width="${Math.max(0, X(nas) - X(0))}" height="${base - topo + 14}" fill="#EEF1F6"/>
         <rect x="${X(por)}" y="${topo - 14}" width="${Math.max(0, X(1440) - X(por))}" height="${base - topo + 14}" fill="#EEF1F6"/>
@@ -1194,8 +1267,40 @@
         <path d="${d}" fill="none" stroke="#0B6FA8" stroke-width="2.2"/>
         ${eixo}${agora}${marcas}
       </svg>
-      <div class="pico-leg"><span><i style="background:#0B6FA8"></i>alta</span><span><i style="background:#fff;border:2px solid #0B6FA8;box-sizing:border-box"></i>baixa</span><span><i style="background:#EEF1F6"></i>noite</span><small>nível em metros, em relação ao nível médio do mar</small></div>
+      <div class="pico-leg"><span><i style="background:#0B6FA8"></i>Alta</span><span><i style="background:#fff;border:2px solid #0B6FA8;box-sizing:border-box"></i>Baixa</span><span><i style="background:#EEF1F6"></i>Noite</span><small>Arraste a linha amarela para ver outro horário</small></div>
     </div>`;
+  }
+  let mareCursor = null;
+  function moverCursorMare(m) {
+    const c = mareCursor, svg = $("#mareSvg");
+    if (!c || !svg) return;
+    m = Math.round(Math.min(c.minFim, Math.max(c.minIni, m)) / 5) * 5;
+    const n = c.nivelMin(m), cx = c.X(m), cy = c.Y(n);
+    $("#mcL").setAttribute("x1", cx); $("#mcL").setAttribute("x2", cx);
+    $("#mcP").setAttribute("cx", cx); $("#mcP").setAttribute("cy", cy);
+    $("#mcA").setAttribute("x", cx - 9); $("#mcS").setAttribute("transform", `translate(${cx} 0)`);
+    const prox = c.ext.find((e) => e.min > m);
+    const ehAgora = c.agora != null && Math.abs(m - c.agora) < 5;
+    $("#mcTxt").innerHTML = `<b>${ehAgora ? "Agora" : c.hhmm(m)} · ${fmt1(n)} m</b>${prox ? ` · ${prox.tipo === "alta" ? "enchendo até " : "secando até "}${c.hhmm(prox.min)}` : ""}${c.agora != null && !ehAgora ? ' <button id="mcVolta">Voltar pro agora</button>' : ""}`;
+    if ($("#mcVolta")) $("#mcVolta").onclick = () => moverCursorMare(c.agora);
+    // destaca a coluna da mesma hora na tabela
+    const h = Math.floor(m / 60);
+    document.querySelectorAll(".tab-surf td.cur, .tab-surf th.cur").forEach((e) => e.classList.remove("cur"));
+    document.querySelectorAll(`.tab-surf [data-h="${h}"]`).forEach((e) => e.classList.add("cur"));
+    const td = document.querySelector(`.tab-surf td[data-h="${h}"]`), tab = $(".tab-surf");
+    if (td && tab) { const l = td.offsetLeft, vis = tab.scrollLeft + 110, fim = tab.scrollLeft + tab.clientWidth - td.offsetWidth;
+      if (l < vis || l > fim) tab.scrollLeft = Math.max(0, l - tab.clientWidth / 2); }
+  }
+  function ligarCursorMare() {
+    const svg = $("#mareSvg");
+    if (!svg || !mareCursor) return;
+    const c = mareCursor;
+    const paraMin = (ev) => { const r = svg.getBoundingClientRect(), vx = (ev.clientX - r.left) * c.W / r.width; return (vx - c.esq) / (c.W - c.esq - c.dir) * 1440; };
+    let arrastando = false;
+    svg.addEventListener("pointerdown", (ev) => { arrastando = true; svg.setPointerCapture(ev.pointerId); moverCursorMare(paraMin(ev)); });
+    svg.addEventListener("pointermove", (ev) => { if (arrastando) moverCursorMare(paraMin(ev)); });
+    const solta = () => { arrastando = false; };
+    svg.addEventListener("pointerup", solta); svg.addEventListener("pointercancel", solta);
   }
   function desenharPico(id) {
     const p = PRAIAS.find((q) => q.id === id), x = previsao[id][surfeDia], hs = x.surfe;
@@ -1203,29 +1308,37 @@
     $("#surfeVoltar").hidden = false;
     if (!hs) { $("#surfeLista").innerHTML = `<div class="fav-vazio"><b>Sem previsão de ondas pra este dia</b></div>`; return; }
     const agoraH = surfeDia === 0 ? +relogio.format(new Date()).slice(0, 2) : -1;
-    const col = (q, html) => `<td${q.h === agoraH ? ' class="ag"' : ""}>${html}</td>`;
+    const nas = minutosDe(x.nascer), por = minutosDe(x.porDoSol);
+    const escuro = (h) => h * 60 + 30 < nas - 10 || h * 60 + 30 > por + 10;
+    const col = (q, html) => `<td data-h="${q.h}" class="${q.h === agoraH ? "ag" : ""}${escuro(q.h) ? " esc" : ""}">${html}</td>`;
     const linha = (rotulo, f, cls) => `<tr${cls ? ` class="${cls}"` : ""}><th>${rotulo}</th>${hs.map((q) => col(q, f(q))).join("")}</tr>`;
-    const nivel = Object.fromEntries((x.mareHoras || []).map((m) => [m.h, m.n]));
+    const nivel = Object.fromEntries((x.mareDia || x.mareHoras || []).map((m) => [m.h, m.n]));
+    const maxA = Math.max(1, ...hs.map((q) => swP(q).a || 0));
+    // cor das ondas pelo tamanho e do período pela força
+    const corOnda = (a) => a < 0.5 ? "#9CC9DD" : a < 1 ? "#4FB3D9" : a < 1.5 ? "#1E8FC6" : a < 2.2 ? "#0B6FA8" : "#3E2C93";
+    const clsPer = (p) => p == null ? "" : p >= 12 ? "p3" : p >= 9 ? "p2" : p >= 7 ? "p1" : "p0";
     const tabela = `<div class="tab-surf"><table>
-      ${linha("Hora", (q) => `<b>${q.h}h</b>`, "linha-h")}
-      ${linha("Ondas (m)", (q) => `<b>${fmt1(swP(q).a)}</b>`, "forte")}
-      ${linha("Período (s)", (q) => int(swP(q).p))}
-      ${linha("Direção", (q) => `${seta(swP(q).d)}<small>${rumo(swP(q).d)}</small>`)}
-      ${linha("Vento (km/h)", (q) => { const tv = tipoVento(q.v, q.vd, p.mar); return `<b class="vt ${tv.cls}">${int(q.v)}</b>`; }, "forte")}
-      ${linha("Dir. vento", (q) => { const tv = tipoVento(q.v, q.vd, p.mar); return `<span class="vt ${tv.cls}">${seta(q.vd)}</span><small>${rumo(q.vd)}</small>`; })}
-      ${Object.keys(nivel).length ? linha("Maré (m)", (q) => nivel[q.h] != null ? fmt1(nivel[q.h]) : "–") : ""}
+      <tr class="linha-h"><th></th>${hs.map((q) => col(q, `<b>${q.h === agoraH ? "Agora" : q.h + "h"}</b>`)).join("")}</tr>
+      ${linha('Ondas <small>m</small>', (q) => { const a = swP(q).a; return a == null ? "–" : `<div class="ond"><b>${fmt1(a)}</b><i style="height:${Math.max(4, 36 * a / maxA)}px;background:${corOnda(a)}"></i></div>`; }, "l-ond")}
+      ${linha('Período <small>s</small>', (q) => { const p = swP(q).p; return `<span class="per ${clsPer(p)}">${int(p)}</span>`; })}
+      ${linha("Direção", (q) => `<span class="dirw">${seta(swP(q).d)}</span><small>${rumo(swP(q).d)}</small>`)}
+      ${linha('Vento <small>km/h</small>', (q) => { const tv = tipoVento(q.v, q.vd, p.mar); return `<span class="vpill ${tv.cls}">${seta(q.vd)}<b>${int(q.v)}</b></span><small>${rumo(q.vd)}</small>`; }, "l-vento")}
+      ${Object.keys(nivel).length ? linha('Maré <small>m</small>', (q) => { const n = nivel[q.h], n2 = nivel[q.h + 1]; if (n == null) return "–"; const sob = n2 == null ? null : n2 > n; return `<span class="mar-c">${sob == null ? "" : sob ? "↑" : "↓"}${fmt1(n)}</span>`; }) : ""}
     </table></div>`;
     const mares = (x.mares || []).filter((e) => e.min >= 0 && e.min < 1440).map((e) => `<span><b>${e.tipo === "alta" ? "Alta" : "Baixa"}</b> ${Math.floor(e.min / 60)}h${pad(e.min % 60)}</span>`).join("");
     $("#surfeLista").innerHTML = `<div class="pico">
       ${tabela}
-      <div class="pico-leg"><span><i class="terral"></i>terral</span><span><i class="lateral"></i>lateral</span><span><i class="maral"></i>maral</span></div>
+      <div class="pico-leg"><span><i class="terral"></i>Terral</span><span><i class="lateral"></i>Lateral</span><span><i class="maral"></i>Maral</span><span><i style="background:#0B6FA8"></i>Período longo</span></div>
       ${mares || x.mareDia ? `<h3>Maré</h3>${graficoMareSurfe(x) || `<p class="pico-mare">${mares}</p>`}` : ""}
       ${x.agua != null ? `<p class="pico-dados"><span>Água <b>${fmt1(x.agua)} °C</b></span></p>` : ""}
       <button class="pico-abrir" data-id="${p.id}">Ver previsão completa da praia ›</button>
     </div>`;
     $(".pico-abrir").onclick = () => { fecharSurfe(); estado.dia = surfeDia; abrirPraia(p.id); };
+    ligarCursorMare();
+    const ag = document.querySelector(".tab-surf td.ag");
+    if (ag) $(".tab-surf").scrollLeft = Math.max(0, ag.offsetLeft - 120);
   }
-  function abrirSurfe() { surfeDia = estado.dia; surfeAberta = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function abrirSurfe() { surfeDia = estado.dia; surfeAberta = null; surfeHora = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
   function fecharSurfe() { $("#surfeTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- compartilhar: monta uma imagem do cartão no formato de story (1080 x 1920) ----------
