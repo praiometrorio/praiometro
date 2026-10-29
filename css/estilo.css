@@ -595,3 +595,13 @@ button.selo:active{transform:scale(.98)}
 .orla-nav .fn-btn:active{background:#CFEAF3}
 .ond-sub button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);font-size:12.5px;padding:6px 11px}
 .ond-sub button[aria-pressed=true]{background:#fff;color:var(--ink)}
+
+/* botões em cima da arte da praia: Favoritar com texto, Compartilhar em bolinha */
+.cena .acoes.na-arte svg{position:static;inset:auto;display:block}
+.cena .acoes.na-arte{position:absolute;left:12px;right:12px;bottom:10px;display:flex;align-items:center;gap:8px;margin:0;z-index:3;flex-wrap:nowrap}
+.cena .acoes.na-arte #favoritar{min-height:0;height:38px;padding:0 14px;border-radius:999px;display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:800;background:rgba(16,40,58,.78);color:#fff;border:0;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+.cena .acoes.na-arte #favoritar svg{width:17px;height:17px}
+.cena .acoes.na-arte #favoritar[aria-pressed=true]{background:#FFB627;color:#3D2600}
+.cena .acoes.na-arte #compartilhar{margin-left:auto;width:44px;height:44px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.92);color:#10283A;border:0;box-shadow:0 4px 12px rgba(0,30,50,.25)}
+.cena .acoes.na-arte #compartilhar span{display:none}
+.cena .acoes.na-arte #compartilhar svg{width:22px;height:22px}

@@ -916,14 +916,14 @@
     return `${navFav}
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
+        <div class="acoes na-arte">
+          <button id="favoritar" aria-pressed="${ehFavorita(p.id)}">${ehFavorita(p.id) ? IC.estrelaCheia : IC.estrela}<span>${ehFavorita(p.id) ? "Favorita" : "Favoritar"}</span></button>
+          <button id="compartilhar" aria-label="Compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
+        </div>
       </div>
       <div class="horario" id="horas" role="list" aria-label="Céu hora a hora">${horas.join("")}</div>
       <div class="corpo">
         <p class="veredito">${a.veredito}</p>
-        <div class="acoes">
-          <button id="favoritar" aria-pressed="${ehFavorita(p.id)}">${ehFavorita(p.id) ? IC.estrelaCheia : IC.estrela}<span>${ehFavorita(p.id) ? "Favorita" : "Favoritar"}</span></button>
-          <button id="compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
-        </div>
         ${window.CEU && CEU.suportado() ? `<button id="verCeu" class="ver-ceu">
           <span class="vc-ic">${IC.camera}</span>
           <span class="vc-txt"><b>Veja o trajeto do sol</b><small>Aponte a câmera para o céu</small></span>
