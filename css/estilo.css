@@ -605,3 +605,7 @@ button.selo:active{transform:scale(.98)}
 .cena .acoes.na-arte #compartilhar{margin-left:auto;width:44px;height:44px;min-height:0;padding:0;border-radius:50%;display:grid;place-items:center;background:rgba(255,255,255,.92);color:#10283A;border:0;box-shadow:0 4px 12px rgba(0,30,50,.25)}
 .cena .acoes.na-arte #compartilhar span{display:none}
 .cena .acoes.na-arte #compartilhar svg{width:22px;height:22px}
+
+/* sem internet */
+.offline{display:grid;gap:2px;background:#FFF2D0;color:#5E3B00;border-radius:14px;padding:10px 14px;font-size:13.5px}
+.offline b{font-size:14.5px}

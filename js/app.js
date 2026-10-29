@@ -314,10 +314,31 @@
   async function carregar(forcar) {
     const cache = guarda.ler(CACHE_CHAVE);
     if (!forcar && cache && Date.now() - cache.t < CACHE_MIN * 60000) return cache;
-    const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao()), buscarJSON(urlMar()).catch(() => null), buscarJSON(urlNuvens()).catch(() => null)]);
-    const novo = { t: Date.now(), tempo, mar, nuvens };
-    guarda.gravar(CACHE_CHAVE, novo);
-    return novo;
+    try {
+      const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao()), buscarJSON(urlMar()).catch(() => null), buscarJSON(urlNuvens()).catch(() => null)]);
+      const novo = { t: Date.now(), tempo, mar, nuvens };
+      guarda.gravar(CACHE_CHAVE, novo);
+      return novo;
+    } catch (e) {
+      // sem internet: usa a última previsão guardada no celular (até 6 dias), avisando de quando ela é
+      if (cache && Date.now() - cache.t < 6 * 86400000) return { ...cache, offline: true };
+      throw e;
+    }
+  }
+  const diaHoje = () => new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+  // aviso no topo e no rodapé: previsão de agora ou a guardada (sem internet)
+  function avisoPrevisao(dados) {
+    const q = new Date(dados.t), dia = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(q);
+    const ontem = new Date(Date.now() - 86400000), diaOntem = new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(ontem);
+    const quando = (dia === diaHoje() ? "hoje" : dia === diaOntem ? "ontem" : dia.slice(8, 10) + "/" + dia.slice(5, 7)) + " às " + hm(q);
+    const el = $("#offline");
+    if (dados.offline) {
+      $("#atualizado").textContent = "Sem internet · mostrando a previsão salva " + quando + ".";
+      if (el) { el.hidden = false; el.innerHTML = `<b>Sem internet</b><span>Mostrando a previsão salva ${quando}. Atualiza sozinho quando a conexão voltar.</span>`; }
+    } else {
+      $("#atualizado").textContent = "Previsão atualizada às " + hm(q) + ".";
+      if (el) el.hidden = true;
+    }
   }
 
   // ---------- metrô mais perto ----------
@@ -629,6 +650,9 @@
         };
       });
     });
+    // previsão guardada de outro dia: começa no dia de hoje
+    const k = datas.findIndex((d) => d >= diaHoje());
+    if (k > 0) { datas = datas.slice(k); Object.keys(out).forEach((id) => { out[id] = out[id].slice(k).map((x, i) => ({ ...x, hoje: i === 0 })); }); }
     previsao = out;
   }
 
@@ -2383,8 +2407,8 @@
       montar(dados);
       desenharDias();
       desenhar();
-      const q = new Date(dados.t);
-      $("#atualizado").textContent = "Previsão atualizada às " + hm(q) + ".";
+      avisoPrevisao(dados);
+      if (dados.offline) ultimaBusca = Date.now() - (CACHE_MIN - 1) * 60000;    // sem internet: tenta de novo em 1 minuto
     } catch (e) {
       console.error(e);
       $("#cartao").innerHTML = '<div class="aviso">Não consegui carregar a previsão agora. Verifique a internet e tente de novo.<br><button id="tentar">Tentar de novo</button></div>';
@@ -2413,9 +2437,9 @@
           const ra = { ...relAberto }, l = linhas.find((q) => q.p.id === ra.id);
           if (l) { abrirRelatorio(ra.k, l); if (ra.min != null && $("#relSvg")) moverRel(ra.min); }
         }
-        $("#atualizado").textContent = "Previsão atualizada às " + hm(new Date(dados.t)) + ".";
+        avisoPrevisao(dados);
       }
-      ultimaBusca = Date.now();
+      ultimaBusca = dados.offline ? Date.now() - (CACHE_MIN - 1) * 60000 : Date.now();
     } catch (e) { console.warn("Não consegui atualizar agora", e); }
     buscando = false;
   }
@@ -2425,6 +2449,7 @@
   document.addEventListener("visibilitychange", aoVoltar);
   window.addEventListener("pageshow", aoVoltar);
   window.addEventListener("focus", aoVoltar);
+  window.addEventListener("online", () => { ultimaBusca = 0; atualizarPrevisao(); });   // a internet voltou
   // segurança extra: confere a cada minuto (o relógio do navegador pode atrasar com o app parado)
   setInterval(aoVoltar, 60000);
 

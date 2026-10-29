@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=6.3">
+  <link rel="stylesheet" href="css/estilo.css?v=6.4">
 </head>
 <body>
 <div class="wrap">
@@ -31,6 +31,8 @@
     </div>
     <nav class="dias" id="dias" aria-label="Dia da previsão"></nav>
   </header>
+
+  <div class="offline" id="offline" hidden></div>
 
   <div class="busca" role="search">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
@@ -145,7 +147,7 @@
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=4"></script>
-<script src="js/app.js?v=7.8"></script>
+<script src="js/app.js?v=7.9"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
