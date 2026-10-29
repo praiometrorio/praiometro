@@ -586,3 +586,4 @@ button.selo:active{transform:scale(.98)}
 .surf-favoritar[aria-pressed=true]{background:#FFE7A3}
 .surf-nav{border-radius:16px;margin-bottom:10px;border:0}
 #surfeLista{will-change:transform}
+.rel-pico{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}

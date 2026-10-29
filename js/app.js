@@ -98,14 +98,14 @@
     const uv = pico ? Math.round(pico.uv) : x.uv;
     const horaJa = +relogio.format(new Date()).slice(0, 2);
     const agoraUv = x.hoje ? comUv.find((y) => y.h === horaJa) : null;
-    const uvTxt = (pico ? `Pico ${uv} às ${pico.h}h` : `UV ${uv}`) + (agoraUv ? ` · agora ${Math.round(agoraUv.uv)}` : "");
+    const uvTxt = (pico ? `Pico às ${pico.h}h: UV ${uv}` : `UV ${uv}`) + (agoraUv ? ` · agora UV ${Math.round(agoraUv.uv)}` : "");
     if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: `${uvTxt} · evite o sol do meio-dia` });
     else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de pegar cor", s: `${uvTxt} · protetor a cada 2h` });
     else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `${uvTxt} · passa protetor` });
     else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: `${uvTxt} · queima mesmo nublado` });
     else selos.push({ cls: "neutro", ic: IC.gota, t: "UV baixo", s: "Pouco risco de queimar" });
 
-    if (p.baia) selos.push({ cls: "mar", ic: IC.calmo, t: "Mar de baía", s: "Calminho, sem onda" });
+    if (p.baia) selos.push({ cls: "mar", ic: IC.calmo, t: "Mar de baía", s: o != null ? `Calminho, ondas de até ${fmt(o)} m` : "Calminho" });
     else if (o == null) selos.push({ cls: "neutro", ic: IC.onda, t: "Mar", s: "Sem dado do mar agora" });
     else if (o < 0.6) selos.push({ cls: "mar", ic: IC.calmo, t: "Piscininha", s: `Mar liso, ondas de ${fmt(o)} m` });
     else if (o < 1.2) selos.push({ cls: "mar", ic: IC.onda, t: "Marolinha", s: `Ondas de ${fmt(o)} m, dá pra nadar` });
@@ -379,6 +379,9 @@
     { ate: 99, nome: "Extremo", cor: "#8E44AD" }
   ];
   const faixaUv = (v) => FAIXAS_UV.find((f) => v <= f.ate + 0.49);
+  // quadradinho colorido "UV 5 · Moderado" (cor da faixa, fonte do título)
+  const uvSelo = (v) => { const f = faixaUv(v), escuro = f.nome === "Moderado";
+    return `<span class="uv-selo" style="display:inline-flex;align-items:baseline;gap:5px;background:${f.cor};color:${escuro ? "#3D2E00" : "#fff"};border-radius:10px;padding:4px 10px;font-family:var(--f-display);font-weight:700;font-size:16px;line-height:1.1">UV ${Math.round(v)}<small style="font-family:var(--f-body);font-weight:700;font-size:11px;opacity:.9">${f.nome}</small></span>`; };
   function graficoUv(x) {
     const hs = x.horas.filter((y) => y.uv != null && y.h >= HORA_INI && y.h <= HORA_FIM);
     if (hs.length < 6) return "";
@@ -408,8 +411,8 @@
     const legenda = FAIXAS_UV.map((f) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:${f.cor};display:inline-block"></i>${f.nome}</span>`).join("");
     return `<div class="info uv" style="display:block;background:#FFF3EC;color:#5A2410"><div style="display:grid;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b>${agora ? `<span style="display:flex;align-items:center;gap:8px;background:${faixaUv(agora.uv).cor};color:${corTexto(faixaUv(agora.uv))};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right">AGORA<br>${faixaUv(agora.uv).nome}</small><b style="font-size:26px;line-height:1">${Math.round(agora.uv)}</b></span>` : '<small style="opacity:.7;font-size:12px">Hora a hora</small>'}</div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap">${chip(`Pico ${Math.round(pico.uv)} às ${pico.h}h · ${faixaUv(pico.uv).nome}`, faixaUv(pico.uv), corTexto(faixaUv(pico.uv)))}</div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico ${Math.round(pico.uv)} às ${pico.h}h.">${barras}</svg>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-weight:700;font-size:14px">Pico do UV às ${pico.h}h</span>${uvSelo(pico.uv)}</div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico do UV às ${pico.h}h: UV ${Math.round(pico.uv)}.">${barras}</svg>
       <div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:10.5px;opacity:.85">${legenda}</div>
       <div style="font-size:14px;line-height:1.35">${dica}</div>
     </div></div>`;
@@ -575,11 +578,13 @@
             for (let hr = HORA_INI; hr <= HORA_FIM; hr++) {
               const ts = `${data}T${pad(hr)}:00`, k = mh.time.indexOf(ts), kt = h.time.indexOf(ts);
               if (k < 0 || g("wave_height", k) == null) continue;
+              // praia de baía: o modelo de ondas não enxerga a baía; limita em 0,5 m, igual ao quadradinho "Mar"
+              const lim = (v) => (v != null && p.baia ? Math.min(v, 0.5) : v);
               res.push({ h: hr,
-                alt: g("wave_height", k), dir: g("wave_direction", k), per: g("wave_period", k),
-                sw: { a: g("swell_wave_height", k), d: g("swell_wave_direction", k), p: g("swell_wave_period", k) },
-                sw2: { a: g("secondary_swell_wave_height", k), d: g("secondary_swell_wave_direction", k), p: g("secondary_swell_wave_period", k) },
-                vg: { a: g("wind_wave_height", k), d: g("wind_wave_direction", k) },
+                alt: lim(g("wave_height", k)), dir: g("wave_direction", k), per: g("wave_period", k),
+                sw: { a: lim(g("swell_wave_height", k)), d: g("swell_wave_direction", k), p: g("swell_wave_period", k) },
+                sw2: { a: lim(g("secondary_swell_wave_height", k)), d: g("secondary_swell_wave_direction", k), p: g("secondary_swell_wave_period", k) },
+                vg: { a: lim(g("wind_wave_height", k)), d: g("wind_wave_direction", k) },
                 v: kt >= 0 ? ventoEm(kt) : null, vd: kt >= 0 ? dirEm(kt) : null, raj: kt >= 0 ? rajEm(kt) : null });
             }
             return res.length ? res : null;
@@ -1222,7 +1227,7 @@
   let surfeDia = 0, surfeAberta = null, surfeModo = "lista", surfeHora = null;
   // ---------- mapa do mar: a previsão de todos os picos no mapa, com régua de horário ----------
   let mapaSurfe = null, mapaSurfePronto = false, marcasSurfe = [];
-  const PRIORIDADE_SURFE = ["arpoador", "leblon", "ipanema", "copacabana", "saoconrado", "barra", "joatinga", "recreio", "prainha", "grumari", "reserva", "leme", "vidigal", "diabo", "itacoatiara", "itaipu", "piratininga"];
+  const PRIORIDADE_SURFE = ["arpoador", "leblon", "ipanema", "copacabana", "saoconrado", "barra", "joatinga", "recreio", "prainha", "grumari", "reserva", "leme", "vidigal", "diabo", "itacoatiara", "itaipu", "piratininga", "vermelha", "botafogo", "flamengo", "icarai"];
   // ponto no mar, 1,3 km em frente à praia (na direção para onde ela está virada)
   const noMar = (p, km = 1.3) => { const r = p.mar * Math.PI / 180; return [p.lon + Math.sin(r) * km / (111.32 * Math.cos(p.lat * Math.PI / 180)), p.lat + Math.cos(r) * km / 110.57]; };
   const AREAS_SURFE = [
@@ -2023,7 +2028,8 @@
   const NOME_CEU = { sol: "Sol", parcial: "Sol entre nuvens", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
   const COR_CEU = { sol: "#FFB627", parcial: "#FFD98A", nublado: "#8C9AA5", chuva: "#5B7FA3", noite: "#B9C0D4" };
   const SAUDE_UV = ["Risco baixo para a pele.", "Use protetor solar.", "Protetor, chapéu e óculos.", "Protetor FPS 50 e reaplique sempre.", "Queima rápido: proteção máxima."];
-  const faixaIdx = (u) => FAIXAS_UV.findIndex((f) => u <= f.ate) < 0 ? FAIXAS_UV.length - 1 : FAIXAS_UV.findIndex((f) => u <= f.ate);
+  // UV é sempre mostrado em número inteiro, então a faixa (Leve, Moderado...) também sai do número inteiro: 5 = Moderado, 6 = Alto
+  const faixaIdx = (u) => { const i = FAIXAS_UV.findIndex((f) => Math.round(u) <= f.ate); return i < 0 ? FAIXAS_UV.length - 1 : i; };
   const marCat = (o) => o < 0.6 ? { n: "Piscininha", c: "#8FD3EA" } : o < 1.2 ? { n: "Marolinha", c: "#4FB3D9" } : o < 2 ? { n: "Mar mexido", c: "#1E8FC6" } : { n: "Mar pesado", c: "#0B3F6B" };
   const ventoCat = (v) => v <= 10 ? { n: "Vento fraco", c: "#7CC99A" } : v <= 15 ? { n: "Brisa", c: "#F2C12E" } : v <= 20 ? { n: "Vento moderado", c: "#F08A3C" } : { n: "Ventania", c: "#D9534F" };
   const aguaCat = (t) => t < 20 ? "Gelada" : t < 22.5 ? "Fresquinha" : "Quentinha";
@@ -2039,12 +2045,12 @@
       resumo: () => { const j = maiorSequencia(hs, (y) => y.est === "sol"), ch = hs.filter((y) => y.chuva >= 50).map((y) => y.h);
         return [j && j.fim - j.ini >= 1 ? `Sol firme ${faixaH(j)}` : "Sem sol firme", ch.length ? `Chance alta de chuva a partir das ${ch[0]}h` : "Sem chance alta de chuva", `Máxima de ${x.temp}°`]; },
       leg: Object.keys(NOME_CEU).map((e) => [COR_CEU[e], NOME_CEU[e]]), nota: "Altura da barra: temperatura · número azul: chance de chuva" };
-    if (k === "uv") { const pts = hs.filter((y) => y.uv != null).map((y) => ({ h: y.h, v: Math.round(y.uv * 10) / 10, cor: FAIXAS_UV[faixaIdx(y.uv)].cor }));
+    if (k === "uv") { const pts = hs.filter((y) => y.uv != null).map((y) => { const v = Math.round(y.uv); return { h: y.h, v, cor: FAIXAS_UV[faixaIdx(v)].cor, rot: v > 0 ? String(v) : "", rotCor: "#10283A", bruto: y.uv }; });
       return { titulo: "Índice UV hora a hora", unid: "", max: Math.max(11, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "UV",
         texto: (q) => `<b>UV ${Math.round(q.v)} · ${FAIXAS_UV[faixaIdx(q.v)].nome}</b><span>${SAUDE_UV[faixaIdx(q.v)]}</span>`,
-        resumo: () => { const pk = pts.reduce((a, b) => (b.v > a.v ? b : a), pts[0] || { v: 0, h: 0 }), alto = pts.filter((q) => q.v >= 6);
+        resumo: () => { const pk = pts.reduce((a, b) => (b.bruto > a.bruto ? b : a), pts[0] || { v: 0, h: 0, bruto: 0 }), alto = pts.filter((q) => q.v >= 6);
           const j = maiorSequencia(hs, (y) => y.uv != null && Math.round(y.uv) >= 6);
-          return [`Pico ${Math.round(pk.v)} às ${pk.h}h`, alto.length && j ? `UV alto ou mais ${faixaH(j)}` : "Sem UV alto no dia"]; },
+          return [`<span class="rel-pico">Pico do UV às ${pk.h}h ${uvSelo(pk.v)}</span>`, alto.length && j ? `UV alto ou mais ${faixaH(j)}` : "Sem UV alto no dia"]; },
         leg: FAIXAS_UV.map((f) => [f.cor, f.nome]) }; }
     if (k === "mar") { const pts = (x.surfe ? x.surfe.map((q) => { const o = swP(q); return { h: q.h, o: o.a, d: o.d, per: o.p }; }) : (x.marH || []))
         .filter((q) => q.o != null).map((q) => ({ h: q.h, v: Math.round(q.o * 10) / 10, cor: marCat(q.o).c, d: q.d, per: q.per }));
@@ -2108,7 +2114,7 @@
     const passo = (hi - lo) <= 3 ? 0.5 : (hi - lo) <= 12 ? 2 : (hi - lo) <= 30 ? 5 : 25;
     for (let v = Math.ceil(lo / passo) * passo; v <= hi + 1e-9; v += passo) grade += `<line x1="${esq}" x2="${W - dir}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#E8EEF2"/><text x="${esq - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6B7A86">${fmt1(v)}</text>`;
     let marcas = "";
-    if (cfg.tipo === "barra") marcas = pts.map((q) => { const x0 = X(q.h * 60) + 2, y = Y(Math.max(lo, q.v)); return `<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${(larg - 4).toFixed(1)}" height="${Math.max(1.5, base - y).toFixed(1)}" rx="3" fill="${q.cor}"/>${q.rot ? `<text x="${(x0 + (larg - 4) / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="800" fill="#2F6FB0">${q.rot}</text>` : ""}`; }).join("");
+    if (cfg.tipo === "barra") marcas = pts.map((q) => { const x0 = X(q.h * 60) + 2, y = Y(Math.max(lo, q.v)); return `<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${(larg - 4).toFixed(1)}" height="${Math.max(1.5, base - y).toFixed(1)}" rx="3" fill="${q.cor}"/>${q.rot ? `<text x="${(x0 + (larg - 4) / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${q.rotCor || "#2F6FB0"}">${q.rot}</text>` : ""}`; }).join("");
     else { const d = pts.map((q, i) => `${i ? "L" : "M"}${X(q.h * 60 + 30).toFixed(1)},${Y(q.v).toFixed(1)}`).join(" ");
       marcas = `<path d="${d} L${X(pts[n - 1].h * 60 + 30).toFixed(1)},${base} L${X(pts[0].h * 60 + 30).toFixed(1)},${base} Z" fill="#16A3C9" opacity=".15"/><path d="${d}" fill="none" stroke="#16A3C9" stroke-width="2.5"/>`; }
     if (cfg.linha) { const d = cfg.linha.map((q, i) => `${i ? "L" : "M"}${X(q.h * 60 + 30).toFixed(1)},${(base - (base - topo) * q.v / 100).toFixed(1)}`).join(" ");
