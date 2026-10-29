@@ -8,8 +8,8 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v6";
-  const CACHE_MIN = 60;                        // minutos que a previsão fica guardada
+  const CACHE_CHAVE = "pm-previsao-v7";
+  const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
   // ---------- utilidades ----------
@@ -283,7 +283,7 @@
   // ---------- busca da previsão ----------
   const listaLat = () => PRAIAS.map((p) => p.lat).join(","), listaLon = () => PRAIAS.map((p) => p.lon).join(",");
   const urlPrevisao = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=temperature_2m,precipitation_probability,cloud_cover,wind_speed_10m,uv_index" +
+    "&hourly=temperature_2m,precipitation_probability,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index" +
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
@@ -291,16 +291,16 @@
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=cloud_cover,wind_speed_10m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=wave_height,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,secondary_swell_wave_height,secondary_swell_wave_direction,secondary_swell_wave_period,wind_wave_height,wind_wave_direction,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
   async function buscarJSON(url) {
     const r = await fetch(url);
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
   }
-  async function carregar() {
+  async function carregar(forcar) {
     const cache = guarda.ler(CACHE_CHAVE);
-    if (cache && Date.now() - cache.t < CACHE_MIN * 60000) return cache;
+    if (!forcar && cache && Date.now() - cache.t < CACHE_MIN * 60000) return cache;
     const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao()), buscarJSON(urlMar()).catch(() => null), buscarJSON(urlNuvens()).catch(() => null)]);
     const novo = { t: Date.now(), tempo, mar, nuvens };
     guarda.gravar(CACHE_CHAVE, novo);
@@ -546,6 +546,24 @@
           aguaData: prop && typeof prop === "object" ? prop.data : null,
           aguaOk: prop && typeof prop === "object" ? prop.ok : null,
           aguaTotal: prop && typeof prop === "object" ? prop.total : null,
+          surfe: p.mar == null ? null : (() => {
+            if (!m || !m.hourly) return null;
+            const mh = m.hourly, g = (nome, k) => (mh[nome] ? mh[nome][k] : null);
+            const res = [];
+            for (let hr = HORA_INI; hr <= HORA_FIM; hr++) {
+              const ts = `${data}T${pad(hr)}:00`, k = mh.time.indexOf(ts), kt = h.time.indexOf(ts);
+              if (k < 0 || g("wave_height", k) == null) continue;
+              res.push({ h: hr,
+                alt: g("wave_height", k), dir: g("wave_direction", k), per: g("wave_period", k),
+                sw: { a: g("swell_wave_height", k), d: g("swell_wave_direction", k), p: g("swell_wave_period", k) },
+                sw2: { a: g("secondary_swell_wave_height", k), d: g("secondary_swell_wave_direction", k), p: g("secondary_swell_wave_period", k) },
+                vg: { a: g("wind_wave_height", k), d: g("wind_wave_direction", k) },
+                v: kt >= 0 ? ventoEm(kt) : null, vd: kt >= 0 && h.wind_direction_10m ? h.wind_direction_10m[kt] : null,
+                raj: kt >= 0 && h.wind_gusts_10m && h.wind_gusts_10m[kt] != null ? Math.round(h.wind_gusts_10m[kt]) : null });
+            }
+            return res.length ? res : null;
+          })(),
+          mareDia: Array.from({ length: 24 }, (_, i) => ({ h: i, n: nivelEm(data, i) })).filter((q) => q.n != null),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
@@ -823,7 +841,20 @@
         <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${IC[y.est]}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
-    $("#cartao").innerHTML = `
+    // passar para o lado entre as favoritas (só quando a praia aberta é uma favorita e há 2 ou mais)
+    const favs = listaFavoritas();
+    const iFav = favs.findIndex((q) => q.p.id === p.id);
+    let navFav = "";
+    if (iFav >= 0 && favs.length > 1) {
+      const ant = favs[(iFav - 1 + favs.length) % favs.length].p, prox = favs[(iFav + 1) % favs.length].p;
+      navFav = `<div class="fav-nav" aria-label="Navegar entre as favoritas">
+        <button class="fn-btn" data-ir="${ant.id}" aria-label="Favorita anterior: ${ant.nome}">‹<span>${ant.nome}</span></button>
+        <span class="fn-meio">${IC.estrelaCheia}<b>${iFav + 1} de ${favs.length}</b><i>${favs.map((q, k) => `<em${k === iFav ? ' class="on"' : ""}></em>`).join("")}</i></span>
+        <button class="fn-btn dir" data-ir="${prox.id}" aria-label="Próxima favorita: ${prox.nome}"><span>${prox.nome}</span>›</button>
+      </div>`;
+    }
+
+    $("#cartao").innerHTML = `${navFav}
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
       </div>
@@ -856,6 +887,8 @@
           <small>Arraste para ver o sol andando no mapa</small>
         </div>`;
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
+    document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => irFavorita(b.dataset.ir, b.classList.contains("dir") ? 1 : -1));
+    if (navFav) ligarArraste($("#cartao .cena"), favs, iFav);
     $("#compartilhar").onclick = () => compartilhar(l);
     if ($("#verCeu")) $("#verCeu").onclick = () => CEU.abrir(p);
     $("#minuto").addEventListener("input", (e) => {
@@ -1016,11 +1049,38 @@
   function contarFavoritas() { const q = $("#favQtd"); if (q) q.textContent = favoritas.length ? favoritas.length : ""; }
 
   // ---------- tela das favoritas: previsão resumida de cada uma; tocando, abre a completa ----------
+  // mesma ordem da tela das favoritas: da melhor nota para a pior
+  function listaFavoritas() {
+    return favoritas.map((id) => linhas.find((l) => l.p.id === id)).filter(Boolean).sort((a, b) => b.a.score - a.a.score);
+  }
+  function irFavorita(id, lado) {
+    const p = PRAIAS.find((x) => x.id === id);
+    if (estado.regiao !== "todas" && estado.regiao !== p.regiao) irParaRegiao(p.regiao);
+    estado.sel = id; estado.minuto = null;
+    if (mapa) mapa.flyTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 13.4), duration: 900 });
+    desenhar();
+    const c = $("#cartao");
+    c.classList.remove("vem-dir", "vem-esq"); void c.offsetWidth;
+    c.classList.add(lado > 0 ? "vem-dir" : "vem-esq");
+  }
+  // arrastar o dedo na foto da praia para o lado troca de favorita
+  function ligarArraste(el, favs, i) {
+    if (!el) return;
+    let x0 = null, y0 = 0;
+    el.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
+    el.addEventListener("touchend", (e) => {
+      if (x0 == null) return;
+      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
+      x0 = null;
+      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+      const lado = dx < 0 ? 1 : -1;
+      irFavorita(favs[(i + lado + favs.length) % favs.length].p.id, lado);
+    }, { passive: true });
+  }
   function desenharFavoritas() {
     const dia = nomeDia(estado.dia);
     $("#favDia").textContent = `Previsão de ${dia}`;
-    const minhas = favoritas.map((id) => linhas.find((l) => l.p.id === id)).filter(Boolean)
-      .sort((a, b) => b.a.score - a.a.score);
+    const minhas = listaFavoritas();
     if (!minhas.length) {
       $("#favLista").innerHTML = `<div class="fav-vazio">${IC.estrela}<b>Nenhuma praia favorita ainda</b>
         <span>Abra uma praia e toque em <b>Favoritar</b>. Ela aparece aqui, com a previsão resumida, sempre que você abrir.</span></div>`;
@@ -1035,6 +1095,138 @@
   }
   function abrirFavoritas() { desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
   function fecharFavoritas() { $("#favTela").hidden = true; document.body.style.overflow = ""; }
+
+  // ---------- surfe: só dados técnicos (swell, período, direção, vento, maré) ----------
+  const PONTOS = ["N", "NNE", "NE", "ENE", "L", "ESE", "SE", "SSE", "S", "SSO", "SO", "OSO", "O", "ONO", "NO", "NNO"];
+  const rumo = (g) => g == null ? "" : PONTOS[Math.round(((g % 360) + 360) % 360 / 22.5) % 16];
+  const difAng = (a, b) => { const d = Math.abs((((a - b) % 360) + 360) % 360); return d > 180 ? 360 - d : d; };
+  // terral / lateral / maral pela direção do vento em relação à orientação da praia
+  function tipoVento(v, vd, praia) {
+    if (v == null || vd == null) return { tipo: "–", cls: "neutro" };
+    const c = Math.cos(difAng(vd, praia) * Math.PI / 180);
+    if (c <= -0.5) return { tipo: "Terral", cls: "terral" };
+    if (c >= 0.5) return { tipo: "Maral", cls: "maral" };
+    return { tipo: "Lateral", cls: "lateral" };
+  }
+  const fmt1 = (n) => n == null ? "–" : String(Math.round(n * 10) / 10).replace(".", ",");
+  const int = (n) => n == null ? "–" : Math.round(n);
+  const seta = (g, cor) => g == null ? "" : `<svg class="seta" viewBox="0 0 24 24" style="transform:rotate(${(g + 180) % 360}deg)" aria-hidden="true"><path d="M12 3l6 9h-4v9h-4v-9H6z" fill="${cor || "currentColor"}"/></svg>`;
+  const swP = (q) => (q.sw && q.sw.a != null ? q.sw : { a: q.alt, p: q.per, d: q.dir });
+  const PICOS = () => PRAIAS.filter((p) => p.mar != null);
+  let surfeDia = 0, surfeAberta = null;
+  // hora mostrada na lista: hoje, a hora atual; outros dias, 8h
+  const horaLista = () => surfeDia === 0 ? Math.min(HORA_FIM, Math.max(HORA_INI, +relogio.format(new Date()).slice(0, 2))) : 8;
+  function desenharSurfe() {
+    const nomes = datas.map((dt, d) => d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[new Date(dt + "T12:00:00").getDay()]);
+    $("#surfeDias").innerHTML = nomes.map((n, d) => `<button data-d="${d}" aria-pressed="${d === surfeDia}">${n}</button>`).join("");
+    document.querySelectorAll("#surfeDias button").forEach((b) => b.onclick = () => { surfeDia = +b.dataset.d; desenharSurfe(); });
+    if (surfeAberta) return desenharPico(surfeAberta);
+    $("#surfeTitulo").textContent = "Surfe";
+    $("#surfeVoltar").hidden = true;
+    const hL = horaLista();
+    const lista = PICOS().map((p) => { const x = previsao[p.id][surfeDia]; return { p, q: x.surfe && x.surfe.find((y) => y.h === hL) }; }).filter((r) => r.q);
+    if (!lista.length) { $("#surfeLista").innerHTML = `<div class="fav-vazio"><b>Sem previsão de ondas agora</b><span>Tente de novo daqui a pouco.</span></div>`; return; }
+    $("#surfeLista").innerHTML = `<p class="surf-hora">${surfeDia === 0 ? "Agora (" + hL + "h)" : "Às " + hL + "h"} · toque no pico para ver hora a hora</p>` + lista.map(({ p, q }) => {
+      const s = swP(q), s2 = q.sw2, tv = tipoVento(q.v, q.vd, p.mar);
+      return `<button class="surf-card" data-id="${p.id}">
+        <span class="sc-meio"><b>${p.nome}</b>
+          <span class="sc-l">${seta(s.d)}<b>${fmt1(s.a)} m</b> · ${int(s.p)} s · ${rumo(s.d)}</span>
+          <span class="sc-l">${seta(q.vd)}${rumo(q.vd)} ${int(q.v)} km/h · <i class="vt ${tv.cls}">${tv.tipo}</i></span>
+        </span>
+        <span class="fav-abrir">›</span>
+      </button>`;
+    }).join("");
+    document.querySelectorAll(".surf-card").forEach((b) => b.onclick = () => { surfeAberta = b.dataset.id; desenharSurfe(); $("#surfeTela").scrollTop = 0; });
+  }
+  // maré do dia inteiro: curva suave, altas e baixas com hora e nível, noite sombreada e o "agora"
+  function graficoMareSurfe(x) {
+    const pts = x.mareDia || [];
+    if (pts.length < 12) return "";
+    const W = 340, H = 190, esq = 30, dir = 8, topo = 26, base = 150;
+    const ext = (x.mares || []).filter((e) => e.min >= 0 && e.min < 1440 && e.nivel != null);
+    const ns = pts.map((q) => q.n).concat(ext.map((e) => e.nivel));
+    let lo = Math.min(...ns), hi = Math.max(...ns);
+    const amp0 = hi - lo || 0.3; lo -= amp0 * 0.42; hi += amp0 * 0.22;
+    const passo = hi - lo > 1.2 ? 0.4 : 0.2;
+    const X = (min) => esq + (W - esq - dir) * min / 1440, Y = (n) => base - (base - topo) * (n - lo) / (hi - lo);
+    const P = pts.map((q) => [X(q.h * 60), Y(q.n)]);
+    // curva suave (Catmull-Rom)
+    let d = `M${P[0][0].toFixed(1)},${P[0][1].toFixed(1)}`;
+    for (let i = 0; i < P.length - 1; i++) {
+      const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+      d += ` C${(p1[0] + (p2[0] - p0[0]) / 6).toFixed(1)},${(p1[1] + (p2[1] - p0[1]) / 6).toFixed(1)} ${(p2[0] - (p3[0] - p1[0]) / 6).toFixed(1)},${(p2[1] - (p3[1] - p1[1]) / 6).toFixed(1)} ${p2[0].toFixed(1)},${p2[1].toFixed(1)}`;
+    }
+    const area = d + ` L${P[P.length - 1][0].toFixed(1)},${base} L${P[0][0].toFixed(1)},${base} Z`;
+    const nas = minutosDe(x.nascer), por = minutosDe(x.porDoSol);
+    let grade = "";
+    for (let v = Math.ceil(lo / passo) * passo; v <= hi; v += passo) {
+      const y = Y(v).toFixed(1);
+      grade += `<line x1="${esq}" x2="${W - dir}" y1="${y}" y2="${y}" stroke="#E3EAF0" ${Math.abs(v) < 1e-6 ? 'stroke-dasharray="3 3" stroke="#B9C7D2"' : ""}/><text x="${esq - 4}" y="${+y + 3}" text-anchor="end" font-size="9" fill="#5A6B78">${fmt1(v)}</text>`;
+    }
+    let eixo = "";
+    for (let h = 0; h <= 24; h += 3) eixo += `<text x="${X(h * 60)}" y="${base + 14}" text-anchor="middle" font-size="9" fill="#5A6B78">${h}h</text><line x1="${X(h * 60)}" x2="${X(h * 60)}" y1="${base}" y2="${base + 4}" stroke="#B9C7D2"/>`;
+    const hhmm = (m) => `${Math.floor(m / 60)}h${pad(m % 60)}`;
+    const marcas = ext.map((e) => {
+      const cx = X(e.min), cy = Y(e.nivel), alta = e.tipo === "alta";
+      const ty = alta ? cy - 16 : cy + 18, anc = cx < esq + 30 ? "start" : cx > W - 34 ? "end" : "middle";
+      return `<circle cx="${cx}" cy="${cy}" r="4" fill="${alta ? "#0B6FA8" : "#fff"}" stroke="#0B6FA8" stroke-width="2"/>
+        <text x="${cx}" y="${ty}" text-anchor="${anc}" font-size="10" font-weight="800" fill="#10283A">${hhmm(e.min)}</text>
+        <text x="${cx}" y="${ty + 10}" text-anchor="${anc}" font-size="9" fill="#5A6B78">${fmt1(e.nivel)} m</text>`;
+    }).join("");
+    let agora = "", estadoTxt = "";
+    if (surfeDia === 0) {
+      const t = new Date(), mA = +relogio.format(t).slice(0, 2) * 60 + +relogio.format(t).slice(3, 5);
+      const k = Math.floor(mA / 60), a0 = pts.find((q) => q.h === k), a1 = pts.find((q) => q.h === k + 1);
+      if (a0) {
+        const f = (mA % 60) / 60, nA = a1 ? a0.n + (a1.n - a0.n) * f : a0.n, cx = X(mA), cy = Y(nA);
+        agora = `<line x1="${cx}" x2="${cx}" y1="${topo - 10}" y2="${base}" stroke="#E8A400" stroke-width="1.5" stroke-dasharray="4 3"/><circle cx="${cx}" cy="${cy}" r="5" fill="#E8A400" stroke="#fff" stroke-width="2"/>`;
+        const prox = ext.find((e) => e.min > mA);
+        estadoTxt = `<p class="mare-agora"><b>Agora ${fmt1(nA)} m</b> · ${prox ? (prox.tipo === "alta" ? "enchendo até " : "secando até ") + hhmm(prox.min) : ""}</p>`;
+      }
+    }
+    return `<div class="mare-surf">${estadoTxt}
+      <svg viewBox="0 0 ${W} ${H - 22}" role="img" aria-label="Maré do dia">
+        <defs><linearGradient id="gMare" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9" stop-opacity=".55"/><stop offset="1" stop-color="#4FB3D9" stop-opacity=".08"/></linearGradient></defs>
+        <rect x="${X(0)}" y="${topo - 14}" width="${Math.max(0, X(nas) - X(0))}" height="${base - topo + 14}" fill="#EEF1F6"/>
+        <rect x="${X(por)}" y="${topo - 14}" width="${Math.max(0, X(1440) - X(por))}" height="${base - topo + 14}" fill="#EEF1F6"/>
+        ${grade}
+        <path d="${area}" fill="url(#gMare)"/>
+        <path d="${d}" fill="none" stroke="#0B6FA8" stroke-width="2.2"/>
+        ${eixo}${agora}${marcas}
+      </svg>
+      <div class="pico-leg"><span><i style="background:#0B6FA8"></i>alta</span><span><i style="background:#fff;border:2px solid #0B6FA8;box-sizing:border-box"></i>baixa</span><span><i style="background:#EEF1F6"></i>noite</span><small>nível em metros, em relação ao nível médio do mar</small></div>
+    </div>`;
+  }
+  function desenharPico(id) {
+    const p = PRAIAS.find((q) => q.id === id), x = previsao[id][surfeDia], hs = x.surfe;
+    $("#surfeTitulo").textContent = p.nome;
+    $("#surfeVoltar").hidden = false;
+    if (!hs) { $("#surfeLista").innerHTML = `<div class="fav-vazio"><b>Sem previsão de ondas pra este dia</b></div>`; return; }
+    const agoraH = surfeDia === 0 ? +relogio.format(new Date()).slice(0, 2) : -1;
+    const col = (q, html) => `<td${q.h === agoraH ? ' class="ag"' : ""}>${html}</td>`;
+    const linha = (rotulo, f, cls) => `<tr${cls ? ` class="${cls}"` : ""}><th>${rotulo}</th>${hs.map((q) => col(q, f(q))).join("")}</tr>`;
+    const nivel = Object.fromEntries((x.mareHoras || []).map((m) => [m.h, m.n]));
+    const tabela = `<div class="tab-surf"><table>
+      ${linha("Hora", (q) => `<b>${q.h}h</b>`, "linha-h")}
+      ${linha("Ondas (m)", (q) => `<b>${fmt1(swP(q).a)}</b>`, "forte")}
+      ${linha("Período (s)", (q) => int(swP(q).p))}
+      ${linha("Direção", (q) => `${seta(swP(q).d)}<small>${rumo(swP(q).d)}</small>`)}
+      ${linha("Vento (km/h)", (q) => { const tv = tipoVento(q.v, q.vd, p.mar); return `<b class="vt ${tv.cls}">${int(q.v)}</b>`; }, "forte")}
+      ${linha("Dir. vento", (q) => { const tv = tipoVento(q.v, q.vd, p.mar); return `<span class="vt ${tv.cls}">${seta(q.vd)}</span><small>${rumo(q.vd)}</small>`; })}
+      ${Object.keys(nivel).length ? linha("Maré (m)", (q) => nivel[q.h] != null ? fmt1(nivel[q.h]) : "–") : ""}
+    </table></div>`;
+    const mares = (x.mares || []).filter((e) => e.min >= 0 && e.min < 1440).map((e) => `<span><b>${e.tipo === "alta" ? "Alta" : "Baixa"}</b> ${Math.floor(e.min / 60)}h${pad(e.min % 60)}</span>`).join("");
+    $("#surfeLista").innerHTML = `<div class="pico">
+      ${tabela}
+      <div class="pico-leg"><span><i class="terral"></i>terral</span><span><i class="lateral"></i>lateral</span><span><i class="maral"></i>maral</span></div>
+      ${mares || x.mareDia ? `<h3>Maré</h3>${graficoMareSurfe(x) || `<p class="pico-mare">${mares}</p>`}` : ""}
+      ${x.agua != null ? `<p class="pico-dados"><span>Água <b>${fmt1(x.agua)} °C</b></span></p>` : ""}
+      <button class="pico-abrir" data-id="${p.id}">Ver previsão completa da praia ›</button>
+    </div>`;
+    $(".pico-abrir").onclick = () => { fecharSurfe(); estado.dia = surfeDia; abrirPraia(p.id); };
+  }
+  function abrirSurfe() { surfeDia = estado.dia; surfeAberta = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function fecharSurfe() { $("#surfeTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- compartilhar: monta uma imagem do cartão no formato de story (1080 x 1920) ----------
   const COR_SELO = { sol: ["#FFE7B3", "#5E3B00"], bronze: ["#FFD9C2", "#6E2A08"], mar: ["#CDEFF6", "#0A4A5C"], mexido: ["#CDE0EA", "#0A3A4D"],
@@ -1153,8 +1345,11 @@
     ligarBusca();
     contarFavoritas();
     $("#abrirFav").onclick = abrirFavoritas;
+    $("#abrirSurfe").onclick = abrirSurfe;
+    $("#fecharSurfe").onclick = fecharSurfe;
+    $("#surfeVoltar").onclick = () => { surfeAberta = null; desenharSurfe(); };
     $("#fecharFav").onclick = fecharFavoritas;
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); if (e.key === "Escape" && !$("#surfeTela").hidden) fecharSurfe(); });
     $("#regioes").innerHTML = Object.entries(REGIOES).map(([k, v]) => `<button data-r="${k}" aria-pressed="${k === estado.regiao}">${v.nome}</button>`).join("");
     document.querySelectorAll("#regioes button").forEach((b) => b.onclick = () => irParaRegiao(b.dataset.r));
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -1180,6 +1375,28 @@
       $("#tentar").onclick = () => location.reload();
     }
   }
+
+  // atualização automática: a cada 10 minutos com o app aberto, e ao voltar para o app depois de 10 minutos fora
+  let ultimaBusca = Date.now(), buscando = false;
+  async function atualizarPrevisao() {
+    if (buscando || document.hidden || !linhas.length) return;
+    buscando = true;
+    try {
+      const dados = await carregar(true);
+      {
+        montar(dados);
+        desenharDias();
+        desenhar();
+        if (!$("#favTela").hidden) desenharFavoritas();
+             if (!$("#surfeTela").hidden) desenharSurfe();
+        $("#atualizado").textContent = "Previsão atualizada às " + hm(new Date(dados.t)) + ".";
+      }
+      ultimaBusca = Date.now();
+    } catch (e) { console.warn("Não consegui atualizar agora", e); }
+    buscando = false;
+  }
+  setInterval(atualizarPrevisao, CACHE_MIN * 60000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - ultimaBusca >= CACHE_MIN * 60000) atualizarPrevisao(); });
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
