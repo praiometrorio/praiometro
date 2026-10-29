@@ -1580,7 +1580,7 @@
     costa: { nome: "Costa do Rio", lat0: -26.5, lat1: -22, lon0: -46, lon1: -40.5, passo: 0.5, sobe: 4, caixa: [-45.2, -25.5, -41.2, -22.4], linhaGrade: 1, zMax: 14.5, mascZ: 7.8 } };
   Object.values(GRADES_OND).forEach((g) => { g.lin = Math.round((g.lat1 - g.lat0) / g.passo) + 1; g.col = Math.round((g.lon1 - g.lon0) / g.passo) + 1; });
   // janela de detalhe da orla (Grumari a Itacoatiara)
-  const JANELA_RIO = { w: -43.56, e: -43.0, s: -23.10, n: -22.93, z: 12 };
+  const JANELA_RIO = { w: -43.56, e: -43.0, s: -23.14, n: -22.93, z: 12 };
   const limitesOnd = (gid) => { const g = GRADES_OND[gid]; return [[g.lon0, g.lat0], [g.lon1, g.lat1]]; };
   const RAMPA_OND = [[0, [150, 200, 255]], [0.5, [110, 200, 240]], [1, [90, 215, 180]], [1.5, [120, 220, 90]], [2, [200, 235, 70]], [2.5, [250, 230, 60]],
     [3, [250, 185, 50]], [4, [240, 120, 40]], [5, [220, 50, 40]], [6, [170, 20, 40]], [7, [220, 40, 160]], [9, [255, 170, 255]]];
@@ -1812,9 +1812,11 @@
       const pxKm = M.W / ((M.e - M.w) * 111.32 * Math.cos(23 * Math.PI / 180)), d0 = 0.15 * pxKm, dBg = 3 * pxKm;
       const cx = Math.ceil(M.W / 16) + 1, cy = Math.ceil(M.H / 16) + 1, corr = new Float32Array(cx * cy);
       for (let j = 0; j < cy; j++) for (let i = 0; i < cx; i++) {
-        let sw = 1 / (dBg * dBg), sf = sw;
-        comF.forEach((q) => { const dx = i * 16 - q.x, dy = j * 16 - q.y, w = 1 / (dx * dx + dy * dy + d0 * d0); sw += w; sf += w * q.f; });
-        corr[j * cx + i] = sf / sw;
+        let sw = 1 / (dBg * dBg), sf = sw, dmin = 1e9;
+        comF.forEach((q) => { const dx = i * 16 - q.x, dy = j * 16 - q.y, d2 = dx * dx + dy * dy, w = 1 / (d2 + d0 * d0); sw += w; sf += w * q.f; if (d2 < dmin) dmin = d2; });
+        // a correção vale perto das praias e some no mar aberto (some de vez a uns 5 km)
+        const fade = Math.exp(-dmin / (dBg * dBg));
+        corr[j * cx + i] = 1 + (sf / sw - 1) * fade;
       }
       for (let y = 0; y < M.H; y++) {
         const fj = y / 16, j0 = Math.min(cy - 2, fj | 0), tj = fj - j0, lin = y * M.W;
@@ -1823,7 +1825,19 @@
           H[k] *= (corr[j0 * cx + i0] * (1 - ti) + corr[j0 * cx + i0 + 1] * ti) * (1 - tj) + (corr[(j0 + 1) * cx + i0] * (1 - ti) + corr[(j0 + 1) * cx + i0 + 1] * ti) * tj; }
       }
     }
-    for (let k = 0; k < M.W * M.H; k++) if (M.agua[k]) px[k] = corPx(H[k]);
+    // nas bordas da janela (sul, leste e oeste) o detalhe da orla se mistura aos poucos com a grade grossa: sem "degrau" de cor
+    const borda = 70;
+    for (let y = 0; y < M.H; y++) {
+      const fj = y / 16, j0 = Math.min(gy - 2, fj | 0), tj = fj - j0, lin = y * M.W, dyS = M.H - 1 - y;
+      for (let x = 0; x < M.W; x++) { const k = lin + x; if (!M.agua[k]) continue;
+        const de = Math.min(dyS, x, M.W - 1 - x);
+        if (de < borda) {
+          const fi = x / 16, i0 = Math.min(gx - 2, fi | 0), ti = fi - i0, t = de / borda;
+          const v = (gv[j0 * gx + i0] * (1 - ti) + gv[j0 * gx + i0 + 1] * ti) * (1 - tj) + (gv[(j0 + 1) * gx + i0] * (1 - ti) + gv[(j0 + 1) * gx + i0 + 1] * ti) * tj;
+          H[k] = v * (1 - t) + H[k] * t;
+        }
+        px[k] = corPx(H[k]); }
+    }
     ctx.putImageData(img, 0, 0);
     rioCache = { t: ondT, H, A, alto, praias };
     return true;
@@ -1888,10 +1902,30 @@
     // setas da orla: a cada ~700 m onde a ondulação chega
     const ptsRio = [];
     if (gid === "costa" && rioCache) {
-      const M = mascaras.rio, P = 22, r = (rioCache.A.chave + 180) % 360;
-      for (let y = P / 2; y < M.H; y += P) for (let x = P / 2; x < M.W; x += P) { const k = y * M.W + x;
+      // quatro densidades: de longe uma seta a cada ~5 km, depois ~2,4 km, ~1,2 km e, bem perto, ~600 m
+      const M = mascaras.rio, P = 16, r = (rioCache.A.chave + 180) % 360;
+      for (let iy = 0, y = P / 2; y < M.H; y += P, iy++) for (let ix = 0, x = P / 2; x < M.W; x += P, ix++) { const k = y * M.W + x;
         if (!M.agua[k] || rioCache.A.q[k] < 40) continue;
-        ptsRio.push({ type: "Feature", properties: { r, o: Math.min(1, 0.35 + rioCache.A.q[k] / 255) }, geometry: { type: "Point", coordinates: [M.w + (M.e - M.w) * (x + 0.5) / M.W, latDeY(M.yN + (M.yS - M.yN) * (y + 0.5) / M.H)] } }); }
+        const n = ix % 8 === 0 && iy % 8 === 0 ? 1 : ix % 4 === 0 && iy % 4 === 0 ? 2 : ix % 2 === 0 && iy % 2 === 0 ? 3 : 4;
+        ptsRio.push({ type: "Feature", properties: { r, n, o: Math.min(1, 0.35 + rioCache.A.q[k] / 255) }, geometry: { type: "Point", coordinates: [M.w + (M.e - M.w) * (x + 0.5) / M.W, latDeY(M.yN + (M.yS - M.yN) * (y + 0.5) / M.H)] } }); }
+    }
+    // em volta da janela da orla, setas na mesma densidade (vindas da grade grossa), para não ter "buraco" sem seta
+    if (gid === "costa" && rioCache) {
+      const Mg = mascaras.costa, st = 0.0125;
+      for (let a1 = 0; a1 <= 44; a1++) for (let b1 = 0; b1 <= 88; b1++) { const la = -23.40 + a1 * st, lo = -43.85 + b1 * st;
+        if (lo > JANELA_RIO.w && lo < JANELA_RIO.e && la > JANELA_RIO.s && la < JANELA_RIO.n) continue;
+        if (Mg) { const x = Math.floor((lo - Mg.w) / (Mg.e - Mg.w) * Mg.W), y = Math.floor((Mg.yN - mercY(la)) / (Mg.yN - Mg.yS) * Mg.H); if (x < 0 || y < 0 || x >= Mg.W || y >= Mg.H || !Mg.agua[y * Mg.W + x]) continue; }
+        // direção do ponto da grade mais perto que seja mar (o mais perto pode cair em terra)
+        const fi = (g.lat1 - la) / g.passo, fj = (lo - g.lon0) / g.passo;
+        let d = null, melhor = 1e9;
+        for (const ii of [Math.floor(fi), Math.ceil(fi), Math.ceil(fi) + 1]) for (const jj of [Math.floor(fj), Math.ceil(fj)]) {
+          if (ii < 0 || jj < 0 || ii >= g.lin || jj >= g.col) continue;
+          const v = D.d[ii * g.col + jj] && D.d[ii * g.col + jj][ondT], dd = (ii - fi) ** 2 + (jj - fj) ** 2;
+          if (v != null && dd < melhor) { melhor = dd; d = v; } }
+        if (d == null) continue;
+        const n = a1 % 2 === 0 && b1 % 2 === 0 ? 1 : 2;
+        ptsRio.push({ type: "Feature", properties: { r: (d + 180) % 360, n, o: 1 }, geometry: { type: "Point", coordinates: [lo, la] } });
+      }
     }
     mapaOnd.getSource("ondSetas").setData({ type: "FeatureCollection", features: pts });
     mapaOnd.getSource("ondSetasRio").setData({ type: "FeatureCollection", features: ptsRio });
@@ -1913,7 +1947,7 @@
   function mostrarEtiquetas() {
     if (!mapaOnd) return;
     const z = mapaOnd.getZoom(), usados = [];
-    marcasOnd.forEach((m) => { const el = m.getElement(); if (z < 11.3) { el.style.display = "none"; return; }
+    marcasOnd.forEach((m) => { const el = m.getElement(); if (z < 9.6) { el.style.display = "none"; return; }
       el.style.display = ""; const pt = mapaOnd.project(m.getLngLat()), w = el.offsetWidth || 90;
       const bate = usados.some((u) => Math.abs(u.x - pt.x) < (u.w + w) / 2 + 4 && Math.abs(u.y - pt.y) < 24);
       el.style.visibility = bate ? "hidden" : "visible"; if (!bate) usados.push({ x: pt.x, y: pt.y, w }); });
@@ -1958,10 +1992,11 @@
     add({ id: "ondSetas", type: "symbol", source: "ondSetas", maxzoom: 12.2, layout: { "icon-image": "seta-ond", "icon-rotate": ["get", "r"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
       "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.55, 6, 0.75, 10, 0.85] } });
     mapaOnd.addSource("ondSetasRio", { type: "geojson", data: vazio });
-    add({ id: "ondSetasRio", type: "symbol", source: "ondSetasRio", minzoom: 12.2, layout: { "icon-image": "seta-ond", "icon-rotate": ["get", "r"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
-      "icon-size": ["interpolate", ["linear"], ["zoom"], 12.2, 0.6, 14, 0.85] }, paint: { "icon-opacity": ["get", "o"] } });
+    [["ondSetasRio1", 9.6, 11, 1], ["ondSetasRio2", 11, 12.2, 2], ["ondSetasRio3", 12.2, 13.3, 3], ["ondSetasRio", 13.3, 24, 4]].forEach(([id, z0, z1, n]) =>
+      add({ id, type: "symbol", source: "ondSetasRio", minzoom: z0, maxzoom: z1, filter: ["<=", ["get", "n"], n], layout: { "icon-image": "seta-ond", "icon-rotate": ["get", "r"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
+        "icon-size": ["interpolate", ["linear"], ["zoom"], 9.6, 0.6, 14, 0.85] }, paint: { "icon-opacity": ["get", "o"] } }));
     // na costa, as setas da grade que caem dentro da janela da orla só aparecem de longe
-    add({ id: "ondSetasJ", type: "symbol", source: "ondSetas", maxzoom: 9.5, filter: ["==", ["get", "j"], 1], layout: { "icon-image": "seta-ond", "icon-rotate": ["get", "r"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
+    add({ id: "ondSetasJ", type: "symbol", source: "ondSetas", maxzoom: 9.6, filter: ["==", ["get", "j"], 1], layout: { "icon-image": "seta-ond", "icon-rotate": ["get", "r"], "icon-rotation-alignment": "map", "icon-allow-overlap": true, "icon-ignore-placement": true,
       "icon-size": ["interpolate", ["linear"], ["zoom"], 3, 0.55, 6, 0.75, 9.5, 0.85], visibility: "none" } });
     mapaOnd.addSource("ondRioPt", { type: "geojson", data: { type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [-43.2, -22.99] } } });
     mapaOnd.addLayer({ id: "ondRioPt", type: "circle", source: "ondRioPt", maxzoom: 8.5, paint: { "circle-radius": 5, "circle-color": "#FFB627", "circle-stroke-color": "#10283A", "circle-stroke-width": 2 } });
@@ -1972,10 +2007,12 @@
     vis("ondImg-atl", gradeOnd === "atl" && !!mascaras.atl);
     vis("ondImg-costa", gradeOnd === "costa" && !!mascaras.costa);
     vis("ondImg-rio", gradeOnd === "costa" && !!mascaras.rio && !!rioCache);
-    vis("ondSetasRio", gradeOnd === "costa");
+    ["ondSetasRio1", "ondSetasRio2", "ondSetasRio3", "ondSetasRio"].forEach((id) => vis(id, gradeOnd === "costa"));
     mapaOnd.setFilter("ondGradeLL", ["==", ["get", "g"], gradeOnd]);
+    // na costa: as setas da grade grossa que caem na orla do Rio dão lugar às setas da orla quando chega perto
     const comRio = gradeOnd === "costa" && !!rioCache;
-    vis("ondSetasJ", false);
+    mapaOnd.setFilter("ondSetas", comRio ? ["==", ["get", "j"], 0] : null);
+    vis("ondSetasJ", comRio);
   }
   // manda a imagem nova para o mapa
   function enviarTela(id) {
@@ -2004,6 +2041,15 @@
 
   async function desenharOnd() {
     $("#ondAreas").innerHTML = Object.entries(GRADES_OND).map(([id, g]) => `<button data-g="${id}" aria-pressed="${id === gradeOnd}">${g.nome}</button>`).join("");
+    // atalhos da Costa do Rio: vai direto para um trecho, já no zoom em que aparecem as praias e as setas
+    const SUB = [["zs", "Zona Sul", [-43.30, -23.035, -43.155, -22.935]], ["zo", "Zona Oeste", [-43.54, -23.075, -43.27, -22.985]], ["nit", "Niterói", [-43.14, -23.0, -43.01, -22.89]], ["tudo", "Toda a costa", null]];
+    $("#ondSub").hidden = gradeOnd !== "costa";
+    $("#ondSub").innerHTML = SUB.map(([id, n]) => `<button data-s="${id}">${n}</button>`).join("");
+    document.querySelectorAll("#ondSub button").forEach((b) => b.onclick = () => {
+      const sub = SUB.find((q) => q[0] === b.dataset.s), c = sub[2] || GRADES_OND.costa.caixa;
+      document.querySelectorAll("#ondSub button").forEach((o) => o.setAttribute("aria-pressed", o === b));
+      if (mapaOnd) mapaOnd.fitBounds([[c[0], c[1]], [c[2], c[3]]], { padding: 6, duration: 900 });
+    });
     document.querySelectorAll("#ondAreas button").forEach((b) => b.onclick = () => {
       if (gradeOnd === b.dataset.g) return;
       gradeOnd = b.dataset.g; campoCache = null; rioCache = null;

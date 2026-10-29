@@ -593,3 +593,5 @@ button.selo:active{transform:scale(.98)}
 .orla-nav .fn-meio{color:#0A5A78}
 .orla-nav .fn-meio svg{width:20px;height:20px;color:#0B7FA6;fill:none;stroke:currentColor}
 .orla-nav .fn-btn:active{background:#CFEAF3}
+.ond-sub button{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.25);font-size:12.5px;padding:6px 11px}
+.ond-sub button[aria-pressed=true]{background:#fff;color:var(--ink)}
