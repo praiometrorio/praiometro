@@ -19,10 +19,12 @@ PRAIAS = [
   ("prainha", "Prainha", -23.0410, -43.5060), ("grumari", "Grumari", -23.0480, -43.5250),
   ("piratininga", "Piratininga", -22.9560, -43.0900), ("itaipu", "Itaipu", -22.9660, -43.0530),
   ("itacoatiara", "Itacoatiara", -22.9760, -43.0280),
+  ("diabo", "Praia do Diabo", -22.9895, -43.1907), ("vidigal", "Vidigal", -22.9922, -43.2319),
+  ("joatinga", "Joatinga", -23.0149, -43.2902),
 ]
 # ordem de desempate: as mais conhecidas aparecem primeiro na mensagem
 FAMA = ["ipanema", "copacabana", "leblon", "barra", "arpoador", "leme", "recreio", "grumari", "prainha", "saoconrado",
-        "reserva", "vermelha", "itacoatiara", "piratininga", "itaipu"]
+        "reserva", "vermelha", "itacoatiara", "piratininga", "itaipu", "joatinga", "vidigal", "diabo"]
 DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 
 def baixar(url):
@@ -32,31 +34,47 @@ def baixar(url):
 def previsao():
     lat = ",".join(str(p[2]) for p in PRAIAS); lon = ",".join(str(p[3]) for p in PRAIAS)
     base = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&timezone={urllib.parse.quote(FUSO)}&forecast_days=7"
-    tempo = baixar(base + "&hourly=precipitation_probability,cloud_cover,wind_speed_10m")
-    try: nuvens = baixar(base + "&hourly=cloud_cover&models=" + ",".join(MODELOS))
+    tempo = baixar(base + "&hourly=precipitation_probability,cloud_cover,wind_speed_10m&daily=sunrise,sunset")
+    try: nuvens = baixar(base + "&hourly=cloud_cover,wind_speed_10m&models=" + ",".join(MODELOS))
     except Exception: nuvens = None
     if isinstance(tempo, dict): tempo = [tempo]
     if isinstance(nuvens, dict): nuvens = [nuvens]
     return tempo, nuvens
 
+def minutos(hhmm):
+    return int(hhmm[:2]) * 60 + int(hhmm[3:5])
+
 def analisar_dia(t, n, data):
-    """Mesmo cálculo do site: horas de sol (7h–18h), vento e chuva máximos (6h–19h)."""
-    h = t["hourly"]; media = {}
+    """EXATAMENTE o mesmo cálculo do app (js/app.js: montar, estadoHora, analisar, ehPraiao):
+    - nuvens = média dos 9 modelos; vento = valor do meio (mediana) dos 9 modelos
+    - céu de cada hora (6h às 20h): chuva >= 50% = chuva; nuvens >= 70 = nublado; >= 35 = entre nuvens; senão sol;
+      antes do nascer / depois do pôr do sol não conta como sol
+    - horas de sol = horas com "sol" entre 6h e 20h; vento = o mais forte entre 9h e 17h; chuva = a maior entre 6h e 20h"""
+    h = t["hourly"]; media = {}; meio = {}
     if n:
         nh = n["hourly"]
         for k, ts in enumerate(nh["time"]):
             xs = [nh.get("cloud_cover_" + m, [None] * len(nh["time"]))[k] for m in MODELOS]
             xs = [x for x in xs if x is not None]
             if len(xs) >= 3: media[ts] = sum(xs) / len(xs)
+            vs = sorted(v for v in (nh.get("wind_speed_10m_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if v is not None)
+            if len(vs) >= 3: meio[ts] = vs[(len(vs) - 1) // 2] if len(vs) % 2 else (vs[len(vs) // 2 - 1] + vs[len(vs) // 2]) / 2
+    d = t["daily"]["time"].index(data) if data in t["daily"]["time"] else None
+    nas = minutos((t["daily"]["sunrise"][d] or "T05:30")[11:16]) if d is not None else 330
+    por = minutos((t["daily"]["sunset"][d] or "T18:30")[11:16]) if d is not None else 1110
     sol, vento, chuva = 0, 0, 0
     for k, ts in enumerate(h["time"]):
         if ts[:10] != data: continue
-        hr = int(ts[11:13]); c = h["precipitation_probability"][k] or 0
-        nv = media.get(ts, h["cloud_cover"][k] or 0)
-        if 6 <= hr <= 19:
-            vento = max(vento, h["wind_speed_10m"][k] or 0); chuva = max(chuva, c)
-        if 7 <= hr <= 18 and c < 50 and nv < 35: sol += 1
-    return sol, round(vento), chuva
+        hr = int(ts[11:13])
+        if hr < 6 or hr > 20: continue
+        c = h["precipitation_probability"][k] or 0
+        nv = round(media.get(ts, h["cloud_cover"][k] or 0))
+        v = meio.get(ts, h["wind_speed_10m"][k])
+        chuva = max(chuva, c)
+        if v is not None and 9 <= hr <= 17: vento = max(vento, round(v))
+        escuro = hr * 60 + 30 < nas - 10 or hr * 60 + 30 > por + 10
+        if not escuro and c < 50 and nv < 35: sol += 1
+    return sol, vento, chuva
 
 def praias_boas(tempo, nuvens, data, rigoroso):
     boas = []

@@ -574,3 +574,15 @@ button.selo:active{transform:scale(.98)}
 .ond-obs{margin:0;color:#fff;opacity:.75;font-size:12px;text-align:center}
 .ond-escala i{background:linear-gradient(90deg,rgb(150,200,255) 0%,rgb(110,200,240) 6.25%,rgb(90,215,180) 12.5%,rgb(120,220,90) 18.75%,rgb(200,235,70) 25%,rgb(250,230,60) 31.25%,rgb(250,185,50) 37.5%,rgb(240,120,40) 50%,rgb(220,50,40) 62.5%,rgb(170,20,40) 75%,rgb(220,40,160) 87.5%,rgb(255,170,255) 100%)}
 #ondMapa{background:#C4C7CA}
+.ond-etq{background:rgba(16,40,58,.88);color:#fff;font:600 12px var(--f-body);border-radius:10px;padding:3px 8px;white-space:nowrap;pointer-events:none}
+.ond-rio small{opacity:.8}
+
+/* favoritos do surfe */
+.surf-fav-btn{margin-bottom:4px}
+.surf-card .fav{font-style:normal;color:#E0A100}
+.fav-card.simples .ic.surf-ic{background:#CDEFF6;color:#0A4A5C}
+.surf-favoritar{display:inline-flex;align-items:center;gap:8px;justify-self:start;border:1.5px solid #E8C25A;background:#FFF6DC;color:#5E3B00;font-weight:800;font-size:14px;border-radius:999px;padding:8px 14px;cursor:pointer}
+.surf-favoritar svg{width:18px;height:18px;color:#E0A100;fill:currentColor}
+.surf-favoritar[aria-pressed=true]{background:#FFE7A3}
+.surf-nav{border-radius:16px;margin-bottom:10px;border:0}
+#surfeLista{will-change:transform}
