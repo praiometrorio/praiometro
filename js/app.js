@@ -58,6 +58,17 @@
 
   // ---------- leitura do tempo ----------
   // Cada hora vira um "estado": sol, parcial (entre nuvens), nublado ou chuva
+  // horário de pico do UV: se o maior valor (como é mostrado, inteiro) dura várias horas seguidas, "das 10h às 13h"; se é uma hora só, "às 12h"
+  function picoUvTxt(horas) {
+    const c = horas.filter((y) => y.uv != null && y.uv > 0);
+    if (!c.length) return null;
+    const top = c.reduce((m, y) => (y.uv > m.uv ? y : m)), M = Math.round(top.uv);
+    let ini = top.h, fim = top.h;
+    const igual = (h) => { const y = horas.find((q) => q.h === h); return y && y.uv != null && Math.round(y.uv) === M; };
+    while (igual(ini - 1)) ini--;
+    while (igual(fim + 1)) fim++;
+    return ini === fim ? `às ${ini}h` : `das ${ini}h às ${fim}h`;
+  }
   const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= 35 ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
@@ -98,7 +109,7 @@
     const uv = pico ? Math.round(pico.uv) : x.uv;
     const horaJa = +relogio.format(new Date()).slice(0, 2);
     const agoraUv = x.hoje ? comUv.find((y) => y.h === horaJa) : null;
-    const uvTxt = (pico ? `Pico às ${pico.h}h: UV ${uv}` : `UV ${uv}`) + (agoraUv ? ` · agora UV ${Math.round(agoraUv.uv)}` : "");
+    const uvTxt = (pico ? `Pico ${picoUvTxt(x.horas)}` : `UV ${uv}`) + (agoraUv ? ` · agora UV ${Math.round(agoraUv.uv)}` : "");
     if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: `${uvTxt} · evite o sol do meio-dia` });
     else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de pegar cor", s: `${uvTxt} · protetor a cada 2h` });
     else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `${uvTxt} · passa protetor` });
@@ -270,7 +281,8 @@
   // ---------- estado ----------
   const estado = {
     dia: 0,
-    sel: null,                 // praia escolhida pelo usuário (null = a melhor do dia)
+    sel: "ipanema",            // praia aberta (começa sempre em Ipanema)
+    modoFav: false,            // true = aberta pela tela de favoritas (arrastar passa só entre as favoritas)
     regiao: matchMedia("(max-width:640px)").matches ? "zs" : "todas",
     minuto: null               // horário escolhido no controle do sol (minutos desde 0h)
   };
@@ -411,8 +423,8 @@
     const legenda = FAIXAS_UV.map((f) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:${f.cor};display:inline-block"></i>${f.nome}</span>`).join("");
     return `<div class="info uv" style="display:block;background:#FFF3EC;color:#5A2410"><div style="display:grid;gap:8px">
       <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b>${agora ? `<span style="display:flex;align-items:center;gap:8px;background:${faixaUv(agora.uv).cor};color:${corTexto(faixaUv(agora.uv))};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right">AGORA<br>${faixaUv(agora.uv).nome}</small><b style="font-size:26px;line-height:1">${Math.round(agora.uv)}</b></span>` : '<small style="opacity:.7;font-size:12px">Hora a hora</small>'}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-weight:700;font-size:14px">Pico do UV às ${pico.h}h</span>${uvSelo(pico.uv)}</div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico do UV às ${pico.h}h: UV ${Math.round(pico.uv)}.">${barras}</svg>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-weight:700;font-size:14px">Pico do UV ${picoUvTxt(x.horas)}</span></div>
+      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico do UV ${picoUvTxt(x.horas)}.">${barras}</svg>
       <div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:10.5px;opacity:.85">${legenda}</div>
       <div style="font-size:14px;line-height:1.35">${dica}</div>
     </div></div>`;
@@ -754,8 +766,9 @@
     if (mapa) mapa.fitBounds([[c[0], c[1]], [c[2], c[3]]], { padding: 30, duration: 900 });
     desenharLista();
   }
-  function selecionar(id, voar) {
+  function selecionar(id, voar, modoFav) {
     estado.sel = id;
+    estado.modoFav = !!modoFav;
     estado.minuto = null;
     const p = PRAIAS.find((x) => x.id === id);
     if (voar && mapa) mapa.flyTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 13.4), duration: 900 });
@@ -854,16 +867,17 @@
     desenharSolNoMapa();
   }
 
-  function desenharCartao(l) {
+  // HTML completo do cartão de uma praia (usado no cartão de verdade e na prévia que entra arrastando entre as favoritas)
+  function htmlCartao(l) {
     const { p, x, a } = l;
     const ord = linhas.slice().sort((q, r) => r.a.score - q.a.score);
     const melhor = ord[0].p.id === p.id;
     const c = cena(a, x, p);
-    const ini = minutosDe(x.nascer), fim = minutosDe(x.porDoSol);
-    if (estado.minuto == null || estado.minuto < ini || estado.minuto > fim) {
-      const agora = new Date(), mAgora = +relogio.format(agora).slice(0, 2) * 60 + +relogio.format(agora).slice(3, 5);
-      estado.minuto = estado.dia === 0 && mAgora >= ini && mAgora <= fim ? mAgora - (mAgora % 5) : Math.min(Math.max(12 * 60, ini), fim);
-    }
+    // sombra na areia: se o relevo já está guardado, o texto já vem pronto (sem "Calculando…")
+    const hzOk = Array.isArray(horizontes[p.id]) || horizontes[p.id] === "erro";
+    const somb = hzOk ? sombraDoDia(p, x) : null;
+    const temSombra = somb && Object.values(somb.sombraHora).some(Boolean);
+    const sombraTxt = somb ? somb.texto + (temSombra ? " <small>Na faixa de horários, a listra embaixo marca a areia na sombra.</small>" : "") + (horizontes[p.id] === "erro" ? " <small>(Sem dados do relevo agora; considerei só os prédios)</small>" : "") : "Calculando a sombra na areia…";
     const ultimaHora = x.horas.filter((y) => y.h >= 16 && y.h <= 18);
     const nuvensTarde = ultimaHora.length ? media(ultimaHora.map((y) => y.nuvens)) : 50;
     const porTxt = nuvensTarde >= 20 && nuvensTarde <= 60 ? "boa chance de céu colorido" : nuvensTarde < 20 ? "céu limpo, cores suaves" : "as nuvens devem esconder";
@@ -875,15 +889,22 @@
       const y = x.horas.find((q) => q.h === h);
       if (!y) continue;
       const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
-      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}" data-h="${h}" title="${h}h: ${NOME_EST[y.est]}">
+      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${NOME_EST[y.est]}">
         <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${IC[y.est]}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
     // passar para o lado entre as favoritas (só quando a praia aberta é uma favorita e há 2 ou mais)
-    const favs = listaFavoritas();
+    const sq = seqNav(p.id), favs = sq.lista;
     const iFav = favs.findIndex((q) => q.p.id === p.id);
     let navFav = "";
-    if (iFav >= 0 && favs.length > 1) {
+    if (iFav >= 0 && favs.length > 1 && sq.modo === "orla") {
+      const ant = favs[(iFav - 1 + favs.length) % favs.length].p, prox = favs[(iFav + 1) % favs.length].p;
+      navFav = `<div class="fav-nav orla-nav" aria-label="Navegar pela orla">
+        <button class="fn-btn" data-ir="${ant.id}" aria-label="Praia anterior na orla: ${ant.nome}">‹<span>${ant.nome}</span></button>
+        <span class="fn-meio">${IC.onda}<b>Orla</b></span>
+        <button class="fn-btn dir" data-ir="${prox.id}" aria-label="Próxima praia na orla: ${prox.nome}"><span>${prox.nome}</span>›</button>
+      </div>`;
+    } else if (iFav >= 0 && favs.length > 1) {
       const ant = favs[(iFav - 1 + favs.length) % favs.length].p, prox = favs[(iFav + 1) % favs.length].p;
       navFav = `<div class="fav-nav" aria-label="Navegar entre as favoritas">
         <button class="fn-btn" data-ir="${ant.id}" aria-label="Favorita anterior: ${ant.nome}">‹<span>${ant.nome}</span></button>
@@ -892,7 +913,7 @@
       </div>`;
     }
 
-    $("#cartao").innerHTML = `${navFav}
+    return `${navFav}
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
       </div>
@@ -909,12 +930,24 @@
           <span class="vc-novo">NOVO</span>
         </button>` : ""}
         <div class="selos">${a.selos.map((s) => `<button class="selo ${s.cls}" data-k="${s.k}" aria-label="${s.t}. ${s.s}. Toque para ver o detalhe hora a hora">${s.ic}<b>${s.t}</b><span>${s.s}</span><i class="selo-mais" aria-hidden="true">›</i></button>`).join("")}</div>
-        <div class="info sombra" id="sombra">${IC.sombra}<span>Calculando a sombra na areia…</span></div>
+        <div class="info sombra" id="sombra">${IC.sombra}<span>${sombraTxt}</span></div>
         ${htmlMetro(p)}
         ${graficoUv(x)}
         ${graficoMare(x)}
         <div class="info por">${IC.porDoSol}<span><b>Pôr do sol às ${x.porDoSol.replace(":", "h")}</b>, ${porTxt}${p.porDoSol ? ". Vista clássica daqui" : ""}.</span></div>
       </div>`;
+  }
+  function desenharCartao(l) {
+    const { p, x } = l;
+    const ini = minutosDe(x.nascer), fim = minutosDe(x.porDoSol);
+    if (estado.minuto == null || estado.minuto < ini || estado.minuto > fim) {
+      const agora = new Date(), mAgora = +relogio.format(agora).slice(0, 2) * 60 + +relogio.format(agora).slice(3, 5);
+      estado.minuto = estado.dia === 0 && mAgora >= ini && mAgora <= fim ? mAgora - (mAgora % 5) : Math.min(Math.max(12 * 60, ini), fim);
+    }
+    $("#cartao").innerHTML = htmlCartao(l);
+    const favs = seqNav(p.id).lista, iFav = favs.findIndex((q) => q.p.id === p.id), navFav = iFav >= 0 && favs.length > 1;
+    // já deixa o relevo das vizinhas pronto, para a prévia do arraste vir completa
+    if (navFav) [favs[(iFav + 1) % favs.length], favs[(iFav - 1 + favs.length) % favs.length]].forEach((q) => carregarHorizonte(q.p));
     const agoraEl = document.querySelector("#horas .agora");
     if (agoraEl) $("#horas").scrollLeft = Math.max(0, agoraEl.offsetLeft - 8);
     // controle do horário do sol: fica junto do mapa (logo acima dele)
@@ -1088,6 +1121,16 @@
 
   // ---------- tela das favoritas: previsão resumida de cada uma; tocando, abre a completa ----------
   // mesma ordem da tela das favoritas: da melhor nota para a pior
+  // ordem da orla, de oeste para leste: arrastar para a esquerda anda para o leste (Ipanema → Arpoador → Copacabana...)
+  const ORLA = ["grumari", "prainha", "recreio", "reserva", "barra", "joatinga", "saoconrado", "vidigal", "leblon", "ipanema", "arpoador", "diabo",
+    "copacabana", "leme", "vermelha", "botafogo", "flamengo", "icarai", "piratininga", "itaipu", "itacoatiara"];
+  // por onde o arrastar passa: só as favoritas (se a praia foi aberta pela tela de favoritas) ou a orla toda
+  function seqNav(id) {
+    const favs = listaFavoritas();
+    if (estado.modoFav && favs.length > 1 && favs.some((q) => q.p.id === id)) return { modo: "fav", lista: favs };
+    const ids = ORLA.concat(PRAIAS.map((p) => p.id).filter((x) => !ORLA.includes(x)));
+    return { modo: "orla", lista: ids.map((x) => linhas.find((l) => l.p.id === x)).filter(Boolean) };
+  }
   function listaFavoritas() {
     return favoritas.map((id) => linhas.find((l) => l.p.id === id)).filter(Boolean).sort((a, b) => b.a.score - a.a.score);
   }
@@ -1102,9 +1145,9 @@
   let deslizando = false, fantasma = null, ladoFantasma = 0;
   const GAP_FAV = 16;
   function vizinhaFav(lado) {
-    const favs = listaFavoritas(), i = favs.findIndex((q) => q.p.id === estado.sel);
-    if (i < 0 || favs.length < 2) return null;
-    return favs[(i + lado + favs.length) % favs.length];
+    const { lista } = seqNav(praiaAtual().p.id), i = lista.findIndex((q) => q.p.id === praiaAtual().p.id);
+    if (i < 0 || lista.length < 2) return null;
+    return lista[(i + lado + lista.length) % lista.length];
   }
   // prévia da praia vizinha (foto, nome e frase) que vem grudada no cartão enquanto arrasta
   function montarFantasma(lado) {
@@ -1114,16 +1157,14 @@
     if (!v) return null;
     const pai = c.parentElement;
     if (getComputedStyle(pai).position === "static") pai.style.position = "relative";
-    const cn = cena(v.a, v.x, v.p), nav = c.querySelector(".fav-nav");
     fantasma = document.createElement("div");
     fantasma.className = "cartao cartao-fantasma";
     fantasma.setAttribute("aria-hidden", "true");
     fantasma.style.cssText = `position:absolute;top:${c.offsetTop}px;left:${c.offsetLeft + lado * (c.offsetWidth + GAP_FAV)}px;width:${c.offsetWidth}px;height:${Math.min(c.offsetHeight, window.innerHeight * 1.5)}px;pointer-events:none`;
-    fantasma.innerHTML = `${nav ? `<div class="fav-nav" style="height:${nav.offsetHeight}px"></div>` : ""}
-      <div class="cena${cn.escura ? " escura" : ""}">${cn.svg}<div class="tit"><h2>${v.p.nome}</h2><span class="local">${v.p.local}</span></div></div>
-      <div class="corpo"><p class="veredito">${v.a.veredito}</p>
-        <div class="selos">${v.a.selos.map((x) => `<div class="selo ${x.cls}">${x.ic}<b>${x.t}</b><span>${x.s}</span></div>`).join("")}</div></div>`;
+    fantasma.innerHTML = htmlCartao(v).replace(/ id="/g, ' data-fid="');     // igualzinho ao cartão de verdade (sem repetir ids)
     pai.appendChild(fantasma);
+    const hr = fantasma.querySelector(".horario"), ag = hr && hr.querySelector(".agora");
+    if (ag) hr.scrollLeft = Math.max(0, ag.offsetLeft - 8);
     ladoFantasma = lado;
     return fantasma;
   }
@@ -1161,8 +1202,7 @@
       ativo = false; modo = null; dx = 0;
       if (deslizando || e.touches.length > 1) return;
       if (e.target.closest("#horas, input, .tab-surf, .mare-g")) return;   // essas partes rolam para o lado sozinhas
-      const favs = listaFavoritas();
-      if (favs.length < 2 || !favs.some((q) => q.p.id === estado.sel)) return;
+      if (!vizinhaFav(1)) return;
       ativo = true; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
     }, { passive: true });
     c.addEventListener("touchmove", (e) => {
@@ -1199,7 +1239,7 @@
         <span class="fav-nome"><b>${p.nome}</b></span>
         <span class="fav-abrir">Previsão completa ›</span>
       </button>`).join("");
-    document.querySelectorAll(".fav-card").forEach((b) => b.onclick = () => { fecharFavoritas(); abrirPraia(b.dataset.id); });
+    document.querySelectorAll(".fav-card").forEach((b) => b.onclick = () => { fecharFavoritas(); abrirPraia(b.dataset.id, true); });
   }
   function abrirFavoritas() { desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
   function fecharFavoritas() { $("#favTela").hidden = true; document.body.style.overflow = ""; }
@@ -2050,7 +2090,7 @@
         texto: (q) => `<b>UV ${Math.round(q.v)} · ${FAIXAS_UV[faixaIdx(q.v)].nome}</b><span>${SAUDE_UV[faixaIdx(q.v)]}</span>`,
         resumo: () => { const pk = pts.reduce((a, b) => (b.bruto > a.bruto ? b : a), pts[0] || { v: 0, h: 0, bruto: 0 }), alto = pts.filter((q) => q.v >= 6);
           const j = maiorSequencia(hs, (y) => y.uv != null && Math.round(y.uv) >= 6);
-          return [`<span class="rel-pico">Pico do UV às ${pk.h}h ${uvSelo(pk.v)}</span>`, alto.length && j ? `UV alto ou mais ${faixaH(j)}` : "Sem UV alto no dia"]; },
+          return [`Pico do UV ${picoUvTxt(hs)}`, alto.length && j ? `UV alto ou mais ${faixaH(j)}` : "Sem UV alto no dia"]; },
         leg: FAIXAS_UV.map((f) => [f.cor, f.nome]) }; }
     if (k === "mar") { const pts = (x.surfe ? x.surfe.map((q) => { const o = swP(q); return { h: q.h, o: o.a, d: o.d, per: o.p }; }) : (x.marH || []))
         .filter((q) => q.o != null).map((q) => ({ h: q.h, v: Math.round(q.o * 10) / 10, cor: marCat(q.o).c, d: q.d, per: q.per }));
@@ -2238,11 +2278,11 @@
       return { p, pontos };
     }).filter((r) => r.pontos).sort((a, b) => b.pontos - a.pontos || a.p.nome.localeCompare(b.p.nome)).slice(0, 6).map((r) => r.p);
   }
-  function abrirPraia(id) {
+  function abrirPraia(id, modoFav) {
     const p = PRAIAS.find((x) => x.id === id);
     if (estado.regiao !== "todas" && estado.regiao !== p.regiao) irParaRegiao(p.regiao);
     $("#busca").value = ""; $("#buscaRes").hidden = true; $("#busca").blur();
-    selecionar(id, true);
+    selecionar(id, true, modoFav);
   }
   function ligarBusca() {
     const inp = $("#busca"), res = $("#buscaRes");

@@ -587,3 +587,9 @@ button.selo:active{transform:scale(.98)}
 .surf-nav{border-radius:16px;margin-bottom:10px;border:0}
 #surfeLista{will-change:transform}
 .rel-pico{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap}
+
+/* arrastar pela orla */
+.orla-nav{background:#E6F4F9;border-bottom-color:#C9E5EF}
+.orla-nav .fn-meio{color:#0A5A78}
+.orla-nav .fn-meio svg{width:20px;height:20px;color:#0B7FA6;fill:none;stroke:currentColor}
+.orla-nav .fn-btn:active{background:#CFEAF3}
