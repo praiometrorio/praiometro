@@ -529,7 +529,7 @@ div.posto{z-index:2}
 .grade{overflow-x:clip}
 #cartao{touch-action:pan-y;will-change:transform}
 .cartao-fantasma{will-change:transform}
-.cartao-fantasma .fav-nav{background:#FFF6DC}
+
 
 /* selos clicáveis e relatório detalhado */
 button.selo{border:0;text-align:left;font:inherit;color:inherit;cursor:pointer;position:relative}

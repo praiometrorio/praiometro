@@ -1161,7 +1161,7 @@
     fantasma.className = "cartao cartao-fantasma";
     fantasma.setAttribute("aria-hidden", "true");
     fantasma.style.cssText = `position:absolute;top:${c.offsetTop}px;left:${c.offsetLeft + lado * (c.offsetWidth + GAP_FAV)}px;width:${c.offsetWidth}px;height:${Math.min(c.offsetHeight, window.innerHeight * 1.5)}px;pointer-events:none`;
-    fantasma.innerHTML = htmlCartao(v).replace(/ id="/g, ' data-fid="');     // igualzinho ao cartão de verdade (sem repetir ids)
+    fantasma.innerHTML = htmlCartao(v);     // igualzinho ao cartão de verdade (mesmo HTML, mesmos estilos); fica depois do cartão na página, então os comandos continuam achando o cartão de verdade
     pai.appendChild(fantasma);
     const hr = fantasma.querySelector(".horario"), ag = hr && hr.querySelector(".agora");
     if (ag) hr.scrollLeft = Math.max(0, ag.offsetLeft - 8);
