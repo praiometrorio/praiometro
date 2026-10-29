@@ -1429,8 +1429,11 @@
 
   // ---------- mapa de ondulação (estilo Windguru): cores da altura, linhas de contorno, setas e régua de tempo ----------
   const GRADES_OND = {
-    atl: { nome: "Atlântico Sul", lat0: -52, lat1: -16, lon0: -60, lon1: -22, passo: 2, sobe: 6, caixa: [-57, -47, -27, -19], linhaGrade: 5 },
-    costa: { nome: "Costa do Rio", lat0: -26.5, lat1: -22, lon0: -46, lon1: -40.5, passo: 0.5, sobe: 4, caixa: [-45.2, -25.5, -41.2, -22.4], linhaGrade: 1 } };
+    atl: { nome: "Atlântico Sul", lat0: -52, lat1: -16, lon0: -60, lon1: -22, passo: 2, sobe: 6, caixa: [-57, -47, -27, -19], linhaGrade: 5, zMax: 9 },
+    costa: { nome: "Costa do Rio", lat0: -26.5, lat1: -22, lon0: -46, lon1: -40.5, passo: 0.5, sobe: 4, caixa: [-45.2, -25.5, -41.2, -22.4], linhaGrade: 1, zMax: 16 } };
+  // limite do mapa = área que tem dado de ondulação; assim não dá para afastar até aparecer mar sem cor
+  const limitesOnd = (gid) => { const g = GRADES_OND[gid]; return [[g.lon0, g.lat0], [g.lon1, g.lat1]]; };
+  function travarOnd() { if (!mapaOnd) return; mapaOnd.setMaxBounds(limitesOnd(gradeOnd)); mapaOnd.setMaxZoom(GRADES_OND[gradeOnd].zMax); }
   Object.values(GRADES_OND).forEach((g) => { g.lin = Math.round((g.lat1 - g.lat0) / g.passo) + 1; g.col = Math.round((g.lon1 - g.lon0) / g.passo) + 1; });
   const RAMPA_OND = [[0, [150, 200, 255]], [0.5, [110, 200, 240]], [1, [90, 215, 180]], [1.5, [120, 220, 90]], [2, [200, 235, 70]], [2.5, [250, 230, 60]],
     [3, [250, 185, 50]], [4, [240, 120, 40]], [5, [220, 50, 40]], [6, [170, 20, 40]], [7, [220, 40, 160]], [9, [255, 170, 255]]];
@@ -1466,9 +1469,15 @@
     $("#ondAreas").innerHTML = Object.entries(GRADES_OND).map(([id, g]) => `<button data-g="${id}" aria-pressed="${id === gradeOnd}">${g.nome}</button>`).join("");
     document.querySelectorAll("#ondAreas button").forEach((b) => b.onclick = () => {
       if (gradeOnd === b.dataset.g) return;
-      gradeOnd = b.dataset.g; campoCache = null;
+      gradeOnd = b.dataset.g; campoCache = null; micro = null;
       const c = GRADES_OND[gradeOnd].caixa;
-      if (mapaOnd) mapaOnd.fitBounds([[c[0], c[1]], [c[2], c[3]]], { padding: 4, duration: 900 });
+      if (mapaOnd) {
+        // solta o limite, voa até a área nova e só então trava de novo (para a animação não dar pulo)
+        mapaOnd.setMaxBounds(null); mapaOnd.setMaxZoom(16);
+        mapaOnd.fitBounds([[c[0], c[1]], [c[2], c[3]]], { padding: 4, duration: 900 });
+        const gid = gradeOnd;
+        mapaOnd.once("moveend", () => { if (gid === gradeOnd) travarOnd(); });
+      }
       desenharOnd();
     });
     if (!dadosOnd[gradeOnd]) {
@@ -1498,8 +1507,10 @@
     }
     const c = GRADES_OND[gradeOnd].caixa;
     mapaOnd = new maplibregl.Map({ container: "ondMapa", style: estilo, bounds: [[c[0], c[1]], [c[2], c[3]]], fitBoundsOptions: { padding: 4 },
-      attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, minZoom: 2.5, maxZoom: 9 });
+      attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, maxZoom: GRADES_OND[gradeOnd].zMax,
+      maxBounds: limitesOnd(gradeOnd) });
     mapaOnd.touchZoomRotate.disableRotation();
+    mapaOnd.on("moveend", agendarMicro);
     mapaOnd.on("load", () => {
       ondPronto = true;
       mapaOnd.addSource("picosOnd", { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [-43.2, -22.99] } }] } });
@@ -1508,7 +1519,7 @@
     });
     mapaOnd.on("render", () => { if (!ondDesenhoPend) pedirOnd(); });
   }
-  function atualizarOndT() { const D = dadosOnd[gradeOnd]; if (!D) return; if ($("#ondTxt")) $("#ondTxt").textContent = nomeOndT(D, ondT); if ($("#ondR")) $("#ondR").value = ondT; campoCache = null; pedirOnd(); }
+  function atualizarOndT() { const D = dadosOnd[gradeOnd]; if (!D) return; if ($("#ondTxt")) $("#ondTxt").textContent = nomeOndT(D, ondT); if ($("#ondR")) $("#ondR").value = ondT; campoCache = null; if (micro) { calcMicro(); } pedirOnd(); }
   function tocarOnd() { pararOnd(); ondPlay = setInterval(() => { const D = dadosOnd[gradeOnd]; if (!D) return; ondT = (ondT + 1) % D.time.length; atualizarOndT(); }, 420); if ($("#ondPlay")) $("#ondPlay").textContent = "❚❚"; }
   function pararOnd() { if (ondPlay) clearInterval(ondPlay); ondPlay = null; if ($("#ondPlay")) $("#ondPlay").textContent = "▶"; }
   function pedirOnd() { if (ondDesenhoPend) return; ondDesenhoPend = true; requestAnimationFrame(() => { ondDesenhoPend = false; pintarOnd(); }); }
@@ -1558,7 +1569,8 @@
     for (let i = 0; i < R2; i++) ys[i] = mapaOnd.project([g.lon0, g.lat1 - i * dLat]).y;
     // recorte pelo mar
     const camadasAgua = (mapaOnd.getStyle().layers || []).filter((l) => l.type === "fill" && (l.id === "water" || l["source-layer"] === "water")).map((l) => l.id);
-    const feats = camadasAgua.length ? mapaOnd.queryRenderedFeatures({ layers: camadasAgua }) : [];
+    const feats = (camadasAgua.length ? mapaOnd.queryRenderedFeatures({ layers: camadasAgua }) : []).filter((f) => !f.properties || f.properties.class !== "lake");
+    const mic = microValido() ? micro : null;
     ctx.save();
     if (feats.length) {
       const pth = new Path2D();
@@ -1578,6 +1590,7 @@
       if (yB < -5 || yA > Hc + 5) continue;
       ctx.drawImage(img, 0, i, C2, 1, x0, yA, x1 - x0, yB - yA + 0.6);
     }
+    if (mic) { pintarMicro(ctx, mic, Wc, Hc); ctx.restore(); grade(ctx, g, Hc, Wc); textoOnd(D, g, true); return; }
     // 2) linhas de contorno (a cada meio metro até 3 m, depois de metro em metro)
     ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.75)";
     const interp = (a, b, v) => (v - a) / (b - a || 1e-6);
@@ -1619,16 +1632,198 @@
     }
     ctx.stroke();
     ctx.restore();
-    // 4) grade de latitude/longitude tracejada
+    grade(ctx, g, Hc, Wc);
+    textoOnd(D, g, false);
+  }
+  // 4) grade de latitude/longitude tracejada
+  function grade(ctx, g, Hc, Wc) {
     ctx.save(); ctx.setLineDash([3, 4]); ctx.strokeStyle = "rgba(0,0,0,.28)"; ctx.lineWidth = 1; ctx.beginPath();
-    const st = g.linhaGrade, b = mapaOnd.getBounds();
+    const st = mapaOnd.getZoom() >= 11 ? 0.05 : mapaOnd.getZoom() >= 8.5 ? 0.25 : g.linhaGrade, b = mapaOnd.getBounds();
     for (let lo = Math.ceil(b.getWest() / st) * st; lo <= b.getEast(); lo += st) { const x = mapaOnd.project([lo, b.getNorth()]).x; ctx.moveTo(x, 0); ctx.lineTo(x, Hc); }
     for (let la = Math.ceil(b.getSouth() / st) * st; la <= b.getNorth(); la += st) { const y = mapaOnd.project([b.getWest(), la]).y; ctx.moveTo(0, y); ctx.lineTo(Wc, y); }
     ctx.stroke(); ctx.restore();
-    // valor em frente ao Rio
+  }
+  // ondulação em alto-mar, em frente ao Rio (ponto da grade a ~35 km da costa)
+  function altoMarRio(D, g) {
     const iR = Math.round((g.lat1 - -23.3) / g.passo), jR = Math.round((-43.2 - g.lon0) / g.passo), kR = iR * g.col + jR;
-    const aR = D.a[kR] && D.a[kR][ondT], dR = D.d[kR] && D.d[kR][ondT], pR = D.p[kR] && D.p[kR][ondT];
-    if ($("#ondRio")) $("#ondRio").innerHTML = aR != null ? `Em frente ao Rio: <b>${fmt1(aR)} m · ${pR ?? "–"} s · de ${rumo(dR)}</b>` : "";
+    const a = D.a[kR] && D.a[kR][ondT], d = D.d[kR] && D.d[kR][ondT], p = D.p[kR] && D.p[kR][ondT];
+    return a == null || d == null ? null : { a, d, p };
+  }
+  function textoOnd(D, g, detalhe) {
+    const r = altoMarRio(D, g);
+    if ($("#ondRio")) $("#ondRio").innerHTML = !r ? "" : (detalhe ? "Alto-mar: " : "Em frente ao Rio: ") + `<b>${fmt1(r.a)} m · ${r.p ?? "–"} s · de ${rumo(r.d)}</b>` +
+      (mascaraCarregando ? " · carregando o detalhe da costa…" : "");
+    if ($(".ond-obs")) $(".ond-obs").textContent = detalhe
+      ? "Detalhe da costa: quanto da ondulação chega em cada trecho, descontando o abrigo de pedras, pontões e ilhas · setas: por onde ela entra"
+      : gradeOnd === "costa" ? "Cor e linhas brancas: altura das ondas · setas: para onde a ondulação vai · dê zoom numa praia para ver o detalhe"
+      : "Cor e linhas brancas: altura das ondas · setas: para onde a ondulação vai";
+  }
+
+  // ---------- detalhe da costa do Rio (zoom de praia) ----------
+  // O modelo de ondas tem pontos a cada ~9 km: não enxerga o Leme. Aqui a gente pega a ondulação de alto-mar
+  // e "joga" ela contra o desenho real da costa (pedras, pontões, ilhas): cada pedacinho de mar recebe
+  // a parte da ondulação que consegue chegar até ele sem bater em terra (com espalhamento, que é como
+  // a onda contorna uma ponta). É uma estimativa geométrica, sem profundidade do fundo.
+  const MASCARA_RJ = { w: -43.80, e: -42.80, s: -23.22, n: -22.78, z: 11.2 };
+  const ZOOM_MICRO = 10.3;
+  let mascara = null, mascaraCarregando = false, mascaraFalhou = false, micro = null, microTimer = null;
+  const mercY = (lat) => Math.log(Math.tan(Math.PI / 4 + lat * Math.PI / 360));
+  const latDeY = (y) => Math.atan(Math.sinh(y)) * 180 / Math.PI;
+  const microValido = () => micro && mapaOnd && gradeOnd === "costa" && mapaOnd.getZoom() >= ZOOM_MICRO && micro.t === ondT;
+  function agendarMicro() {
+    clearTimeout(microTimer);
+    if (!mapaOnd || gradeOnd !== "costa" || mapaOnd.getZoom() < ZOOM_MICRO) { if (micro) { micro = null; pedirOnd(); } return; }
+    if (!mascara) { carregarMascara(); return; }
+    microTimer = setTimeout(calcMicro, 60);
+  }
+  // desenha só a água (linha de costa do OpenStreetMap) num mapa escondido e guarda como máscara terra/mar
+  async function carregarMascara() {
+    if (mascara || mascaraCarregando || mascaraFalhou || !mapaOnd) return;
+    mascaraCarregando = true; pedirOnd();
+    const M = MASCARA_RJ, S = 512 * Math.pow(2, M.z);
+    const W = Math.round((M.e - M.w) / 360 * S), H = Math.round((mercY(M.n) - mercY(M.s)) / (2 * Math.PI) * S);
+    const div = document.createElement("div");
+    div.style.cssText = `position:fixed;left:${-W - 100}px;top:0;width:${W}px;height:${H}px;pointer-events:none`;
+    document.body.appendChild(div);
+    let m = null;
+    try {
+      const srcs = mapaOnd.getStyle().sources, nome = Object.keys(srcs).find((k) => srcs[k].type === "vector");
+      m = new maplibregl.Map({ container: div, interactive: false, attributionControl: false, pixelRatio: 1, preserveDrawingBuffer: true, fadeDuration: 0,
+        center: [(M.w + M.e) / 2, latDeY((mercY(M.n) + mercY(M.s)) / 2)], zoom: M.z,
+        style: { version: 8, sources: { v: srcs[nome] }, layers: [
+          { id: "terra", type: "background", paint: { "background-color": "#fff" } },
+          { id: "mar", type: "fill", source: "v", "source-layer": "water", filter: ["!=", ["get", "class"], "lake"], paint: { "fill-color": "#000", "fill-antialias": false } }] } });
+      await new Promise((ok, erro) => { m.once("idle", ok); setTimeout(() => erro(new Error("demorou")), 30000); });
+      const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+      const cx = cv.getContext("2d", { willReadFrequently: true });
+      cx.drawImage(m.getCanvas(), 0, 0, W, H);
+      const px = cx.getImageData(0, 0, W, H).data, agua = new Uint8Array(W * H);
+      let n = 0;
+      for (let i = 0; i < W * H; i++) if (px[i * 4] < 128) { agua[i] = 1; n++; }
+      if (n < W * H * 0.1 || n > W * H * 0.95) throw new Error("máscara vazia");
+      const b = m.getBounds();
+      mascara = { W, H, agua, w: b.getWest(), e: b.getEast(), yN: mercY(b.getNorth()), yS: mercY(b.getSouth()),
+        kmPx: (b.getEast() - b.getWest()) / W * 111.32 * Math.cos(23 * Math.PI / 180) };
+    } catch (e) { console.warn("Detalhe da costa", e); mascaraFalhou = true; }
+    try { if (m) m.remove(); } catch (e) { /* nada */ }
+    div.remove();
+    mascaraCarregando = false;
+    agendarMicro(); pedirOnd();
+  }
+  // fração da ondulação que chega num ponto (pixel da máscara) vinda de "dir" (graus, de onde vem)
+  function chegada(mx, my, dir, sig) {
+    const { W, H, agua } = mascara, Lmax = 18 / mascara.kmPx;
+    let sw = 0, so = 0, vx = 0, vy = 0;
+    for (let o = -48; o <= 48; o += 8) {
+      const w = Math.exp(-0.5 * (o / sig) * (o / sig)); sw += w;
+      const r = (dir + o) * Math.PI / 180, dx = Math.sin(r), dy = -Math.cos(r);
+      let d = 1.5, livre = true;
+      while (d < Lmax) {
+        const x = Math.round(mx + dx * d), y = Math.round(my + dy * d);
+        if (y < 0) { livre = false; break; }               // saiu pelo norte: é continente
+        if (x < 0 || x >= W || y >= H) break;               // saiu pelo mar aberto
+        if (!agua[y * W + x]) { livre = false; break; }
+        d += Math.max(1, d / 28);
+      }
+      if (livre) { so += w; vx += w * dx; vy += w * dy; }
+    }
+    return { E: so / sw, vx, vy };
+  }
+  const naMascara = (lon, Y) => [(lon - mascara.w) / (mascara.e - mascara.w) * mascara.W, (mascara.yN - Y) / (mascara.yN - mascara.yS) * mascara.H];
+  const ehTerra = (mx, my) => { const x = Math.round(mx), y = Math.round(my); return x >= 0 && y >= 0 && x < mascara.W && y < mascara.H && !mascara.agua[y * mascara.W + x]; };
+  function calcMicro() {
+    const D = dadosOnd[gradeOnd];
+    if (!mascara || !mapaOnd || !D || gradeOnd !== "costa" || mapaOnd.getZoom() < ZOOM_MICRO) { micro = null; pedirOnd(); return; }
+    const alto = altoMarRio(D, GRADES_OND.costa);
+    if (!alto) { micro = null; return; }
+    const cont = $("#ondMapa"), Wc = cont.clientWidth, Hc = cont.clientHeight, P = 5;
+    const nx = Math.ceil(Wc / P) + 2, ny = Math.ceil(Hc / P) + 2;
+    const pA = mapaOnd.unproject([-P, -P]), pB = mapaOnd.unproject([(nx - 2) * P, (ny - 2) * P]);
+    const lonA = pA.lng, lonB = pB.lng, YA = mercY(pA.lat), YB = mercY(pB.lat);
+    const sig = alto.p >= 12 ? 14 : alto.p >= 9 ? 20 : 28;   // ondulação longa contorna menos as pontas
+    const val = new Float32Array(nx * ny).fill(NaN), E = new Float32Array(nx * ny), VX = new Float32Array(nx * ny), VY = new Float32Array(nx * ny);
+    for (let j = 0; j < ny; j++) {
+      const Y = YA + (YB - YA) * j / (ny - 1);
+      for (let i = 0; i < nx; i++) {
+        const [mx, my] = naMascara(lonA + (lonB - lonA) * i / (nx - 1), Y), k = j * nx + i;
+        if (ehTerra(mx, my)) continue;
+        const c = chegada(mx, my, alto.d, sig);
+        E[k] = c.E; VX[k] = c.vx; VY[k] = c.vy; val[k] = alto.a * Math.sqrt(c.E);
+      }
+    }
+    // encosta a cor na areia: terra recebe o valor do mar vizinho
+    const cheio = val.slice();
+    for (let passo = 0; passo < 3; passo++) {
+      const nv = cheio.slice();
+      for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const k = j * nx + i; if (!isNaN(cheio[k])) continue;
+        let s = 0, n = 0; for (const [a, b] of [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]]) { if (a < 0 || b < 0 || a >= nx || b >= ny) continue; const v = cheio[b * nx + a]; if (!isNaN(v)) { s += v; n++; } }
+        if (n) nv[k] = s / n; }
+      cheio.set(nv);
+    }
+    const img = document.createElement("canvas"); img.width = nx; img.height = ny;
+    const ic = img.getContext("2d"), id = ic.createImageData(nx, ny);
+    for (let k = 0; k < nx * ny; k++) { if (isNaN(cheio[k])) continue; const c = corOnd(cheio[k]); id.data[k * 4] = c[0]; id.data[k * 4 + 1] = c[1]; id.data[k * 4 + 2] = c[2]; id.data[k * 4 + 3] = 255; }
+    ic.putImageData(id, 0, 0);
+    // valor de cada praia (ponto a ~300 m da areia, no mar)
+    const praias = PICOS().map((p) => { const ll = noMar(p, 0.3), [mx, my] = naMascara(ll[0], mercY(ll[1]));
+      if (ehTerra(mx, my)) return null; const c = chegada(mx, my, alto.d, sig); return { p, ll, a: alto.a * Math.sqrt(c.E) }; }).filter(Boolean);
+    micro = { t: ondT, nx, ny, P, val, cheio, E, VX, VY, img, lonA, lonB, latA: pA.lat, latB: pB.lat, praias };
+    pedirOnd();
+  }
+  function pintarMicro(ctx, m, Wc, Hc) {
+    const a = mapaOnd.project([m.lonA, m.latA]), b = mapaOnd.project([m.lonB, m.latB]);
+    const sx = (b.x - a.x) / (m.nx - 1), sy = (b.y - a.y) / (m.ny - 1);
+    const X = (i) => a.x + i * sx, Y = (j) => a.y + j * sy;
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(m.img, a.x - sx / 2, a.y - sy / 2, sx * m.nx, sy * m.ny);
+    // linhas de mesma altura (a cada 25 cm)
+    const F = m.cheio, nx = m.nx, mx = Math.max(...F.filter((v) => !isNaN(v)));
+    const niveis = []; for (let L = 0.25; L < Math.min(9, mx); L += L < 3 ? 0.25 : 1) niveis.push(L);
+    ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.7)";
+    const interp = (p, q, v) => (v - p) / (q - p || 1e-6);
+    ctx.beginPath();
+    for (const L of niveis) for (let j = 0; j < m.ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+      const p = F[j * nx + i], q = F[j * nx + i + 1], r = F[(j + 1) * nx + i + 1], s = F[(j + 1) * nx + i];
+      if (isNaN(p) || isNaN(q) || isNaN(r) || isNaN(s)) continue;
+      const caso = (p >= L ? 8 : 0) | (q >= L ? 4 : 0) | (r >= L ? 2 : 0) | (s >= L ? 1 : 0);
+      if (caso === 0 || caso === 15) continue;
+      const xA = X(i), xB = X(i + 1), yA = Y(j), yB = Y(j + 1);
+      const top = [xA + (xB - xA) * interp(p, q, L), yA], dir = [xB, yA + (yB - yA) * interp(q, r, L)], bot = [xA + (xB - xA) * interp(s, r, L), yB], esq = [xA, yA + (yB - yA) * interp(p, s, L)];
+      const seg = (u, v) => { ctx.moveTo(u[0], u[1]); ctx.lineTo(v[0], v[1]); };
+      switch (caso) {
+        case 1: case 14: seg(esq, bot); break; case 2: case 13: seg(bot, dir); break; case 3: case 12: seg(esq, dir); break;
+        case 4: case 11: seg(top, dir); break; case 6: case 9: seg(top, bot); break; case 7: case 8: seg(esq, top); break;
+        case 5: seg(esq, top); seg(bot, dir); break; case 10: seg(esq, bot); seg(top, dir); break;
+      }
+    }
+    ctx.stroke();
+    // setas: por onde a ondulação entra em cada trecho (contornando as pontas)
+    const passo = Math.max(1, Math.round(34 / Math.abs(sx))), Lw = 13;
+    ctx.lineCap = "round"; ctx.lineJoin = "round"; ctx.lineWidth = 1.4;
+    for (let j = 1; j < m.ny; j += passo) for (let i = 1; i < nx; i += passo) {
+      const k = j * nx + i; if (isNaN(m.val[k]) || m.E[k] < 0.04) continue;
+      const px = X(i), py = Y(j); if (px < -10 || py < -10 || px > Wc + 10 || py > Hc + 10) continue;
+      const n = Math.hypot(m.VX[k], m.VY[k]) || 1, ux = -m.VX[k] / n, uy = -m.VY[k] / n;   // vai no sentido contrário de onde vem
+      const hx = px + ux * Lw / 2, hy = py + uy * Lw / 2, ang = Math.atan2(uy, ux);
+      ctx.strokeStyle = `rgba(20,24,28,${(0.3 + 0.6 * Math.min(1, m.E[k])).toFixed(2)})`;
+      ctx.beginPath();
+      ctx.moveTo(px - ux * Lw / 2, py - uy * Lw / 2); ctx.lineTo(hx, hy);
+      ctx.moveTo(hx - Math.cos(ang - 0.5) * 4.5, hy - Math.sin(ang - 0.5) * 4.5); ctx.lineTo(hx, hy); ctx.lineTo(hx - Math.cos(ang + 0.5) * 4.5, hy - Math.sin(ang + 0.5) * 4.5);
+      ctx.stroke();
+    }
+    // etiqueta de cada praia
+    if (mapaOnd.getZoom() >= 11) {
+      ctx.font = "600 12px system-ui, -apple-system, sans-serif"; ctx.textBaseline = "middle";
+      const usados = [];
+      m.praias.forEach((q) => {
+        const pt = mapaOnd.project(q.ll); if (pt.x < 0 || pt.y < 0 || pt.x > Wc || pt.y > Hc) return;
+        const t = `${q.p.nome} ${fmt1(q.a)} m`, w = ctx.measureText(t).width + 14;
+        if (usados.some((u) => Math.abs(u.x - pt.x) < (u.w + w) / 2 && Math.abs(u.y - pt.y) < 22)) return;
+        usados.push({ x: pt.x, y: pt.y, w });
+        ctx.fillStyle = "rgba(16,40,58,.88)"; ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(pt.x - w / 2, pt.y - 10, w, 20, 10); else ctx.rect(pt.x - w / 2, pt.y - 10, w, 20); ctx.fill();
+        ctx.fillStyle = "#fff"; ctx.textAlign = "center"; ctx.fillText(t, pt.x, pt.y + 0.5);
+      });
+    }
   }
 
   // ---------- relatório detalhado de cada quadradinho (selo): gráfico com régua arrastável ----------
