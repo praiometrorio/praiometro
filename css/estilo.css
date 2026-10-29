@@ -609,3 +609,17 @@ button.selo:active{transform:scale(.98)}
 /* sem internet */
 .offline{display:grid;gap:2px;background:#FFF2D0;color:#5E3B00;border-radius:14px;padding:10px 14px;font-size:13.5px}
 .offline b{font-size:14.5px}
+
+/* puxar para atualizar (estilo iPhone) */
+html,body{overscroll-behavior-y:none}
+.wrap{position:relative}
+#puxar{position:absolute;left:50%;z-index:5;width:32px;height:32px;opacity:0;pointer-events:none;transform:translate(-50%,0)}
+#puxar svg{width:32px;height:32px;display:block}
+#puxar{width:36px;height:36px}
+#puxar svg{width:36px;height:36px;filter:drop-shadow(0 0 6px rgba(255,182,39,.45))}
+#puxar .nucleo{fill:#FFB627}
+#puxar .raio{stroke:#FFB627;stroke-width:3;stroke-linecap:round;transition:opacity .1s}
+#puxar.girando svg{animation:puxarGira 1.4s linear infinite}
+#puxar.girando .nucleo{animation:puxarPulsa 1.4s ease-in-out infinite}
+@keyframes puxarGira{to{transform:rotate(360deg)}}
+@keyframes puxarPulsa{50%{r:6px}}

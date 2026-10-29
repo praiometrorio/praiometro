@@ -2450,6 +2450,69 @@
   window.addEventListener("pageshow", aoVoltar);
   window.addEventListener("focus", aoVoltar);
   window.addEventListener("online", () => { ultimaBusca = 0; atualizarPrevisao(); });   // a internet voltou
+
+  // puxar a tela para baixo (no topo): a página toda desce, o sol aparece no espaço de cima, e recarrega tudo
+  (function puxarParaAtualizar() {
+    const wrap = $(".wrap"), cab = wrap.querySelector("header");
+    const ind = document.createElement("div");
+    ind.id = "puxar"; ind.setAttribute("aria-hidden", "true");
+    ind.innerHTML = '<svg viewBox="0 0 40 40"><circle class="nucleo" cx="20" cy="20" r="7"/>' + Array.from({ length: 8 }, (_, i) =>
+      `<line class="raio" x1="20" y1="3.5" x2="20" y2="9" transform="rotate(${i * 45} 20 20)"/>`).join("") + "</svg>";
+    wrap.appendChild(ind);
+    const raios = ind.querySelectorAll(".raio"), LIMITE = 70, PARADO = 72;
+    let y0 = null, x0 = 0, puxando = false, dist = 0, ocupado = false, blocos = [];
+    const telaAberta = () => ["#surfeTela", "#favTela", "#relTela"].some((q) => $(q) && !$(q).hidden);
+    const mover = (d, anim) => {
+      blocos.forEach((b) => { b.style.transition = anim ? "transform .3s ease" : "none"; b.style.transform = d ? `translateY(${d}px)` : ""; });
+      ind.style.transition = anim ? "transform .3s ease, opacity .2s" : "none";
+      ind.style.top = "0px";   // o sol fica no espaço que abre acima de tudo, até do logo
+      ind.style.transform = `translate(-50%, ${Math.max(0, (cab.offsetTop + d) / 2 - 18)}px)`;
+      ind.style.opacity = d > 14 ? 1 : 0;
+    };
+    const nucleo = ind.querySelector(".nucleo");
+    const acender = (p) => {   // o sol nasce: o miolo cresce e os raios acendem um por um
+      raios.forEach((r, i) => r.style.opacity = p >= (i + 1) / 8 ? 1 : 0);
+      nucleo.setAttribute("r", (3 + 4 * Math.min(1, p)).toFixed(2));
+    };
+    document.addEventListener("touchstart", (e) => {
+      if (ocupado || e.touches.length !== 1 || window.scrollY > 0 || telaAberta()) { y0 = null; return; }
+      if (e.target.closest(".maplibregl-map, input")) { y0 = null; return; }
+      y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; puxando = false; dist = 0;
+    }, { passive: true });
+    document.addEventListener("touchmove", (e) => {
+      if (y0 == null) return;
+      const dy = e.touches[0].clientY - y0, dx = e.touches[0].clientX - x0;
+      if (!puxando) {
+        if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) { y0 = null; return; }   // arrasto pro lado: é o cartão
+        if (dy < 8) { if (dy < -4) y0 = null; return; }
+        if (window.scrollY > 0) { y0 = null; return; }
+        puxando = true;
+        blocos = [...wrap.children].filter((b) => b !== ind && !b.hidden && getComputedStyle(b).position !== "fixed");
+        ind.classList.remove("girando");
+      }
+      e.preventDefault();
+      const d = dy - 8;
+      dist = d < 90 ? d * 0.6 : 54 + (d - 90) * 0.25;   // vai ficando mais pesado, como no iPhone
+      mover(dist); acender(dist / LIMITE);
+    }, { passive: false });
+    const soltar = async () => {
+      if (y0 == null || !puxando) { y0 = null; return; }
+      y0 = null; puxando = false;
+      if (dist < LIMITE) { mover(0, true); return; }
+      ocupado = true;
+      mover(PARADO, true); acender(1); ind.classList.add("girando");
+      const t0 = Date.now();
+      if (!linhas.length) { location.reload(); return; }
+      ultimaBusca = 0; buscando = false;
+      await atualizarPrevisao();
+      await new Promise((r) => setTimeout(r, Math.max(0, 800 - (Date.now() - t0))));
+      ind.classList.remove("girando");
+      mover(0, true);
+      setTimeout(() => { blocos.forEach((b) => b.style.transition = ""); ocupado = false; }, 320);
+    };
+    document.addEventListener("touchend", soltar);
+    document.addEventListener("touchcancel", soltar);
+  })();
   // segurança extra: confere a cada minuto (o relógio do navegador pode atrasar com o app parado)
   setInterval(aoVoltar, 60000);
 
