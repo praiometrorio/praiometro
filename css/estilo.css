@@ -524,3 +524,53 @@ div.posto{z-index:2}
 .smk{min-width:0;padding:3px 6px 4px;gap:1px;border-radius:10px}
 .smk-n{font-size:9.5px;max-width:78px;overflow:hidden;text-overflow:ellipsis}
 .smk-o b{font-size:14px}.smk-o em{margin-left:3px;font-size:10.5px}
+
+/* arrastar o cartão inteiro entre as favoritas */
+.grade{overflow-x:clip}
+#cartao{touch-action:pan-y;will-change:transform}
+.cartao-fantasma{will-change:transform}
+.cartao-fantasma .fav-nav{background:#FFF6DC}
+
+/* selos clicáveis e relatório detalhado */
+button.selo{border:0;text-align:left;font:inherit;color:inherit;cursor:pointer;position:relative}
+button.selo:active{transform:scale(.98)}
+.selo .selo-mais{position:absolute;right:10px;top:10px;font-style:normal;font-size:18px;opacity:.45;line-height:1}
+.rel-tela{position:fixed;inset:0;z-index:950;background:rgba(6,25,40,.5);display:flex;align-items:flex-end;justify-content:center;animation:relFundo .2s ease-out}
+.rel-tela[hidden]{display:none}
+@keyframes relFundo{from{background:rgba(6,25,40,0)}}
+.rel-folha{background:#fff;width:100%;max-width:640px;max-height:92vh;overflow-y:auto;border-radius:26px 26px 0 0;padding:16px 18px calc(env(safe-area-inset-bottom,0px) + 22px);animation:relSobe .26s cubic-bezier(.2,.8,.2,1);color:var(--ink)}
+@keyframes relSobe{from{transform:translateY(60%)}}
+@media (min-width:700px){.rel-tela{align-items:center}.rel-folha{border-radius:26px}}
+.rel-topo{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:8px}
+.rel-topo h2{margin:0;font-family:var(--f-display);font-size:20px}
+.rel-topo small{color:var(--muted);font-size:13px}
+.rel-x{width:40px;height:40px;border-radius:50%;border:0;background:#EEF2F5;color:var(--ink);font-size:26px;line-height:1;cursor:pointer;flex:none}
+.rel-agora{display:grid;gap:2px;background:#FFF6DC;border-radius:16px;padding:10px 14px;min-height:62px;align-content:center}
+.rel-agora small{font-size:12px;font-weight:800;color:#9A6B00;text-transform:uppercase;letter-spacing:.04em}
+.rel-agora b{font-size:18px;font-family:var(--f-display)}
+.rel-agora span{font-size:14px;color:var(--muted)}
+.rel-graf{width:100%;height:auto;display:block;margin-top:8px;touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none}
+.rel-dica{margin:4px 0 0;font-size:12px;color:var(--muted);text-align:center}
+.rel-h3{margin:14px 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.rel-resumo{margin:0;padding-left:18px;display:grid;gap:4px;font-size:14px}
+.rel-pontos{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.rel-pontos i{font-style:normal;font-size:13px;font-weight:700;border-radius:999px;padding:5px 10px}
+.rel-pontos i.ok{background:#D8F1E4;color:#0C4F33}.rel-pontos i.ruim{background:#FBDAD5;color:#7F1A10}
+.rel-link{display:block;text-align:center;text-decoration:none;margin-top:14px}
+
+/* mapa de ondulação */
+.ond-box{max-width:720px;margin:0 auto;display:grid;gap:8px}
+.ond-box[hidden]{display:none}
+.ond-mapa-wrap{position:relative;border-radius:20px;overflow:hidden;box-shadow:var(--shadow)}
+#ondMapa{height:calc(100vh - 360px);height:calc(100dvh - 360px);min-height:340px;background:#7FCBE3}
+#ondCanvas{position:absolute;left:0;top:0;pointer-events:none}
+.ond-rio{margin:0;color:#fff;font-size:13px;text-align:center;min-height:18px}
+.ond-hora .ond-l{display:flex;align-items:center;gap:10px;font-size:15px}
+.ond-hora #ondPlay{width:40px;height:40px;border-radius:50%;background:#0B6FA8;color:#fff;font-size:14px;padding:0;flex:none}
+.ond-dias{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin-top:-2px}
+.ond-escala{display:grid;gap:3px}
+.ond-escala i{display:block;height:10px;border-radius:5px;background:linear-gradient(90deg,rgb(43,75,168) 0%,rgb(46,127,208) 10%,rgb(34,179,201) 20%,rgb(60,196,138) 30%,rgb(184,216,74) 40%,rgb(242,193,46) 50%,rgb(240,138,60) 60%,rgb(217,83,79) 80%,rgb(155,63,181) 100%)}
+.ond-escala div{display:flex;justify-content:space-between;color:#fff;font-size:11px;opacity:.85}
+.ond-obs{margin:0;color:#fff;opacity:.75;font-size:12px;text-align:center}
+.ond-escala i{background:linear-gradient(90deg,rgb(150,200,255) 0%,rgb(110,200,240) 6.25%,rgb(90,215,180) 12.5%,rgb(120,220,90) 18.75%,rgb(200,235,70) 25%,rgb(250,230,60) 31.25%,rgb(250,185,50) 37.5%,rgb(240,120,40) 50%,rgb(220,50,40) 62.5%,rgb(170,20,40) 75%,rgb(220,40,160) 87.5%,rgb(255,170,255) 100%)}
+#ondMapa{background:#C4C7CA}

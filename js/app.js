@@ -175,6 +175,7 @@
       ventoRef > 20 ? "ventania" : ventoRef > 15 ? "ventando" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
     const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.propria == null && x.aguaTotal ? (x.aguaOk / x.aguaTotal - 0.5) * 2 : 0);
+    selos.forEach((s, i) => { s.k = ["ceu", "uv", "mar", "agua", "vento", "inea", "surfe"][i]; });
     return { horasSol, janela, ceu, tom, selos, veredito, resumo, score };
   }
 
@@ -563,6 +564,17 @@
             }
             return res.length ? res : null;
           })(),
+          marH: (() => {
+            if (!m || !m.hourly) return [];
+            const r = [];
+            for (let hr = HORA_INI; hr <= HORA_FIM; hr++) {
+              const k = m.hourly.time.indexOf(`${data}T${pad(hr)}:00`);
+              if (k < 0) continue;
+              let o = m.hourly.wave_height[k]; if (p.baia && o != null) o = Math.min(o, 0.5);
+              r.push({ h: hr, o, s: m.hourly.sea_surface_temperature[k], d: m.hourly.wave_direction ? m.hourly.wave_direction[k] : null, per: m.hourly.wave_period ? m.hourly.wave_period[k] : null });
+            }
+            return r;
+          })(),
           mareDia: Array.from({ length: 24 }, (_, i) => ({ h: i, n: nivelEm(data, i) })).filter((q) => q.n != null),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
@@ -574,7 +586,8 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
-            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est, uv: h.uv_index ? h.uv_index[k] : null, v: ventoEm(k) };
+            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est, uv: h.uv_index ? h.uv_index[k] : null, v: ventoEm(k),
+              vd: h.wind_direction_10m ? h.wind_direction_10m[k] : null, raj: h.wind_gusts_10m && h.wind_gusts_10m[k] != null ? Math.round(h.wind_gusts_10m[k]) : null };
           })
         };
       });
@@ -870,7 +883,7 @@
           <span class="vc-txt"><b>Veja o trajeto do sol</b><small>Aponte a câmera para o céu</small></span>
           <span class="vc-novo">NOVO</span>
         </button>` : ""}
-        <div class="selos">${a.selos.map((s) => `<div class="selo ${s.cls}">${s.ic}<b>${s.t}</b><span>${s.s}</span></div>`).join("")}</div>
+        <div class="selos">${a.selos.map((s) => `<button class="selo ${s.cls}" data-k="${s.k}" aria-label="${s.t}. ${s.s}. Toque para ver o detalhe hora a hora">${s.ic}<b>${s.t}</b><span>${s.s}</span><i class="selo-mais" aria-hidden="true">›</i></button>`).join("")}</div>
         <div class="info sombra" id="sombra">${IC.sombra}<span>Calculando a sombra na areia…</span></div>
         ${htmlMetro(p)}
         ${graficoUv(x)}
@@ -887,9 +900,9 @@
           <small>Arraste para ver o sol andando no mapa</small>
         </div>`;
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
-    document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => irFavorita(b.dataset.ir, b.classList.contains("dir") ? 1 : -1));
-    if (navFav) ligarArraste($("#cartao .cena"), favs, iFav);
+    document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     $("#compartilhar").onclick = () => compartilhar(l);
+    document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => abrirRelatorio(b.dataset.k, l));
     if ($("#verCeu")) $("#verCeu").onclick = () => CEU.abrir(p);
     $("#minuto").addEventListener("input", (e) => {
       estado.minuto = +e.target.value;
@@ -1053,29 +1066,99 @@
   function listaFavoritas() {
     return favoritas.map((id) => linhas.find((l) => l.p.id === id)).filter(Boolean).sort((a, b) => b.a.score - a.a.score);
   }
-  function irFavorita(id, lado) {
+  function irFavorita(id) {
     const p = PRAIAS.find((x) => x.id === id);
     if (estado.regiao !== "todas" && estado.regiao !== p.regiao) irParaRegiao(p.regiao);
     estado.sel = id; estado.minuto = null;
     if (mapa) mapa.flyTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 13.4), duration: 900 });
     desenhar();
-    const c = $("#cartao");
-    c.classList.remove("vem-dir", "vem-esq"); void c.offsetWidth;
-    c.classList.add(lado > 0 ? "vem-dir" : "vem-esq");
   }
-  // arrastar o dedo na foto da praia para o lado troca de favorita
-  function ligarArraste(el, favs, i) {
-    if (!el) return;
-    let x0 = null, y0 = 0;
-    el.addEventListener("touchstart", (e) => { x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; }, { passive: true });
-    el.addEventListener("touchend", (e) => {
-      if (x0 == null) return;
-      const dx = e.changedTouches[0].clientX - x0, dy = e.changedTouches[0].clientY - y0;
-      x0 = null;
-      if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-      const lado = dx < 0 ? 1 : -1;
-      irFavorita(favs[(i + lado + favs.length) % favs.length].p.id, lado);
+  // o cartão inteiro sai pro lado e a próxima favorita entra junto, colada (como no app Tempo do iPhone)
+  let deslizando = false, fantasma = null, ladoFantasma = 0;
+  const GAP_FAV = 16;
+  function vizinhaFav(lado) {
+    const favs = listaFavoritas(), i = favs.findIndex((q) => q.p.id === estado.sel);
+    if (i < 0 || favs.length < 2) return null;
+    return favs[(i + lado + favs.length) % favs.length];
+  }
+  // prévia da praia vizinha (foto, nome e frase) que vem grudada no cartão enquanto arrasta
+  function montarFantasma(lado) {
+    if (fantasma && ladoFantasma === lado) return fantasma;
+    tirarFantasma();
+    const v = vizinhaFav(lado), c = $("#cartao");
+    if (!v) return null;
+    const pai = c.parentElement;
+    if (getComputedStyle(pai).position === "static") pai.style.position = "relative";
+    const cn = cena(v.a, v.x, v.p), nav = c.querySelector(".fav-nav");
+    fantasma = document.createElement("div");
+    fantasma.className = "cartao cartao-fantasma";
+    fantasma.setAttribute("aria-hidden", "true");
+    fantasma.style.cssText = `position:absolute;top:${c.offsetTop}px;left:${c.offsetLeft + lado * (c.offsetWidth + GAP_FAV)}px;width:${c.offsetWidth}px;height:${Math.min(c.offsetHeight, window.innerHeight * 1.5)}px;pointer-events:none`;
+    fantasma.innerHTML = `${nav ? `<div class="fav-nav" style="height:${nav.offsetHeight}px"></div>` : ""}
+      <div class="cena${cn.escura ? " escura" : ""}">${cn.svg}<div class="tit"><h2>${v.p.nome}</h2><span class="local">${v.p.local}</span></div></div>
+      <div class="corpo"><p class="veredito">${v.a.veredito}</p>
+        <div class="selos">${v.a.selos.map((x) => `<div class="selo ${x.cls}">${x.ic}<b>${x.t}</b><span>${x.s}</span></div>`).join("")}</div></div>`;
+    pai.appendChild(fantasma);
+    ladoFantasma = lado;
+    return fantasma;
+  }
+  function tirarFantasma() { if (fantasma) fantasma.remove(); fantasma = null; ladoFantasma = 0; }
+  function moverJuntos(dx, trans) {
+    const c = $("#cartao");
+    c.style.transition = trans || "none"; c.style.transform = dx ? `translateX(${dx}px)` : "";
+    if (fantasma) { fantasma.style.transition = trans || "none"; fantasma.style.transform = dx ? `translateX(${dx}px)` : ""; }
+  }
+  function deslizarFavorita(lado, dxAtual) {
+    if (deslizando) return;
+    const v = vizinhaFav(lado);
+    if (!v) return;
+    deslizando = true;
+    const c = $("#cartao"), W = c.offsetWidth + GAP_FAV;
+    montarFantasma(lado);
+    const resto = 1 - Math.min(1, Math.abs(dxAtual) / W), ms = Math.round(160 + 200 * resto);
+    if (!dxAtual) moverJuntos(0);
+    void c.offsetWidth;
+    moverJuntos(-lado * W, `transform ${ms}ms cubic-bezier(.25,.8,.3,1)`);
+    setTimeout(() => {
+      irFavorita(v.p.id);
+      moverJuntos(0);
+      tirarFantasma();
+      setTimeout(() => { c.style.transition = ""; deslizando = false; }, 30);
+    }, ms + 10);
+  }
+  // arrastar o dedo em qualquer parte do cartão: ele acompanha o dedo; soltando depois de 1/4 da tela (ou rápido), troca
+  function ligarArrasteCartao() {
+    const c = $("#cartao");
+    if (!c || c.dataset.arraste) return;
+    c.dataset.arraste = "1";
+    let x0 = 0, y0 = 0, t0 = 0, modo = null, dx = 0, ativo = false;
+    c.addEventListener("touchstart", (e) => {
+      ativo = false; modo = null; dx = 0;
+      if (deslizando || e.touches.length > 1) return;
+      if (e.target.closest("#horas, input, .tab-surf, .mare-g")) return;   // essas partes rolam para o lado sozinhas
+      const favs = listaFavoritas();
+      if (favs.length < 2 || !favs.some((q) => q.p.id === estado.sel)) return;
+      ativo = true; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
     }, { passive: true });
+    c.addEventListener("touchmove", (e) => {
+      if (!ativo) return;
+      const ddx = e.touches[0].clientX - x0, ddy = e.touches[0].clientY - y0;
+      if (!modo && (Math.abs(ddx) > 8 || Math.abs(ddy) > 8)) modo = Math.abs(ddx) > Math.abs(ddy) ? "h" : "v";
+      if (modo !== "h") return;
+      e.preventDefault();
+      dx = ddx;
+      const temViz = montarFantasma(dx < 0 ? 1 : -1);
+      moverJuntos(temViz ? dx : dx * 0.3);
+    }, { passive: false });
+    const fim = () => {
+      if (!ativo || modo !== "h") { ativo = false; return; }
+      ativo = false;
+      const W = c.offsetWidth, vel = Math.abs(dx) / Math.max(1, Date.now() - t0);
+      if (Math.abs(dx) > W * 0.25 || (vel > 0.5 && Math.abs(dx) > 30)) deslizarFavorita(dx < 0 ? 1 : -1, dx);
+      else { moverJuntos(0, "transform 250ms cubic-bezier(.2,.8,.2,1)"); setTimeout(() => { c.style.transition = ""; tirarFantasma(); }, 260); }
+    };
+    c.addEventListener("touchend", fim);
+    c.addEventListener("touchcancel", fim);
   }
   function desenharFavoritas() {
     const dia = nomeDia(estado.dia);
@@ -1188,12 +1271,15 @@
   function desenharSurfe() {
     const nomes = datas.map((dt, d) => d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[new Date(dt + "T12:00:00").getDay()]);
     $("#surfeDias").innerHTML = nomes.map((n, d) => `<button data-d="${d}" aria-pressed="${d === surfeDia}">${n}</button>`).join("");
-    document.querySelectorAll("#surfeDias button").forEach((b) => b.onclick = () => { surfeDia = +b.dataset.d; desenharSurfe(); });
-    if (surfeAberta) { $("#surfeModo").hidden = true; $("#surfeMapaBox").hidden = true; $("#surfeLista").hidden = false; return desenharPico(surfeAberta); }
+    document.querySelectorAll("#surfeDias button").forEach((b) => b.onclick = () => { surfeDia = +b.dataset.d; ondT = null; desenharSurfe(); });
+    if (surfeAberta) { $("#surfeModo").hidden = true; $("#surfeMapaBox").hidden = true; $("#ondBox").hidden = true; pararOnd(); $("#surfeLista").hidden = false; return desenharPico(surfeAberta); }
     $("#surfeTitulo").textContent = "Surfe";
     $("#surfeVoltar").hidden = true;
     $("#surfeModo").hidden = false;
     document.querySelectorAll("#surfeModo button").forEach((b) => { b.setAttribute("aria-pressed", b.dataset.m === surfeModo); b.onclick = () => { surfeModo = b.dataset.m; desenharSurfe(); }; });
+    if (surfeModo !== "ond") pararOnd();
+    $("#ondBox").hidden = surfeModo !== "ond";
+    if (surfeModo === "ond") { $("#surfeLista").hidden = true; $("#surfeMapaBox").hidden = true; desenharOnd(); return; }
     if (surfeModo === "mapa") { $("#surfeLista").hidden = true; $("#surfeMapaBox").hidden = false; desenharSurfeMapa(); return; }
     $("#surfeLista").hidden = false; $("#surfeMapaBox").hidden = true;
     const hL = horaLista();
@@ -1339,7 +1425,336 @@
     if (ag) $(".tab-surf").scrollLeft = Math.max(0, ag.offsetLeft - 120);
   }
   function abrirSurfe() { surfeDia = estado.dia; surfeAberta = null; surfeHora = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
-  function fecharSurfe() { $("#surfeTela").hidden = true; document.body.style.overflow = ""; }
+  function fecharSurfe() { pararOnd(); $("#surfeTela").hidden = true; document.body.style.overflow = ""; }
+
+  // ---------- mapa de ondulação (estilo Windguru): cores da altura, linhas de contorno, setas e régua de tempo ----------
+  const GRADES_OND = {
+    atl: { nome: "Atlântico Sul", lat0: -52, lat1: -16, lon0: -60, lon1: -22, passo: 2, sobe: 6, caixa: [-57, -47, -27, -19], linhaGrade: 5 },
+    costa: { nome: "Costa do Rio", lat0: -26.5, lat1: -22, lon0: -46, lon1: -40.5, passo: 0.5, sobe: 4, caixa: [-45.2, -25.5, -41.2, -22.4], linhaGrade: 1 } };
+  Object.values(GRADES_OND).forEach((g) => { g.lin = Math.round((g.lat1 - g.lat0) / g.passo) + 1; g.col = Math.round((g.lon1 - g.lon0) / g.passo) + 1; });
+  const RAMPA_OND = [[0, [150, 200, 255]], [0.5, [110, 200, 240]], [1, [90, 215, 180]], [1.5, [120, 220, 90]], [2, [200, 235, 70]], [2.5, [250, 230, 60]],
+    [3, [250, 185, 50]], [4, [240, 120, 40]], [5, [220, 50, 40]], [6, [170, 20, 40]], [7, [220, 40, 160]], [9, [255, 170, 255]]];
+  const NIVEIS_OND = [0.5, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8];
+  const corOnd = (v) => {
+    if (v <= RAMPA_OND[0][0]) return RAMPA_OND[0][1];
+    for (let i = 1; i < RAMPA_OND.length; i++) if (v <= RAMPA_OND[i][0]) { const [a, ca] = RAMPA_OND[i - 1], [b, cb] = RAMPA_OND[i], f = (v - a) / (b - a); return ca.map((c, j) => Math.round(c + (cb[j] - c) * f)); }
+    return RAMPA_OND[RAMPA_OND.length - 1][1];
+  };
+  const dadosOnd = {};
+  let gradeOnd = "atl", mapaOnd = null, ondPronto = false, ondT = null, ondPlay = null, ondDesenhoPend = false, campoCache = null;
+  const ondVelho = {};
+  async function carregarOnd(gid, forcar) {
+    const g = GRADES_OND[gid], chave = "pm-ondulacao-v2-" + gid, c = guarda.ler(chave);
+    if (!forcar && c && Date.now() - c.t < CACHE_MIN * 60000) return c;
+    const lats = [], lons = [];
+    for (let i = 0; i < g.lin; i++) for (let j = 0; j < g.col; j++) { lats.push((g.lat1 - i * g.passo).toFixed(2)); lons.push((g.lon0 + j * g.passo).toFixed(2)); }
+    const partes = [];
+    for (let k = 0; k < lats.length; k += 130) partes.push(buscarJSON("https://marine-api.open-meteo.com/v1/marine?latitude=" + lats.slice(k, k + 130).join(",") + "&longitude=" + lons.slice(k, k + 130).join(",") +
+      "&hourly=wave_height,wave_direction,wave_period&temporal_resolution=hourly_3&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7"));
+    const arr = (await Promise.all(partes)).flatMap((r) => (Array.isArray(r) ? r : [r]));
+    const arred = (v, f) => (v == null ? null : Math.round(v * f) / f);
+    const novo = { t: Date.now(), time: arr[0].hourly.time,
+      a: arr.map((q) => q.hourly.wave_height.map((v) => arred(v, 10))),
+      d: arr.map((q) => q.hourly.wave_direction.map((v) => arred(v, 1))),
+      p: arr.map((q) => q.hourly.wave_period.map((v) => arred(v, 1))) };
+    try { guarda.gravar(chave, novo); } catch (e) { /* sem espaço: segue sem guardar */ }
+    return novo;
+  }
+  const nomeOndT = (D, ti) => { const ts = D.time[ti], d = datas.indexOf(ts.slice(0, 10));
+    return `${d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[new Date(ts.slice(0, 10) + "T12:00:00").getDay()]} ${+ts.slice(11, 13)}h`; };
+  async function desenharOnd() {
+    $("#ondAreas").innerHTML = Object.entries(GRADES_OND).map(([id, g]) => `<button data-g="${id}" aria-pressed="${id === gradeOnd}">${g.nome}</button>`).join("");
+    document.querySelectorAll("#ondAreas button").forEach((b) => b.onclick = () => {
+      if (gradeOnd === b.dataset.g) return;
+      gradeOnd = b.dataset.g; campoCache = null;
+      const c = GRADES_OND[gradeOnd].caixa;
+      if (mapaOnd) mapaOnd.fitBounds([[c[0], c[1]], [c[2], c[3]]], { padding: 4, duration: 900 });
+      desenharOnd();
+    });
+    if (!dadosOnd[gradeOnd]) {
+      $("#ondHora").innerHTML = `<span>Carregando a ondulação…</span>`;
+      try { dadosOnd[gradeOnd] = await carregarOnd(gradeOnd, ondVelho[gradeOnd]); delete ondVelho[gradeOnd]; campoCache = null; } catch (e) { $("#ondHora").innerHTML = `<span>Não consegui carregar a ondulação agora.</span>`; return; }
+    }
+    const D = dadosOnd[gradeOnd];
+    if (ondT == null) { const rf = relogio.format(new Date()), agora = +rf.slice(0, 2) + +rf.slice(3, 5) / 60; ondT = Math.min(D.time.length - 1, Math.round((surfeDia * 24 + (surfeDia === 0 ? agora : 9)) / 3)); }
+    ondT = Math.min(ondT, D.time.length - 1);
+    $("#ondHora").innerHTML = `<div class="ond-l"><button id="ondPlay" aria-label="Animar">${ondPlay ? "❚❚" : "▶"}</button><span>Ondulação <b id="ondTxt">${nomeOndT(D, ondT)}</b></span></div>
+      <input type="range" id="ondR" min="0" max="${D.time.length - 1}" step="1" value="${ondT}" aria-label="Horário">
+      <div class="ond-dias">${datas.map((dt, d) => `<span>${d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[new Date(dt + "T12:00:00").getDay()]}</span>`).join("")}</div>`;
+    $("#ondR").oninput = (e) => { ondT = +e.target.value; pararOnd(); atualizarOndT(); };
+    $("#ondPlay").onclick = () => { if (ondPlay) pararOnd(); else tocarOnd(); };
+    if (mapaOnd) { mapaOnd.resize(); pedirOnd(); return; }
+    if (!window.maplibregl) return;
+    let estilo = ESTILO_URL;
+    try { estilo = estiloPraiometro(await buscarJSON(ESTILO_URL)); } catch (e) { console.warn("Estilo padrão do mapa", e); }
+    // terra cinza, sem detalhes (como nos mapas de ondulação dos sites de surfe)
+    if (estilo && estilo.layers) {
+      estilo = JSON.parse(JSON.stringify(estilo));
+      estilo.layers = estilo.layers.filter((l) => l.type === "background" || l.type === "symbol" && /place|city|country|state/.test(l.id) || (l.type === "fill" && (l.id === "water" || l["source-layer"] === "water")) || l.type === "line" && /boundary/.test(l.id));
+      estilo.layers.forEach((l) => { l.paint = l.paint || {};
+        if (l.type === "background") l.paint["background-color"] = "#C4C7CA";
+        if (l.type === "fill") { l.paint["fill-color"] = "#9DB3C4"; l.paint["fill-opacity"] = 1; }
+        if (l.type === "symbol") { l.paint["text-color"] = "#2E3A44"; l.paint["text-halo-color"] = "#E6E8EA"; } });
+    }
+    const c = GRADES_OND[gradeOnd].caixa;
+    mapaOnd = new maplibregl.Map({ container: "ondMapa", style: estilo, bounds: [[c[0], c[1]], [c[2], c[3]]], fitBoundsOptions: { padding: 4 },
+      attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, minZoom: 2.5, maxZoom: 9 });
+    mapaOnd.touchZoomRotate.disableRotation();
+    mapaOnd.on("load", () => {
+      ondPronto = true;
+      mapaOnd.addSource("picosOnd", { type: "geojson", data: { type: "FeatureCollection", features: [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [-43.2, -22.99] } }] } });
+      mapaOnd.addLayer({ id: "picosOnd", type: "circle", source: "picosOnd", paint: { "circle-radius": 5, "circle-color": "#FFB627", "circle-stroke-color": "#10283A", "circle-stroke-width": 2 } });
+      pedirOnd();
+    });
+    mapaOnd.on("render", () => { if (!ondDesenhoPend) pedirOnd(); });
+  }
+  function atualizarOndT() { const D = dadosOnd[gradeOnd]; if (!D) return; if ($("#ondTxt")) $("#ondTxt").textContent = nomeOndT(D, ondT); if ($("#ondR")) $("#ondR").value = ondT; campoCache = null; pedirOnd(); }
+  function tocarOnd() { pararOnd(); ondPlay = setInterval(() => { const D = dadosOnd[gradeOnd]; if (!D) return; ondT = (ondT + 1) % D.time.length; atualizarOndT(); }, 420); if ($("#ondPlay")) $("#ondPlay").textContent = "❚❚"; }
+  function pararOnd() { if (ondPlay) clearInterval(ondPlay); ondPlay = null; if ($("#ondPlay")) $("#ondPlay").textContent = "▶"; }
+  function pedirOnd() { if (ondDesenhoPend) return; ondDesenhoPend = true; requestAnimationFrame(() => { ondDesenhoPend = false; pintarOnd(); }); }
+  // campo suavizado (bilinear) da altura das ondas na hora escolhida; terra recebe o valor do mar mais perto
+  function campoOnd() {
+    if (campoCache && campoCache.g === gradeOnd && campoCache.t === ondT) return campoCache;
+    const g = GRADES_OND[gradeOnd], D = dadosOnd[gradeOnd], R = g.lin, C = g.col, U = g.sobe;
+    const base = [];
+    for (let i = 0; i < R; i++) { base.push([]); for (let j = 0; j < C; j++) base[i].push(D.a[i * C + j][ondT]); }
+    // preenche a terra com o vizinho de mar mais perto (para a cor encostar certinho na costa)
+    for (let passo = 0; passo < 6; passo++) {
+      let falta = false;
+      const nv = base.map((r) => r.slice());
+      for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) if (base[i][j] == null) {
+        const viz = [[i - 1, j], [i + 1, j], [i, j - 1], [i, j + 1]].filter(([a, b]) => a >= 0 && b >= 0 && a < R && b < C && base[a][b] != null).map(([a, b]) => base[a][b]);
+        if (viz.length) nv[i][j] = viz.reduce((s, v) => s + v, 0) / viz.length; else falta = true;
+      }
+      for (let i = 0; i < R; i++) base[i] = nv[i];
+      if (!falta) break;
+    }
+    const R2 = (R - 1) * U + 1, C2 = (C - 1) * U + 1, F = [];
+    for (let i = 0; i < R2; i++) {
+      const fi = i / U, i0 = Math.min(R - 2, Math.floor(fi)), ti = fi - i0;
+      F.push(new Float32Array(C2));
+      for (let j = 0; j < C2; j++) {
+        const fj = j / U, j0 = Math.min(C - 2, Math.floor(fj)), tj = fj - j0;
+        const v = (a, b) => base[a][b] ?? 0;
+        F[i][j] = v(i0, j0) * (1 - ti) * (1 - tj) + v(i0 + 1, j0) * ti * (1 - tj) + v(i0, j0 + 1) * (1 - ti) * tj + v(i0 + 1, j0 + 1) * ti * tj;
+      }
+    }
+    campoCache = { g: gradeOnd, t: ondT, F, R2, C2 };
+    return campoCache;
+  }
+  function pintarOnd() {
+    const D = dadosOnd[gradeOnd];
+    if (!mapaOnd || !ondPronto || !D || $("#ondBox").hidden) return;
+    const g = GRADES_OND[gradeOnd], cv = $("#ondCanvas"), cont = $("#ondMapa"), dpr = Math.min(2, window.devicePixelRatio || 1);
+    const Wc = cont.clientWidth, Hc = cont.clientHeight;
+    if (cv.width !== Math.round(Wc * dpr) || cv.height !== Math.round(Hc * dpr)) { cv.width = Math.round(Wc * dpr); cv.height = Math.round(Hc * dpr); cv.style.width = Wc + "px"; cv.style.height = Hc + "px"; }
+    const ctx = cv.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, Wc, Hc);
+    const { F, R2, C2 } = campoOnd(), U = g.sobe, dLat = g.passo / U, dLon = g.passo / U;
+    // posição na tela de cada ponto do campo (Mercator: o y muda com a latitude)
+    const xs = new Float32Array(C2), ys = new Float32Array(R2);
+    for (let j = 0; j < C2; j++) xs[j] = mapaOnd.project([g.lon0 + j * dLon, g.lat1]).x;
+    for (let i = 0; i < R2; i++) ys[i] = mapaOnd.project([g.lon0, g.lat1 - i * dLat]).y;
+    // recorte pelo mar
+    const camadasAgua = (mapaOnd.getStyle().layers || []).filter((l) => l.type === "fill" && (l.id === "water" || l["source-layer"] === "water")).map((l) => l.id);
+    const feats = camadasAgua.length ? mapaOnd.queryRenderedFeatures({ layers: camadasAgua }) : [];
+    ctx.save();
+    if (feats.length) {
+      const pth = new Path2D();
+      const anel = (r) => { r.forEach((c, i) => { const pt = mapaOnd.project(c); i ? pth.lineTo(pt.x, pt.y) : pth.moveTo(pt.x, pt.y); }); pth.closePath(); };
+      feats.forEach((f) => { const gm = f.geometry; if (gm.type === "Polygon") gm.coordinates.forEach(anel); else if (gm.type === "MultiPolygon") gm.coordinates.forEach((pl) => pl.forEach(anel)); });
+      ctx.clip(pth, "nonzero");
+    }
+    // 1) cores: uma linha de pixels por faixa de latitude
+    const img = document.createElement("canvas"); img.width = C2; img.height = R2;
+    const ic = img.getContext("2d"), id = ic.createImageData(C2, R2);
+    for (let i = 0; i < R2; i++) for (let j = 0; j < C2; j++) { const c = corOnd(F[i][j]), k = (i * C2 + j) * 4; id.data[k] = c[0]; id.data[k + 1] = c[1]; id.data[k + 2] = c[2]; id.data[k + 3] = 255; }
+    ic.putImageData(id, 0, 0);
+    ctx.imageSmoothingEnabled = true;
+    const x0 = xs[0] - (xs[1] - xs[0]) / 2, x1 = xs[C2 - 1] + (xs[1] - xs[0]) / 2;
+    for (let i = 0; i < R2; i++) {
+      const yA = i ? (ys[i - 1] + ys[i]) / 2 : ys[0] - (ys[1] - ys[0]) / 2, yB = i < R2 - 1 ? (ys[i] + ys[i + 1]) / 2 : ys[i] + (ys[i] - ys[i - 1]) / 2;
+      if (yB < -5 || yA > Hc + 5) continue;
+      ctx.drawImage(img, 0, i, C2, 1, x0, yA, x1 - x0, yB - yA + 0.6);
+    }
+    // 2) linhas de contorno (a cada meio metro até 3 m, depois de metro em metro)
+    ctx.lineWidth = 1; ctx.strokeStyle = "rgba(255,255,255,.75)";
+    const interp = (a, b, v) => (v - a) / (b - a || 1e-6);
+    ctx.beginPath();
+    for (const L of NIVEIS_OND) {
+      for (let i = 0; i < R2 - 1; i++) {
+        const yA = ys[i], yB = ys[i + 1];
+        if (Math.max(yA, yB) < -5 || Math.min(yA, yB) > Hc + 5) continue;
+        for (let j = 0; j < C2 - 1; j++) {
+          const a = F[i][j], b = F[i][j + 1], c = F[i + 1][j + 1], d = F[i + 1][j];
+          const caso = (a >= L ? 8 : 0) | (b >= L ? 4 : 0) | (c >= L ? 2 : 0) | (d >= L ? 1 : 0);
+          if (caso === 0 || caso === 15) continue;
+          const xA = xs[j], xB = xs[j + 1];
+          const top = [xA + (xB - xA) * interp(a, b, L), yA], dir = [xB, yA + (yB - yA) * interp(b, c, L)], bot = [xA + (xB - xA) * interp(d, c, L), yB], esq = [xA, yA + (yB - yA) * interp(a, d, L)];
+          const seg = (p, q) => { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); };
+          switch (caso) {
+            case 1: case 14: seg(esq, bot); break; case 2: case 13: seg(bot, dir); break; case 3: case 12: seg(esq, dir); break;
+            case 4: case 11: seg(top, dir); break; case 6: case 9: seg(top, bot); break; case 7: case 8: seg(esq, top); break;
+            case 5: seg(esq, top); seg(bot, dir); break; case 10: seg(esq, bot); seg(top, dir); break;
+          }
+        }
+      }
+    }
+    ctx.stroke();
+    // 3) setas pretas: para onde a ondulação vai
+    const espac = Math.abs(xs[U] - xs[0]), pula = espac < 16 ? 2 : 1, Lw = Math.max(8, Math.min(14, espac * 0.6));
+    ctx.strokeStyle = "rgba(20,24,28,.85)"; ctx.lineWidth = 1.2; ctx.lineCap = "round"; ctx.lineJoin = "round";
+    ctx.beginPath();
+    for (let i = 0; i < g.lin; i += pula) for (let j = 0; j < g.col; j += pula) {
+      const k = i * g.col + j, a = D.a[k][ondT], dd = D.d[k][ondT];
+      if (a == null || dd == null) continue;
+      const px = xs[j * U], py = ys[i * U];
+      if (px < -10 || py < -10 || px > Wc + 10 || py > Hc + 10) continue;
+      const r = ((dd + 180) % 360) * Math.PI / 180, sx = Math.sin(r), sy = -Math.cos(r);
+      const hx = px + sx * Lw / 2, hy = py + sy * Lw / 2;
+      ctx.moveTo(px - sx * Lw / 2, py - sy * Lw / 2); ctx.lineTo(hx, hy);
+      const ang = Math.atan2(sy, sx);
+      ctx.moveTo(hx - Math.cos(ang - 0.5) * 4, hy - Math.sin(ang - 0.5) * 4); ctx.lineTo(hx, hy); ctx.lineTo(hx - Math.cos(ang + 0.5) * 4, hy - Math.sin(ang + 0.5) * 4);
+    }
+    ctx.stroke();
+    ctx.restore();
+    // 4) grade de latitude/longitude tracejada
+    ctx.save(); ctx.setLineDash([3, 4]); ctx.strokeStyle = "rgba(0,0,0,.28)"; ctx.lineWidth = 1; ctx.beginPath();
+    const st = g.linhaGrade, b = mapaOnd.getBounds();
+    for (let lo = Math.ceil(b.getWest() / st) * st; lo <= b.getEast(); lo += st) { const x = mapaOnd.project([lo, b.getNorth()]).x; ctx.moveTo(x, 0); ctx.lineTo(x, Hc); }
+    for (let la = Math.ceil(b.getSouth() / st) * st; la <= b.getNorth(); la += st) { const y = mapaOnd.project([b.getWest(), la]).y; ctx.moveTo(0, y); ctx.lineTo(Wc, y); }
+    ctx.stroke(); ctx.restore();
+    // valor em frente ao Rio
+    const iR = Math.round((g.lat1 - -23.3) / g.passo), jR = Math.round((-43.2 - g.lon0) / g.passo), kR = iR * g.col + jR;
+    const aR = D.a[kR] && D.a[kR][ondT], dR = D.d[kR] && D.d[kR][ondT], pR = D.p[kR] && D.p[kR][ondT];
+    if ($("#ondRio")) $("#ondRio").innerHTML = aR != null ? `Em frente ao Rio: <b>${fmt1(aR)} m · ${pR ?? "–"} s · de ${rumo(dR)}</b>` : "";
+  }
+
+  // ---------- relatório detalhado de cada quadradinho (selo): gráfico com régua arrastável ----------
+  const NOME_CEU = { sol: "Sol", parcial: "Sol entre nuvens", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
+  const COR_CEU = { sol: "#FFB627", parcial: "#FFD98A", nublado: "#8C9AA5", chuva: "#5B7FA3", noite: "#B9C0D4" };
+  const SAUDE_UV = ["Risco baixo para a pele.", "Use protetor solar.", "Protetor, chapéu e óculos.", "Protetor FPS 50 e reaplique sempre.", "Queima rápido: proteção máxima."];
+  const faixaIdx = (u) => FAIXAS_UV.findIndex((f) => u <= f.ate) < 0 ? FAIXAS_UV.length - 1 : FAIXAS_UV.findIndex((f) => u <= f.ate);
+  const marCat = (o) => o < 0.6 ? { n: "Piscininha", c: "#8FD3EA" } : o < 1.2 ? { n: "Marolinha", c: "#4FB3D9" } : o < 2 ? { n: "Mar mexido", c: "#1E8FC6" } : { n: "Mar pesado", c: "#0B3F6B" };
+  const ventoCat = (v) => v <= 10 ? { n: "Vento fraco", c: "#7CC99A" } : v <= 15 ? { n: "Brisa", c: "#F2C12E" } : v <= 20 ? { n: "Vento moderado", c: "#F08A3C" } : { n: "Ventania", c: "#D9534F" };
+  const aguaCat = (t) => t < 20 ? "Gelada" : t < 22.5 ? "Fresquinha" : "Quentinha";
+  let relAtual = null, relAberto = null;
+  function configRelatorio(k, l) {
+    const { p, x } = l;
+    const hs = x.horas;
+    if (k === "ceu") return { titulo: "Céu hora a hora", unid: "°", min: Math.min(...hs.map((y) => y.t)) - 4, max: Math.max(...hs.map((y) => y.t)) + 2, tipo: "barra",
+      pts: hs.map((y) => ({ h: y.h, v: y.t, cor: COR_CEU[y.est], rot: y.chuva >= 20 ? y.chuva + "%" : "" })), barraNome: "Temperatura",
+      texto: (q, y = hs.find((z) => z.h === q.h)) => `<b>${NOME_CEU[y.est]}</b><span>Nuvens ${y.nuvens}% · Chuva ${y.chuva}% · ${y.t}°</span>`,
+      resumo: () => { const sol = hs.filter((y) => y.est === "sol").map((y) => y.h), ch = hs.filter((y) => y.chuva >= 50).map((y) => y.h);
+        return [sol.length ? `Sol firme em ${sol.length} h (${sol[0]}h às ${sol[sol.length - 1] + 1}h)` : "Sem sol firme", ch.length ? `Chance alta de chuva a partir das ${ch[0]}h` : "Sem chance alta de chuva", `Máxima de ${x.temp}°`]; },
+      leg: Object.keys(NOME_CEU).map((e) => [COR_CEU[e], NOME_CEU[e]]), nota: "Altura da barra: temperatura · número azul: chance de chuva" };
+    if (k === "uv") { const pts = hs.filter((y) => y.uv != null).map((y) => ({ h: y.h, v: Math.round(y.uv * 10) / 10, cor: FAIXAS_UV[faixaIdx(y.uv)].cor }));
+      return { titulo: "Índice UV hora a hora", unid: "", max: Math.max(11, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "UV",
+        texto: (q) => `<b>UV ${Math.round(q.v)} · ${FAIXAS_UV[faixaIdx(q.v)].nome}</b><span>${SAUDE_UV[faixaIdx(q.v)]}</span>`,
+        resumo: () => { const pk = pts.reduce((a, b) => (b.v > a.v ? b : a), pts[0] || { v: 0, h: 0 }), alto = pts.filter((q) => q.v >= 6);
+          return [`Pico ${Math.round(pk.v)} às ${pk.h}h`, alto.length ? `UV alto ou mais das ${alto[0].h}h às ${alto[alto.length - 1].h + 1}h` : "Sem UV alto no dia"]; },
+        leg: FAIXAS_UV.map((f) => [f.cor, f.nome]) }; }
+    if (k === "mar") { const pts = (x.marH || []).filter((q) => q.o != null).map((q) => ({ h: q.h, v: Math.round(q.o * 10) / 10, cor: marCat(q.o).c, d: q.d, per: q.per }));
+      return { titulo: p.baia ? "Mar de baía" : "Ondas hora a hora", unid: "m", max: Math.max(1.5, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "Ondas (m)", setas: true,
+        texto: (q) => `<b>${fmt1(q.v)} m · ${marCat(q.v).n}</b><span>${q.per ? Math.round(q.per) + " s" : ""}${q.d != null ? " · de " + rumo(q.d) : ""}</span>`,
+        resumo: () => { if (!pts.length) return ["Sem dado do mar agora"]; const mx = pts.reduce((a, b) => (b.v > a.v ? b : a)), mn = pts.reduce((a, b) => (b.v < a.v ? b : a));
+          return [`Maior às ${mx.h}h: ${fmt1(mx.v)} m`, `Menor às ${mn.h}h: ${fmt1(mn.v)} m`, ...(p.baia ? ["Dentro da baía o mar fica calmo"] : [])]; },
+        leg: [["#8FD3EA", "Piscininha"], ["#4FB3D9", "Marolinha"], ["#1E8FC6", "Mexido"], ["#0B3F6B", "Pesado"]] }; }
+    if (k === "agua") { const pts = (x.marH || []).filter((q) => q.s != null).map((q) => ({ h: q.h, v: Math.round(q.s * 10) / 10, cor: "#16A3C9" }));
+      const lo = Math.min(...pts.map((q) => q.v)), hi = Math.max(...pts.map((q) => q.v));
+      return { titulo: "Temperatura da água", unid: "°C", min: Math.floor(lo - 1), max: Math.ceil(hi + 1), tipo: "linha", pts, barraNome: "Água °C",
+        texto: (q) => `<b>${fmt1(q.v)} °C · ${aguaCat(q.v)}</b><span>Temperatura na superfície do mar</span>`,
+        resumo: () => pts.length ? [`Entre ${fmt1(lo)} e ${fmt1(hi)} °C no dia`] : ["Sem dado da temperatura"], leg: [] }; }
+    if (k === "vento") { const pts = hs.filter((y) => y.v != null).map((y) => ({ h: y.h, v: y.v, cor: ventoCat(y.v).c, d: y.vd, raj: y.raj }));
+      return { titulo: "Vento hora a hora", unid: "km/h", max: Math.max(25, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "Vento (km/h)", setas: true, setaVento: true,
+        texto: (q) => `<b>${q.v} km/h · ${ventoCat(q.v).n}</b><span>${q.d != null ? "De " + rumo(q.d) : ""}${q.raj ? " · rajadas de " + q.raj + " km/h" : ""}</span>`,
+        resumo: () => { if (!pts.length) return ["Sem dado do vento"]; const mx = pts.reduce((a, b) => (b.v > a.v ? b : a)), calmo = pts.filter((q) => q.v <= 10);
+          return [`Mais forte às ${mx.h}h: ${mx.v} km/h`, calmo.length ? `Mais calmo das ${calmo[0].h}h às ${calmo[calmo.length - 1].h + 1}h` : "Sem horário de vento fraco"]; },
+        leg: [["#7CC99A", "Fraco"], ["#F2C12E", "Brisa"], ["#F08A3C", "Moderado"], ["#D9534F", "Ventania"]] }; }
+    return null;
+  }
+  function abrirRelatorio(k, l) {
+    relAberto = { k, id: l.p.id, min: null };
+    if (k === "surfe" && l.p.mar != null) { surfeDia = estado.dia; surfeAberta = l.p.id; surfeHora = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; return; }
+    const sh = $("#relTela"), corpo = $("#relCorpo");
+    $("#relLocal").textContent = `${l.p.nome} · ${nomeDia(estado.dia)}`;
+    if (k === "inea") {
+      const x = l.x, dt = x.aguaData ? x.aguaData.slice(8, 10) + "/" + x.aguaData.slice(5, 7) + "/" + x.aguaData.slice(0, 4) : null;
+      $("#relTitulo").textContent = "Balneabilidade (INEA)";
+      corpo.innerHTML = `<div class="rel-agora"><b>${x.propria === true ? "Água própria" : x.propria === false ? "Água imprópria" : x.aguaTotal ? `Própria em ${x.aguaOk} de ${x.aguaTotal} pontos` : "Sem boletim"}</b>
+        <span>${dt ? "Coleta de " + dt : ""}</span></div>
+        ${x.aguaTotal ? `<div class="rel-pontos">${Array.from({ length: x.aguaTotal }, (_, i) => `<i class="${i < x.aguaOk ? "ok" : "ruim"}">Ponto ${i + 1}: ${i < x.aguaOk ? "próprio" : "impróprio"}</i>`).join("")}</div>` : ""}
+        <ul class="rel-resumo"><li>O INEA coleta a água toda semana e publica o boletim às quintas.</li><li>Depois de chuva forte, a água costuma piorar por até 24 h.</li></ul>
+        <a class="pico-abrir rel-link" href="https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/" target="_blank" rel="noopener">Ver boletim no site do INEA ›</a>`;
+      sh.hidden = false; document.body.style.overflow = "hidden"; return;
+    }
+    const cfg = configRelatorio(k, l);
+    if (!cfg || !cfg.pts.length) return;
+    relAtual = cfg;
+    $("#relTitulo").textContent = cfg.titulo;
+    corpo.innerHTML = `<div class="rel-agora" id="relTxt"></div>${graficoRelatorio(cfg)}
+      ${cfg.leg.length ? `<div class="pico-leg">${cfg.leg.map(([c, n]) => `<span><i style="background:${c}"></i>${n}</span>`).join("")}${cfg.linha ? `<span><i style="background:#2F6FB0;height:3px;border-radius:2px"></i>${cfg.linhaNome}</span>` : ""}</div>` : ""}
+      <p class="rel-dica">${cfg.nota ? cfg.nota + "<br>" : ""}Arraste no gráfico para ver cada horário</p>
+      <h3 class="rel-h3">Resumo do dia</h3><ul class="rel-resumo">${cfg.resumo().map((t) => `<li>${t}</li>`).join("")}</ul>`;
+    sh.hidden = false; document.body.style.overflow = "hidden";
+    const agH = estado.dia === 0 ? +relogio.format(new Date()).slice(0, 2) : 12;
+    moverRel(agH * 60 + (estado.dia === 0 ? +relogio.format(new Date()).slice(3, 5) : 0));
+    ligarRel();
+  }
+  function fecharRelatorio() { $("#relTela").hidden = true; document.body.style.overflow = ""; relAtual = null; relAberto = null; }
+  // gráfico: barras (ou linha) de 6h às 20h, com régua amarela
+  let relGeo = null;
+  function graficoRelatorio(cfg) {
+    const W = 340, H = 200, esq = 30, dir = 8, topo = 18, base = cfg.setas ? 150 : 166;
+    const pts = cfg.pts, n = pts.length, h0 = pts[0].h, h1 = pts[n - 1].h + 1;
+    const lo = cfg.min ?? 0, hi = cfg.max;
+    const X = (min) => esq + (W - esq - dir) * (min - h0 * 60) / ((h1 - h0) * 60), Y = (v) => base - (base - topo) * (v - lo) / (hi - lo);
+    const larg = (W - esq - dir) / (h1 - h0);
+    let grade = "";
+    const passo = (hi - lo) <= 3 ? 0.5 : (hi - lo) <= 12 ? 2 : (hi - lo) <= 30 ? 5 : 25;
+    for (let v = Math.ceil(lo / passo) * passo; v <= hi + 1e-9; v += passo) grade += `<line x1="${esq}" x2="${W - dir}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#E8EEF2"/><text x="${esq - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6B7A86">${fmt1(v)}</text>`;
+    let marcas = "";
+    if (cfg.tipo === "barra") marcas = pts.map((q) => { const x0 = X(q.h * 60) + 2, y = Y(Math.max(lo, q.v)); return `<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${(larg - 4).toFixed(1)}" height="${Math.max(1.5, base - y).toFixed(1)}" rx="3" fill="${q.cor}"/>${q.rot ? `<text x="${(x0 + (larg - 4) / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="800" fill="#2F6FB0">${q.rot}</text>` : ""}`; }).join("");
+    else { const d = pts.map((q, i) => `${i ? "L" : "M"}${X(q.h * 60 + 30).toFixed(1)},${Y(q.v).toFixed(1)}`).join(" ");
+      marcas = `<path d="${d} L${X(pts[n - 1].h * 60 + 30).toFixed(1)},${base} L${X(pts[0].h * 60 + 30).toFixed(1)},${base} Z" fill="#16A3C9" opacity=".15"/><path d="${d}" fill="none" stroke="#16A3C9" stroke-width="2.5"/>`; }
+    if (cfg.linha) { const d = cfg.linha.map((q, i) => `${i ? "L" : "M"}${X(q.h * 60 + 30).toFixed(1)},${(base - (base - topo) * q.v / 100).toFixed(1)}`).join(" ");
+      marcas += `<path d="${d}" fill="none" stroke="#2F6FB0" stroke-width="2" stroke-dasharray="1 0"/>`; }
+    let eixo = "";
+    for (let h = h0; h <= h1; h += 2) eixo += `<text x="${X(h * 60).toFixed(1)}" y="${H - 22 + (cfg.setas ? 0 : 0)}" text-anchor="middle" font-size="9" fill="#6B7A86">${h}h</text>`;
+    let setas = "";
+    if (cfg.setas) setas = pts.map((q) => q.d == null ? "" : `<g transform="translate(${(X(q.h * 60) + larg / 2).toFixed(1)} ${base + 12}) rotate(${(q.d + 180) % 360})"><path d="M0 -6 L4 1 L1 1 L1 6 L-1 6 L-1 1 L-4 1 Z" fill="#33505F"/></g>`).join("");
+    relGeo = { X, Y, esq, dir, W, h0, h1, base, topo, larg };
+    return `<svg viewBox="0 0 ${W} ${H - 10}" class="rel-graf" id="relSvg" role="img" aria-label="${cfg.titulo}">
+      ${grade}${marcas}${setas}${eixo}
+      <g id="rcG" style="pointer-events:none"><rect id="rcB" x="0" y="${topo - 8}" width="0" height="${base - topo + 8}" fill="#E8A400" opacity=".12"/>
+        <line id="rcL" x1="0" x2="0" y1="${topo - 10}" y2="${base}" stroke="#E8A400" stroke-width="2" stroke-dasharray="4 3"/>
+        <rect id="rcA" x="-9" y="${base - 7}" width="18" height="14" rx="7" fill="#E8A400"/>
+        <path id="rcS" d="M-4.5 ${base - 3} l-3 3 l3 3 M4.5 ${base - 3} l3 3 l-3 3" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round"/></g>
+    </svg>`;
+  }
+  function moverRel(min) {
+    const g = relGeo, cfg = relAtual;
+    if (!g || !cfg || !$("#relSvg")) return;
+    min = Math.min(g.h1 * 60 - 1, Math.max(g.h0 * 60, min));
+    const h = Math.floor(min / 60), q = cfg.pts.find((z) => z.h === h) || cfg.pts[0];
+    const cx = g.X(h * 60) + g.larg / 2;
+    $("#rcL").setAttribute("x1", cx); $("#rcL").setAttribute("x2", cx);
+    $("#rcB").setAttribute("x", g.X(h * 60)); $("#rcB").setAttribute("width", g.larg);
+    $("#rcA").setAttribute("x", cx - 9); $("#rcS").setAttribute("transform", `translate(${cx} 0)`);
+    const ag = estado.dia === 0 && h === +relogio.format(new Date()).slice(0, 2);
+    $("#relTxt").innerHTML = `<small>${ag ? "Agora · " : ""}${h}h</small>${cfg.texto(q)}`;
+    if (relAberto) relAberto.min = min;
+  }
+  function ligarRel() {
+    const svg = $("#relSvg"), g = relGeo;
+    if (!svg) return;
+    const paraMin = (ev) => { const r = svg.getBoundingClientRect(), vx = (ev.clientX - r.left) * g.W / r.width; return g.h0 * 60 + (vx - g.esq) / (g.W - g.esq - g.dir) * (g.h1 - g.h0) * 60; };
+    let arr = false;
+    svg.addEventListener("pointerdown", (ev) => { arr = true; svg.setPointerCapture(ev.pointerId); moverRel(paraMin(ev)); });
+    svg.addEventListener("pointermove", (ev) => { if (arr) moverRel(paraMin(ev)); });
+    svg.addEventListener("pointerup", () => { arr = false; }); svg.addEventListener("pointercancel", () => { arr = false; });
+  }
 
   // ---------- compartilhar: monta uma imagem do cartão no formato de story (1080 x 1920) ----------
   const COR_SELO = { sol: ["#FFE7B3", "#5E3B00"], bronze: ["#FFD9C2", "#6E2A08"], mar: ["#CDEFF6", "#0A4A5C"], mexido: ["#CDE0EA", "#0A3A4D"],
@@ -1459,10 +1874,13 @@
     contarFavoritas();
     $("#abrirFav").onclick = abrirFavoritas;
     $("#abrirSurfe").onclick = abrirSurfe;
+    $("#fecharRel").onclick = fecharRelatorio;
+    $("#relTela").addEventListener("click", (e) => { if (e.target.id === "relTela") fecharRelatorio(); });
+    ligarArrasteCartao();
     $("#fecharSurfe").onclick = fecharSurfe;
     $("#surfeVoltar").onclick = () => { surfeAberta = null; desenharSurfe(); };
     $("#fecharFav").onclick = fecharFavoritas;
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); if (e.key === "Escape" && !$("#surfeTela").hidden) fecharSurfe(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); if (e.key === "Escape" && !$("#surfeTela").hidden) fecharSurfe(); if (e.key === "Escape" && !$("#relTela").hidden) fecharRelatorio(); });
     $("#regioes").innerHTML = Object.entries(REGIOES).map(([k, v]) => `<button data-r="${k}" aria-pressed="${k === estado.regiao}">${v.nome}</button>`).join("");
     document.querySelectorAll("#regioes button").forEach((b) => b.onclick = () => irParaRegiao(b.dataset.r));
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -1495,13 +1913,22 @@
     if (buscando || document.hidden || !linhas.length) return;
     buscando = true;
     try {
-      const dados = await carregar(true);
+      const [dados, bal] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null)]);
+      if (bal && bal.praias) balneab = bal;
       {
         montar(dados);
         desenharDias();
         desenhar();
         if (!$("#favTela").hidden) desenharFavoritas();
-             if (!$("#surfeTela").hidden) desenharSurfe();
+        // mapa de ondulação: marca como velho e recarrega se estiver aberto
+        Object.keys(dadosOnd).forEach((g) => { delete dadosOnd[g]; ondVelho[g] = true; });
+        campoCache = null;
+        if (!$("#surfeTela").hidden) desenharSurfe();
+        // relatório aberto: redesenha com os dados novos, no mesmo horário
+        if (!$("#relTela").hidden && relAberto) {
+          const ra = { ...relAberto }, l = linhas.find((q) => q.p.id === ra.id);
+          if (l) { abrirRelatorio(ra.k, l); if (ra.min != null && $("#relSvg")) moverRel(ra.min); }
+        }
         $("#atualizado").textContent = "Previsão atualizada às " + hm(new Date(dados.t)) + ".";
       }
       ultimaBusca = Date.now();
@@ -1509,7 +1936,13 @@
     buscando = false;
   }
   setInterval(atualizarPrevisao, CACHE_MIN * 60000);
-  document.addEventListener("visibilitychange", () => { if (!document.hidden && Date.now() - ultimaBusca >= CACHE_MIN * 60000) atualizarPrevisao(); });
+  // voltou para o app (outra aba, celular bloqueado, app em segundo plano): se passou 10 min, atualiza na hora
+  const aoVoltar = () => { if (!document.hidden && Date.now() - ultimaBusca >= CACHE_MIN * 60000) atualizarPrevisao(); };
+  document.addEventListener("visibilitychange", aoVoltar);
+  window.addEventListener("pageshow", aoVoltar);
+  window.addEventListener("focus", aoVoltar);
+  // segurança extra: confere a cada minuto (o relógio do navegador pode atrasar com o app parado)
+  setInterval(aoVoltar, 60000);
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
