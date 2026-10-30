@@ -1,0 +1,20 @@
+name: Aviso do treino cedo
+
+on:
+  schedule:
+    - cron: "13 22 * * *"     # todo dia, 19h13 em Brasília (as notificações saem às 20h30)
+  workflow_dispatch:
+
+jobs:
+  avisar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Conferir a previsão de amanhã cedo e agendar os avisos
+        env:
+          ONESIGNAL_APP_ID: ${{ secrets.ONESIGNAL_APP_ID }}
+          ONESIGNAL_KEY: ${{ secrets.ONESIGNAL_KEY }}
+        run: cd scripts && python treino.py
