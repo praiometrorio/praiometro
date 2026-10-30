@@ -17,7 +17,7 @@ import numpy as np
 from PIL import Image
 
 PAGINA = "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/"
-CAB = {"User-Agent": "Mozilla/5.0 (Praiometro; +https://praiometrorio.github.io/praiometro/)"}
+CAB = {"User-Agent": "Mozilla/5.0 (Praiometro; +https://praiometrorio.com.br/)"}
 
 # Posição de cada alfinete no mapa (centro do alfinete, em fração da largura e da altura da imagem).
 # Medido no boletim de 22/10/2026 (imagens de 1228 x 709 e 1228 x 992 pixels).

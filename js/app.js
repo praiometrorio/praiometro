@@ -666,12 +666,29 @@
   }
   const nomeDia = (d) => d === 0 ? "hoje" : d === 1 ? "amanhã" : SEMANA_LONGA[new Date(datas[d] + "T12:00:00").getDay()];
 
+  // céu animado no fundo de cada aba de dia: sol com passarinhos, nuvens andando, chuva caindo
+  const PASSARO = '<b class="passaro"><svg viewBox="0 0 10 5"><path d="M.5.8Q2.7 4 5 2.2Q7.3 4 9.5.8"/></svg></b>';
+  const NUVEM = (top, dur, atraso, opac, g) => `<b class="nuvem" style="top:${top}px;animation-duration:${dur}s;animation-delay:-${atraso}s;opacity:${opac}">` +
+    (g ? '<i style="left:0;top:8px;width:30px;height:14px"></i><i style="left:9px;top:0;width:18px;height:18px"></i><i style="left:20px;top:5px;width:20px;height:15px"></i>'
+       : '<i style="left:0;top:8px;width:24px;height:12px"></i><i style="left:6px;top:1px;width:15px;height:15px"></i><i style="left:15px;top:5px;width:17px;height:13px"></i>') + "</b>";
+  const CENA_DIA = {
+    sol: (k) => '<svg class="raios" viewBox="0 0 74 74"><path d="M37 2v10M37 62v10M2 37h10M62 37h10M12 12l7 7M55 55l7 7M12 62l7-7M55 19l7-7"/></svg><b class="astro"></b>' +
+      PASSARO.replace('class="passaro"', `class="passaro" style="top:9px;animation-delay:-${(k * 2.3) % 7}s"`) +
+      PASSARO.replace('class="passaro"', `class="passaro" style="top:16px;animation-duration:8.5s;animation-delay:-${(k * 3.1 + 2) % 8}s"`),
+    parcial: (k) => '<b class="astro peq"></b>' + NUVEM(-2, 16, (k * 5) % 16, 1, false) +
+      PASSARO.replace('class="passaro"', `class="passaro" style="top:30px;animation-duration:9s;animation-delay:-${(k * 2.7) % 9}s"`),
+    nublado: (k) => NUVEM(0, 14, (k * 4) % 14, .95, false) + NUVEM(20, 19, (k * 7 + 9) % 19, .75, true) + NUVEM(9, 24, (k * 5 + 15) % 24, .6, false),
+    chuva: (k) => '<b class="gotas"></b><b class="gotas g2"></b>' + NUVEM(-7, 18, (k * 6) % 18, 1, true) + NUVEM(-9, 22, (k * 4 + 12) % 22, .85, false)
+  };
+  const cenaDia = (ceu, k) => `<span class="cena-dia" aria-hidden="true">${CENA_DIA[ceu](k)}</span>`;
+
   function desenharDias() {
     $("#dias").innerHTML = datas.map((data, d) => {
       const dt = new Date(data + "T12:00:00");
       const nome = d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[dt.getDay()];
       const x = previsao.ipanema[d], a = analisar(x, PRAIAS.find((p) => p.id === "ipanema"));
-      return `<button class="dia" data-d="${d}" aria-pressed="${d === estado.dia}">${IC[a.ceu]}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
+      const ceu = CENA_DIA[a.ceu] ? a.ceu : "sol";
+      return `<button class="dia c-${ceu}" data-d="${d}" aria-pressed="${d === estado.dia}">${cenaDia(ceu, d)}${IC[a.ceu]}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
     }).join("");
     document.querySelectorAll(".dia").forEach((b) => b.onclick = () => { estado.dia = +b.dataset.d; estado.minuto = null; desenhar(); });
   }
@@ -2309,7 +2326,7 @@
     });
     // rodapé
     ctx.fillStyle = "#10283A"; ctx.font = "700 52px Unbounded, sans-serif"; ctx.textAlign = "center"; ctx.fillText("Praiômetro", W / 2, H - 130);
-    ctx.fillStyle = "#5A6B78"; ctx.font = "500 34px Figtree, sans-serif"; ctx.fillText("praiometrorio.github.io/praiometro", W / 2, H - 78); ctx.textAlign = "left";
+    ctx.fillStyle = "#5A6B78"; ctx.font = "500 34px Figtree, sans-serif"; ctx.fillText("praiometrorio.com.br", W / 2, H - 78); ctx.textAlign = "left";
     return new Promise((ok) => cv.toBlob(ok, "image/png"));
   }
   async function compartilhar(l) {
@@ -2318,7 +2335,7 @@
       const blob = await gerarImagem(l);
       const nome = `praiometro-${l.p.id}.png`;
       const arq = new File([blob], nome, { type: "image/png" });
-      const texto = `${l.p.nome} ${nomeDia(estado.dia)}: ${l.a.veredito} https://praiometrorio.github.io/praiometro/`;
+      const texto = `${l.p.nome} ${nomeDia(estado.dia)}: ${l.a.veredito} https://praiometrorio.com.br`;
       if (navigator.canShare && navigator.canShare({ files: [arq] })) {
         await navigator.share({ files: [arq], text: texto, title: "Praiômetro" });
       } else {

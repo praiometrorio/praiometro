@@ -14,6 +14,7 @@
 
   function mostrar() {
     const ligado = !!(OS && OS.User.PushSubscription.optedIn);
+    if (ligado && !ler("pm-contou-alerta")) { gravar("pm-contou-alerta", true); (window.pmEventos = window.pmEventos || []).push("ativou-alerta"); }
     banner.hidden = ligado || !!ler("pm-alerta-fechado");
     rodape.hidden = false;
     rodape.innerHTML = ligado
@@ -45,12 +46,14 @@
   mostrar();
 
   window.OneSignalDeferred = window.OneSignalDeferred || [];
+  // pasta onde o site está (funciona tanto em praiometrorio.com.br/ quanto no endereço antigo do GitHub)
+  const BASE = new URL(".", location.href).pathname;
   window.OneSignalDeferred.push(async function (OneSignal) {
     await OneSignal.init({
       appId: APP_ID,
       // trabalhador próprio numa pasta separada, para não misturar com o sw.js do site
-      serviceWorkerPath: "praiometro/push/onesignal/OneSignalSDKWorker.js",
-      serviceWorkerParam: { scope: "/praiometro/push/onesignal/" }
+      serviceWorkerPath: BASE.slice(1) + "push/onesignal/OneSignalSDKWorker.js",
+      serviceWorkerParam: { scope: BASE + "push/onesignal/" }
     });
     OS = OneSignal;
     OneSignal.User.PushSubscription.addEventListener("change", mostrar);

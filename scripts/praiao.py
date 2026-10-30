@@ -6,7 +6,7 @@
 import json, os, sys, datetime, urllib.request, urllib.parse
 
 FUSO = "America/Sao_Paulo"
-SITE = "https://praiometrorio.github.io/praiometro/"
+SITE = "https://praiometrorio.com.br/"
 MODELOS = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless",
            "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"]
 # praias de mar aberto (as da baía não contam para praião, igual ao site)
