@@ -667,13 +667,22 @@
   // Limites de vento (vento médio da previsão, km/h): [bom até, atrapalha até]; acima disso é ruim.
   // Estimativa a partir do peso/tamanho oficial de cada bola e de quanto o vento desvia a jogada; ajustável com o feedback.
   // (o robô scripts/treino.py usa os MESMOS limites: se mudar aqui, mude lá)
+  // ícones desenhados de cada esporte (bola de tênis, vôlei, bola preta e branca no futevôlei, pé + bola na altinha, raquete de frescobol, tênis de corrida)
+  const ICONES_ESP = {
+  beach: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><circle cx="16" cy="16" r="13" fill="#D9EA3F" stroke="#B7C928" stroke-width="1"/><path d="M5.2 9.2C11.5 12.6 11.5 19.4 5.2 22.8M26.8 9.2C20.5 12.6 20.5 19.4 26.8 22.8" fill="none" stroke="#fff" stroke-width="2.3" stroke-linecap="round"/></svg>',
+  volei: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><defs><clipPath id="cv"><circle cx="16" cy="16" r="13"/></clipPath></defs><circle cx="16" cy="16" r="13" fill="#fff"/><g clip-path="url(#cv)" fill="none" stroke-linecap="round"><path d="M16 16C15 10 11 5 4 6" stroke="#1F57B8" stroke-width="3.2"/><path d="M16 16C21 13 27 14 30 19" stroke="#F4C21C" stroke-width="3.2"/><path d="M16 16C12 20 12 26 15 31" stroke="#1F57B8" stroke-width="3.2"/><path d="M11 3C10 9 6 12 2 12" stroke="#F4C21C" stroke-width="3.2"/><path d="M29 10C24 9 21 5 21 2" stroke="#1F57B8" stroke-width="3.2"/><path d="M5 25C9 22 14 25 16 30" stroke="#F4C21C" stroke-width="2.6"/></g><circle cx="16" cy="16" r="13" fill="none" stroke="#1F3F7A" stroke-width="1.3"/></svg>',
+  futev: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><defs><clipPath id="cf"><circle cx="16" cy="16" r="13"/></clipPath></defs><circle cx="16" cy="16" r="13" fill="#fff"/><g clip-path="url(#cf)"><g fill="#1A1A1A"><polygon points="16.00,11.40 20.37,14.58 18.70,19.72 13.30,19.72 11.63,14.58"/><polygon points="22.17,7.51 20.57,2.59 24.76,-0.45 28.94,2.59 27.34,7.51"/><polygon points="25.99,19.24 30.17,16.20 34.36,19.24 32.76,24.16 27.58,24.16"/><polygon points="16.00,26.50 20.18,29.54 18.59,34.46 13.41,34.46 11.82,29.54"/><polygon points="6.01,19.24 4.42,24.16 -0.76,24.16 -2.36,19.24 1.83,16.20"/><polygon points="9.83,7.51 4.66,7.51 3.06,2.59 7.24,-0.45 11.43,2.59"/></g><path d="M16.00 11.40L16.00 6.70 M16.00 6.70L4.66 7.51 M16.00 6.70L27.34 7.51 M20.37 14.58L24.84 13.13 M24.84 13.13L20.57 2.59 M24.84 13.13L27.58 24.16 M18.70 19.72L21.47 23.52 M21.47 23.52L30.17 16.20 M21.47 23.52L11.82 29.54 M13.30 19.72L10.53 23.52 M10.53 23.52L20.18 29.54 M10.53 23.52L1.83 16.20 M11.63 14.58L7.16 13.13 M7.16 13.13L4.42 24.16 M7.16 13.13L11.43 2.59" stroke="#1A1A1A" stroke-width="0.90" fill="none"/></g><circle cx="16" cy="16" r="13" fill="none" stroke="#1A1A1A" stroke-width="1.2"/></svg>',
+  altinha: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><text x="-1" y="29" font-size="23">🦶</text><defs><clipPath id="ca"><circle cx="23.5" cy="8.5" r="6.8"/></clipPath></defs><circle cx="23.5" cy="8.5" r="6.8" fill="#fff"/><g clip-path="url(#ca)"><g fill="#1A1A1A"><polygon points="23.50,6.09 25.79,7.76 24.91,10.45 22.09,10.45 21.21,7.76"/><polygon points="26.73,4.06 25.89,1.48 28.08,-0.11 30.27,1.48 29.43,4.06"/><polygon points="28.72,10.20 30.91,8.61 33.10,10.20 32.27,12.77 29.56,12.77"/><polygon points="23.50,13.99 25.69,15.58 24.85,18.16 22.15,18.16 21.31,15.58"/><polygon points="18.28,10.20 17.44,12.77 14.73,12.77 13.90,10.20 16.09,8.61"/><polygon points="20.27,4.06 17.57,4.06 16.73,1.48 18.92,-0.11 21.11,1.48"/></g><path d="M23.50 6.09L23.50 3.64 M23.50 3.64L17.57 4.06 M23.50 3.64L29.43 4.06 M25.79 7.76L28.13 7.00 M28.13 7.00L25.89 1.48 M28.13 7.00L29.56 12.77 M24.91 10.45L26.36 12.44 M26.36 12.44L30.91 8.61 M26.36 12.44L21.31 15.58 M22.09 10.45L20.64 12.44 M20.64 12.44L25.69 15.58 M20.64 12.44L16.09 8.61 M21.21 7.76L18.87 7.00 M18.87 7.00L17.44 12.77 M18.87 7.00L21.11 1.48" stroke="#1A1A1A" stroke-width="0.47" fill="none"/></g><circle cx="23.5" cy="8.5" r="6.8" fill="none" stroke="#1A1A1A" stroke-width="1"/></svg>',
+  fresco: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><g transform="rotate(-35 14 14)"><ellipse cx="14" cy="11" rx="8" ry="9.5" fill="#D99A55" stroke="#9C6127" stroke-width="1.3"/><path d="M10 6c2-1.5 6-1.5 8 0" stroke="#F3C48C" stroke-width="1.4" fill="none" stroke-linecap="round"/><rect x="11.8" y="19.5" width="4.4" height="10" rx="1.6" fill="#2E2E3A"/></g><circle cx="26" cy="7" r="3.8" fill="#FF7A2F" stroke="#D35A15" stroke-width="1"/></svg>',
+  corrida: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><path d="M3 22.5c0-3 1-6.5 2.5-9.5.5-1 1.8-1.2 2.6-.4 1.6 1.6 3.6 2.2 5.4 1.6l2.6-.9c.9-.3 1.9 0 2.4.8l2 3c.6.9 1.5 1.5 2.6 1.7l4.6.8c1.8.3 3.1 1.9 3.1 3.7v.4H3z" fill="#FF6B3D"/><path d="M3 24.2h26.8v1.6c0 1-.8 1.8-1.8 1.8H4.8c-1 0-1.8-.8-1.8-1.8z" fill="#fff" stroke="#10283A" stroke-width="1"/><path d="M11 15.5l1.6 2.6M14 14.5l1.6 2.6M17 14l1.6 2.6" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>'
+  };
   const ESPORTES = {
-    beach:  { nome: "Beach tennis", ic: "🎾", vento: [7, 13] },
-    volei:  { nome: "Vôlei", ic: "🏐", vento: [8, 15] },
-    futev:  { nome: "Futevôlei", ic: "⚽", vento: [10, 18] },
-    altinha:{ nome: "Altinha", ic: "🦶", vento: [10, 18] },
-    fresco: { nome: "Frescobol", ic: "🏓", vento: [12, 20] },
-    corrida:{ nome: "Corrida", ic: "🏃", vento: [25, 35] }
+    beach:  { nome: "Beach tennis", ic: ICONES_ESP.beach, vento: [7, 13] },
+    volei:  { nome: "Vôlei", ic: ICONES_ESP.volei, vento: [8, 15] },
+    futev:  { nome: "Futevôlei", ic: ICONES_ESP.futev, vento: [10, 18] },
+    altinha:{ nome: "Altinha", ic: ICONES_ESP.altinha, vento: [10, 18] },
+    fresco: { nome: "Frescobol", ic: ICONES_ESP.fresco, vento: [12, 20] },
+    corrida:{ nome: "Corrida", ic: ICONES_ESP.corrida, vento: [25, 35] }
   };
   const HORAS_TREINO = [5, 6, 7, 8, 9];
   const SEMANA_CURTA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -739,6 +748,10 @@
     }
     return null;
   }
+  function sessaoDia(t, d) {
+    const x = previsao[t.praia] && previsao[t.praia][d], q = x && x.cedo ? x.cedo.find((y) => y.h === t.hora) : null;
+    return q ? { d, x, q, nota: notaTreino(q, t.esp) } : null;
+  }
   const textoDias = (dias) => dias.length === 7 ? "Todo dia" : dias.slice().sort().map((d) => SEMANA_CURTA[d - 1]).join(", ");
   const nomePraia = (id) => (PRAIAS.find((p) => p.id === id) || {}).nome || id;
 
@@ -770,12 +783,13 @@
     $("#treinoVoltar").hidden = m === "lista" || (m === "escolher" && !treinos.length) || m === "notif";
 
     if (m === "escolher") {
+      const so1 = !!trTela.avulso;
       corpo.innerHTML = `
-        <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>${treinos.length ? "Mais um esporte" : "Quais esportes você pratica?"}</h3>
-          <p>${treinos.length ? "Escolha o esporte que você quer adicionar." : "Escolha um para começar. Depois dá pra adicionar outros."}</p></div></div>
+        <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>${so1 ? "Qual esporte?" : treinos.length ? "Mais um esporte" : "Quais esportes você pratica?"}</h3>
+          <p>${so1 ? "Escolha o esporte e o dia que você está pensando em ir." : treinos.length ? "Escolha o esporte que você quer adicionar." : "Escolha um para começar. Depois você diz se é toda semana ou só um dia."}</p></div></div>
         <div class="tr-card tr-esportes">${Object.entries(ESPORTES).map(([k, e]) => `<button data-esp="${k}"><span>${e.ic}</span>${e.nome}</button>`).join("")}</div>`;
       corpo.querySelectorAll("[data-esp]").forEach((b) => b.onclick = () =>
-        irTreino("form", { rascunho: { id: null, esp: b.dataset.esp, praia: "ipanema", hora: 6, dias: [], piso: "orla" } }));
+        irTreino("form", { rascunho: { id: null, esp: b.dataset.esp, praia: "ipanema", hora: 6, dias: [], piso: "orla", tipo: so1 ? "avulso" : "fixo", d: 1 } }));
       return;
     }
 
@@ -784,14 +798,18 @@
       corpo.innerHTML = `
         <div class="tr-card tr-form">
           <p class="tr-form-esp"><span>${E.ic}</span>${E.nome}</p>
-          <p class="tr-rot">Em que dias?</p>
-          <div class="tr-dias">${SEMANA_CURTA.map((nm, i) => `<button data-dia="${i + 1}" class="${r.dias.includes(i + 1) ? "on" : ""}">${nm}</button>`).join("")}</div>
+          ${r.id ? "" : `<div class="tr-tipo"><button data-tipo="fixo" class="${r.tipo !== "avulso" ? "on" : ""}">Toda semana</button><button data-tipo="avulso" class="${r.tipo === "avulso" ? "on" : ""}">Só um dia</button></div>`}
+          ${r.tipo === "avulso"
+            ? `<p class="tr-rot">Que dia você está pensando em ir?</p>
+               <div class="tr-dias">${datas.map((_, d) => `<button data-diaum="${d}" class="${d === r.d ? "on" : ""}">${nomeDiaTreino(d)}</button>`).join("")}</div>`
+            : `<p class="tr-rot">Em que dias?</p>
+               <div class="tr-dias">${SEMANA_CURTA.map((nm, i) => `<button data-dia="${i + 1}" class="${r.dias.includes(i + 1) ? "on" : ""}">${nm}</button>`).join("")}</div>`}
           <p class="tr-rot">Que horas?</p>
           <div class="tr-dias">${HORAS_TREINO.map((hh) => `<button data-hora="${hh}" class="${hh === r.hora ? "on" : ""}">${hh}h</button>`).join("")}</div>
           <p class="tr-rot">Em que praia?</p>
           <select class="tr-select" id="trPraia">${PRAIAS.filter((z) => !z.baia).map((z) => `<option value="${z.id}"${z.id === r.praia ? " selected" : ""}>${z.nome}</option>`).join("")}</select>
           ${r.esp === "corrida" ? `<p class="tr-rot">Onde você corre?</p><div class="tr-dias"><button data-piso="orla" class="${r.piso === "orla" ? "on" : ""}">Orla</button><button data-piso="areia" class="${r.piso === "areia" ? "on" : ""}">Areia</button></div>` : ""}
-          <button class="tr-ligar" id="trSalvar">Salvar</button>
+          <button class="tr-ligar" id="trSalvar">${r.tipo === "avulso" ? "Ver a previsão" : "Salvar"}</button>
           <p class="tr-aviso-msg" id="trFormMsg"></p>
           ${r.id ? '<button class="tr-remover" id="trRemover">Remover esse treino</button>' : ""}
         </div>`;
@@ -800,11 +818,17 @@
       corpo.querySelectorAll("[data-hora]").forEach((b) => b.onclick = () => { r.hora = +b.dataset.hora; corpo.querySelectorAll("[data-hora]").forEach((z) => z.classList.toggle("on", z === b)); });
       corpo.querySelectorAll("[data-piso]").forEach((b) => b.onclick = () => { r.piso = b.dataset.piso; corpo.querySelectorAll("[data-piso]").forEach((z) => z.classList.toggle("on", z === b)); });
       $("#trPraia").onchange = (e) => { r.praia = e.target.value; };
+      corpo.querySelectorAll("[data-tipo]").forEach((b) => b.onclick = () => { r.tipo = b.dataset.tipo; desenharTreino(); });
+      corpo.querySelectorAll("[data-diaum]").forEach((b) => b.onclick = () => { r.d = +b.dataset.diaum; corpo.querySelectorAll("[data-diaum]").forEach((z) => z.classList.toggle("on", z === b)); });
       $("#trSalvar").onclick = () => {
+        if (r.tipo === "avulso") {             // só um dia: mostra a previsão, sem salvar nada
+          (window.pmEventos = window.pmEventos || []).push("treino-avulso-" + r.esp);
+          return irTreino("detalhe", { avulso: { ...r } });
+        }
         if (!r.dias.length) { $("#trFormMsg").textContent = "Escolha pelo menos um dia."; return; }
         const primeiro = !treinos.length;
         if (r.id) treinos = treinos.map((t) => t.id === r.id ? { ...r } : t);
-        else treinos.push({ ...r, id: Date.now().toString(36), criado: datas[0] });
+        else { const { tipo, d, ...fixo } = r; treinos.push({ ...fixo, id: Date.now().toString(36), criado: datas[0] }); }
         gravaTreinos();
         (window.pmEventos = window.pmEventos || []).push("treino-" + r.esp);
         irTreino(primeiro && !avisoTreino ? "notif" : "lista");
@@ -828,8 +852,8 @@
     }
 
     if (m === "detalhe") {
-      const t = treinos.find((z) => z.id === trTela.id); if (!t) return irTreino("lista");
-      const E = ESPORTES[t.esp], s = proximaSessao(t), corrida = t.esp === "corrida";
+      const av = trTela.avulso, t = av || treinos.find((z) => z.id === trTela.id); if (!t) return irTreino("lista");
+      const E = ESPORTES[t.esp], s = av ? sessaoDia(t, av.d) : proximaSessao(t), corrida = t.esp === "corrida";
       if (!s) {
         corpo.innerHTML = `<div class="tr-card"><p>Sem previsão para o próximo ${E.nome.toLowerCase()} (${textoDias(t.dias)} · ${t.hora}h) nos próximos dias.</p></div>`;
         return;
@@ -859,16 +883,20 @@
           ${corrida ? "" : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
         </div>
         <div class="tr-card tr-linhas">
-          <div><span>Seus dias</span><b>${textoDias(t.dias)}</b></div>
+          ${av ? "" : `<div><span>Seus dias</span><b>${textoDias(t.dias)}</b></div>`}
           <div><span>Nascer do sol</span><b>${(x.nascer || "").replace(/^0/, "").replace(":", "h")}</b></div>
           <div><span>UV alto</span><b>${uvAlto ? "a partir das " + uvAlto.h + "h" : "não fica alto"}</b></div>
           ${corrida ? `<div><span>Onde você corre</span><b>${t.piso === "areia" ? "Areia" : "Orla"}</b></div>
             ${t.piso === "areia" ? `<div><span>Maré às ${t.hora}h</span><b>${mareTxt(q.mare)}</b></div>` : ""}
             ${sens != null ? `<div><span>Calor + umidade</span><b>${sens < 23 ? "tranquilo" : sens < 28 ? "abafado, vá com calma" : "perigoso, evite"}</b></div>` : ""}` : ""}
         </div>
-        <button class="tr-editar" id="trEditar">Editar dias, horário e praia</button>
+        ${av ? `<button class="tr-editar" id="trEditar">Mudar dia, horário ou praia</button>
+               ${treinos.length < MAX_TREINOS ? `<button class="tr-editar claro" id="trVirarFixo">Faço toda ${SEMANA_CURTA[diaSemana(datas[av.d]) - 1].toLowerCase()}: salvar como treino da semana</button>` : ""}`
+             : '<button class="tr-editar" id="trEditar">Editar dias, horário e praia</button>'}
         ${NOTA_RODAPE}`;
-      $("#trEditar").onclick = () => irTreino("form", { rascunho: { ...t, dias: t.dias.slice() } });
+      $("#trEditar").onclick = () => irTreino("form", { rascunho: av ? { ...av } : { ...t, dias: t.dias.slice() } });
+      const vf = $("#trVirarFixo");
+      if (vf) vf.onclick = () => irTreino("form", { rascunho: { ...av, tipo: "fixo", dias: [diaSemana(datas[av.d])] } });
       return;
     }
 
@@ -886,7 +914,10 @@
             ${s ? `<span class="tr-selo n${s.nota.n}">${NOTA_CURTA[s.nota.n]}</span>` : ""}</div>
           ${s ? `<p class="tr-item-quando">${nomeDiaTreino(s.d)}, ${t.hora}h${s.nota.n ? " · " + s.nota.motivos.join(" e ") : ""}</p>${faixaTreino(t, s.x, true)}` : '<p class="tr-item-quando">Sem previsão nos próximos dias</p>'}
         </button>`; }).join("")}
-      ${treinos.length < MAX_TREINOS ? '<button class="tr-add" id="trAdd">+ Adicionar outro esporte</button>' : ""}
+      <div class="tr-add-linha">
+        ${treinos.length < MAX_TREINOS ? '<button class="tr-add" id="trAdd">+ Adicionar treino da semana</button>' : ""}
+        <button class="tr-add" id="trUmDia">🔎 Pensando em ir num dia? Ver só esse dia</button>
+      </div>
       <div class="tr-card tr-aviso">
         <p class="tr-rot">🔔 Aviso na véspera, às 20h30</p>
         <p class="tr-aviso-txt">${avisoTreino ? "Ligado: na noite anterior a cada treino, chega como vai estar no seu horário." : "Na noite anterior a cada treino, a gente avisa como vai estar no seu horário."}</p>
@@ -896,6 +927,7 @@
       ${NOTA_RODAPE}`;
     corpo.querySelectorAll("[data-abrir]").forEach((b) => b.onclick = () => irTreino("detalhe", { id: b.dataset.abrir }));
     const add = $("#trAdd"); if (add) add.onclick = () => irTreino("escolher");
+    $("#trUmDia").onclick = () => irTreino("escolher", { avulso: true });
     $("#trLigar").onclick = () => {
       if (avisoTreino) { avisoTreino = false; gravaTreinos(); if (window.pmPush) window.pmPush.etiquetas({}); return desenharTreino(); }
       ligarAvisoTreino(() => desenharTreino());

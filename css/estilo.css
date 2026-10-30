@@ -764,3 +764,11 @@ html,body{overscroll-behavior-y:none}
 .tr-ceu.curto .tr-disco{left:86%;width:54px;height:54px;margin-left:-27px;bottom:42px}
 .tr-ceu.curto .tr-reflexo{left:86%;width:44px;margin-left:-22px}
 .tr-ceu.curto .tr-veredito{max-width:76%}
+/* ícones dos esportes e "só um dia" */
+.ic-esp{width:1.3em;height:1.3em;vertical-align:-.3em;flex:none}
+.tr-esportes button span .ic-esp,.tr-form-esp span .ic-esp,.tr-item-ic .ic-esp{width:34px;height:34px;vertical-align:middle}
+.tr-tipo{display:grid;grid-template-columns:1fr 1fr;background:#F6EFE3;border-radius:14px;padding:4px;margin-top:12px}
+.tr-tipo button{border:0;border-radius:11px;padding:10px;background:none;font:800 14px var(--f-body);color:var(--muted);cursor:pointer}
+.tr-tipo button.on{background:#fff;color:var(--ink);box-shadow:0 2px 6px rgba(0,20,40,.12)}
+.tr-add-linha{display:grid;gap:10px}
+.tr-editar.claro{background:rgba(255,255,255,.08);border:2px dashed rgba(255,255,255,.4);font-size:14px}

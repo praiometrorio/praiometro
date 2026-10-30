@@ -13,7 +13,7 @@ ESPORTES = {   # [bom até, atrapalha até] em km/h (vento médio); acima disso 
     "volei":   ("vôlei", "🏐", (8, 15)),
     "futev":   ("futevôlei", "⚽", (10, 18)),
     "altinha": ("altinha", "🦶", (10, 18)),
-    "fresco":  ("frescobol", "🏓", (12, 20)),
+    "fresco":  ("frescobol", "🏖️", (12, 20)),
     "corrida": ("corrida", "🏃", (25, 35)),
 }
 HORAS = [5, 6, 7, 8, 9]

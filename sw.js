@@ -1,5 +1,5 @@
 // Service worker: guarda os arquivos do site para abrir rápido e funcionar como app.
-const VERSAO = "praiometro-v3-65";
+const VERSAO = "praiometro-v3-67";
 const ARQUIVOS = ["./", "index.html", "css/estilo.css", "js/app.js", "js/praias.js", "js/sol.js", "js/paisagens.js", "js/alerta.js", "js/ceu.js", "js/postos.js", "js/metro.js", "js/servicos.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
