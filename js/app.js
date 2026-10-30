@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v9";
+  const CACHE_CHAVE = "pm-previsao-v10";
   const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -296,7 +296,7 @@
   // ---------- busca da previsão ----------
   const listaLat = () => PRAIAS.map((p) => p.lat).join(","), listaLon = () => PRAIAS.map((p) => p.lon).join(",");
   const urlPrevisao = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=temperature_2m,precipitation_probability,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky" +
+    "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky" +
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
@@ -634,6 +634,13 @@
             return r;
           })(),
           mareDia: Array.from({ length: 24 }, (_, i) => ({ h: i, n: nivelEm(data, i) })).filter((q) => q.n != null),
+          // treino cedo: hora a hora das 4h às 11h (inclui antes do sol nascer)
+          cedo: Array.from({ length: 8 }, (_, i) => 4 + i).map((hr) => {
+            const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
+            const ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
+            return { h: hr, t: h.temperature_2m[k], ur, chuva: h.precipitation_probability[k] || 0, v: ventoEm(k), raj: rajEm(k),
+              uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr) };
+          }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
@@ -654,6 +661,187 @@
     const k = datas.findIndex((d) => d >= diaHoje());
     if (k > 0) { datas = datas.slice(k); Object.keys(out).forEach((id) => { out[id] = out[id].slice(k).map((x, i) => ({ ...x, hoje: i === 0 })); }); }
     previsao = out;
+  }
+
+  // ---------- treino cedo ----------
+  // Limites de vento (vento médio da previsão, km/h): [bom até, atrapalha até]; acima disso é ruim.
+  // Estimativa a partir do peso/tamanho oficial de cada bola e de quanto o vento desvia a jogada; ajustável com o feedback.
+  const ESPORTES = {
+    beach:  { nome: "Beach tennis", ic: "🎾", vento: [7, 13] },
+    volei:  { nome: "Vôlei", ic: "🏐", vento: [8, 15] },
+    futev:  { nome: "Futevôlei", ic: "⚽", vento: [10, 18] },
+    altinha:{ nome: "Altinha", ic: "🦶", vento: [10, 18] },
+    fresco: { nome: "Frescobol", ic: "🏓", vento: [12, 20] },
+    corrida:{ nome: "Corrida", ic: "🏃", vento: [25, 35] }
+  };
+  const HORAS_TREINO = [5, 6, 7, 8, 9];
+  let treino = Object.assign({ esp: "beach", praia: "ipanema", hora: 6, piso: "orla", dias: [1, 3, 5], aviso: false }, guarda.ler("pm-treino") || {});
+  // aviso na véspera: o robô (scripts/treino.py) manda às 20h30 para quem tem a etiqueta do dia seguinte
+  // etiquetas: t1..t7 = segunda..domingo, valor "esporte|praia|hora"; t0 = todos os dias
+  const etiquetasTreino = () => {
+    if (!treino.aviso || !treino.dias.length) return {};
+    const v = `${treino.esp}|${treino.praia}|${treino.hora}`;
+    return treino.dias.length === 7 ? { t0: v } : Object.fromEntries(treino.dias.map((d) => ["t" + d, v]));
+  };
+  const gravaTreino = () => {
+    guarda.gravar("pm-treino", treino);
+    if (treino.aviso && window.pmPush) window.pmPush.etiquetas(etiquetasTreino());
+  };
+  const SEMANA_CURTA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  // calor + umidade: "temperatura de bulbo úmido de globo" (WBGT) na sombra, que é o que o ACSM usa para corridas.
+  // Bulbo úmido pela fórmula de Stull (2011); na sombra, WBGT ≈ 0,7 × bulbo úmido + 0,3 × temperatura.
+  const bulbo = (t, ur) => {
+    if (t == null) return null;
+    if (ur == null) return t - 2.8;
+    const tw = t * Math.atan(0.151977 * Math.sqrt(ur + 8.313659)) + Math.atan(t + ur) - Math.atan(ur - 1.676331) + 0.00391838 * Math.pow(ur, 1.5) * Math.atan(0.023101 * ur) - 4.686035;
+    return 0.7 * tw + 0.3 * t;
+  };
+  // 0 bom, 1 atrapalha, 2 ruim, e o porquê
+  function notaTreino(q, esp) {
+    const E = ESPORTES[esp], motivos = [];
+    let n = 0;
+    if (q.chuva >= 50) { n = 2; motivos.push("chuva"); } else if (q.chuva >= 30) { n = 1; motivos.push("chance de chuva"); }
+    if (esp === "corrida") {
+      const w = bulbo(q.t, q.ur);
+      if (w != null && w >= 28) { n = 2; motivos.push("calor perigoso"); } else if (w != null && w >= 23) { n = Math.max(n, 1); motivos.push("abafado"); }
+      if (q.v != null && q.v > E.vento[1]) { n = Math.max(n, 1); motivos.push("vento forte"); }
+    } else if (q.v != null) {
+      let nv = q.v <= E.vento[0] ? 0 : q.v <= E.vento[1] ? 1 : 2;
+      if (q.raj != null && q.raj >= E.vento[1] + 10 && nv < 2) nv++;          // rajada forte piora um nível
+      if (nv) motivos.push(nv === 2 ? "vento forte" : "vento");
+      n = Math.max(n, nv);
+    }
+    return { n, motivos };
+  }
+  const NOTA_TXT = ["Ótimo pra jogar", "Dá, mas atrapalha", "Melhor remarcar"];
+  // próximo treino: hoje se o horário ainda não passou, senão amanhã
+  function proximoTreino() {
+    const agora = horaAgora();
+    const d = agora.h < treino.hora ? 0 : 1;
+    return { d: Math.min(d, datas.length - 1), quando: d === 0 ? "Hoje" : "Amanhã" };
+  }
+  function horaAgora() {
+    const p = new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()).split(":");
+    return { h: +p[0], m: +p[1] };
+  }
+  function resumoTreino() {
+    const x = previsao[treino.praia] && previsao[treino.praia][proximoTreino().d];
+    if (!x || !x.cedo) return null;
+    const q = x.cedo.find((y) => y.h === treino.hora); if (!q) return null;
+    return { x, q, nota: notaTreino(q, treino.esp) };
+  }
+  function desenharBotaoTreino() {
+    const b = $("#abrirTreino"); if (!b) return;
+    const r = resumoTreino(), E = ESPORTES[treino.esp], pt = proximoTreino();
+    const jaEscolheu = !!guarda.ler("pm-treino");
+    b.querySelector("small").textContent = !jaEscolheu || !r ? "Vai treinar cedo? Veja se dá jogo"
+      : `${pt.quando} ${treino.hora}h · ${E.nome}: ${["ótimo", "atrapalha", "ruim"][r.nota.n]}`;
+  }
+  function abrirTreino() { desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function fecharTreino() { $("#treinoTela").hidden = true; document.body.style.overflow = ""; desenharBotaoTreino(); }
+  function desenharTreino() {
+    const E = ESPORTES[treino.esp], pt = proximoTreino(), p = PRAIAS.find((z) => z.id === treino.praia) || PRAIAS[0];
+    const x = previsao[p.id][pt.d], r = resumoTreino();
+    const cls = ["bom", "medio", "ruim"];
+    const ladoAreia = treino.esp === "corrida";
+    // a partir de que hora o vento (ou o calor) piora
+    let piora = "";
+    if (r) { const pior = x.cedo.find((y) => y.h > treino.hora && notaTreino(y, treino.esp).n > r.nota.n); if (pior) piora = treino.esp === "corrida" ? ` Piora a partir das ${pior.h}h.` : ` O vento aperta a partir das ${pior.h}h.`; }
+    const frase = !r ? "Sem previsão para esse horário." : r.nota.n === 0
+      ? (treino.esp === "corrida" ? "Temperatura boa e sem chuva." : "Vento fraco e sem chuva.") + piora
+      : "Por causa de " + r.nota.motivos.join(" e ") + "." + piora;
+    // maré (corrida na areia): baixa = faixa de areia dura e larga
+    const nivs = (x.mareDia || []).map((q) => q.n), mn = Math.min(...nivs), mx = Math.max(...nivs);
+    const mareTxt = (n) => n == null || !nivs.length ? "—" : (n - mn) / ((mx - mn) || 1) < 0.35 ? "baixa · faixa larga" : (n - mn) / ((mx - mn) || 1) > 0.65 ? "alta · faixa estreita" : "média";
+    const uvAlto = (x.cedo || []).concat(x.horas || []).find((y) => y.uv != null && y.uv >= 6);
+    const sens = r ? bulbo(r.q.t, r.q.ur) : null;
+    // feedback do treino de hoje (depois do horário)
+    const agora = horaAgora(), hojeX = previsao[p.id][0], qHoje = hojeX && hojeX.cedo ? hojeX.cedo.find((y) => y.h === treino.hora) : null;
+    const chaveFb = "pm-fb-" + hojeX.data + "-" + treino.esp;
+    const mostraFb = qHoje && agora.h >= treino.hora + 1 && !guarda.ler(chaveFb);
+    $("#treinoCorpo").innerHTML = `
+      <div class="tr-ceu">
+        <span class="tr-disco"></span><span class="tr-mar"></span><span class="tr-reflexo"></span>
+        <div class="tr-esc">
+          <button class="tr-chip" data-ir="esp">${E.ic} ${E.nome}</button>
+          <label class="tr-chip">📍 <select id="trPraia">${PRAIAS.filter((z) => !z.baia || z.id === treino.praia).map((z) => `<option value="${z.id}"${z.id === p.id ? " selected" : ""}>${z.nome}</option>`).join("")}</select></label>
+          <label class="tr-chip">⏰ <select id="trHora">${HORAS_TREINO.map((hh) => `<option value="${hh}"${hh === treino.hora ? " selected" : ""}>${hh}h</option>`).join("")}</select></label>
+        </div>
+        <div class="tr-veredito">${r ? `<span class="tr-selo n${r.nota.n}">${NOTA_TXT[r.nota.n]}</span>` : ""}<h3>${pt.quando}, ${treino.hora}h</h3><p>${frase}</p></div>
+      </div>
+      ${r ? `<div class="tr-card tr-dados">
+        <div><b>${r.q.v == null ? "–" : r.q.v}</b><span>vento km/h</span></div>
+        <div><b>${r.q.raj == null ? "–" : r.q.raj}</b><span>rajada km/h</span></div>
+        <div><b>${r.q.chuva}%</b><span>chuva</span></div>
+        <div><b>${Math.round(r.q.t)}°</b><span>temperatura</span></div>
+      </div>` : ""}
+      <div class="tr-card">
+        <p class="tr-rot">Hora a hora · ${ladoAreia ? "calor e chuva" : "vento pra bola"}</p>
+        <div class="tr-faixa">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => { const nt = notaTreino(y, treino.esp);
+          return `<div class="tr-h ${cls[nt.n]}${y.h === treino.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${ladoAreia ? Math.round(y.t) + "°" : (y.v ?? "–")}</span><span class="u">${ladoAreia ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : "km/h"}</span></div>`; }).join("")}</div>
+        <div class="tr-leg"><span><i class="bom"></i>bom</span><span><i class="medio"></i>atrapalha</span><span><i class="ruim"></i>ruim</span></div>
+        ${ladoAreia ? "" : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
+      </div>
+      <div class="tr-card tr-linhas">
+        <div><span>Nascer do sol</span><b>${(x.nascer || "").replace(/^0/, "").replace(":", "h")}</b></div>
+        <div><span>UV alto</span><b>${uvAlto ? "a partir das " + uvAlto.h + "h" : "não fica alto"}</b></div>
+        ${ladoAreia ? `<div><span>Onde você corre</span><b><button class="tr-piso${treino.piso === "orla" ? " on" : ""}" data-piso="orla">Orla</button><button class="tr-piso${treino.piso === "areia" ? " on" : ""}" data-piso="areia">Areia</button></b></div>
+        ${treino.piso === "areia" && r ? `<div><span>Maré às ${treino.hora}h</span><b>${mareTxt(r.q.mare)}</b></div>` : ""}
+        ${sens != null ? `<div><span>Calor + umidade</span><b>${sens < 23 ? "tranquilo" : sens < 28 ? "abafado, vá com calma" : "perigoso, evite"}</b></div>` : ""}` : ""}
+      </div>
+      <div class="tr-card tr-aviso">
+        <p class="tr-rot">🔔 Aviso na véspera, às 20h30</p>
+        <p class="tr-aviso-txt">Escolha os dias em que você treina. Na noite anterior, chega uma notificação dizendo como vai estar às ${treino.hora}h em ${p.nome}.</p>
+        <div class="tr-dias">${SEMANA_CURTA.map((nm, i) => `<button data-dia="${i + 1}" class="${treino.dias.includes(i + 1) ? "on" : ""}">${nm}</button>`).join("")}</div>
+        <button class="tr-ligar${treino.aviso ? " ligado" : ""}" id="trLigar">${treino.aviso ? "✓ Aviso ligado · desligar" : "Ligar aviso"}</button>
+        <p class="tr-aviso-msg" id="trAvisoMsg"></p>
+      </div>
+      ${mostraFb ? `<div class="tr-card tr-fb"><p>Como estava ${ladoAreia ? "a corrida" : "o vento pro seu jogo"} hoje às ${treino.hora}h?</p>
+        <div><button data-fb="bom">👍 Bom</button><button data-fb="atrapalhou">😐 Atrapalhou</button><button data-fb="ruim">👎 Ruim</button></div></div>` : ""}
+      <div class="tr-card tr-esportes" id="trEsportes" hidden>${Object.entries(ESPORTES).map(([k, e]) => `<button data-esp="${k}"${k === treino.esp ? ' class="on"' : ""}><span>${e.ic}</span>${e.nome}</button>`).join("")}</div>
+      <p class="tr-nota">* Os limites de vento são estimativas e estão sujeitos a mudanças. Contamos também com o seu feedback para melhorar cada vez mais a nossa precisão.</p>`;
+    const corpo = $("#treinoCorpo");
+    corpo.querySelector('[data-ir="esp"]').onclick = () => { const el = $("#trEsportes"); el.hidden = !el.hidden; if (!el.hidden) el.scrollIntoView({ behavior: "smooth", block: "center" }); };
+    corpo.querySelectorAll("[data-esp]").forEach((b) => b.onclick = () => { treino.esp = b.dataset.esp; gravaTreino(); desenharTreino(); });
+    $("#trPraia").onchange = (e) => { treino.praia = e.target.value; gravaTreino(); desenharTreino(); };
+    $("#trHora").onchange = (e) => { treino.hora = +e.target.value; gravaTreino(); desenharTreino(); };
+    corpo.querySelectorAll("[data-piso]").forEach((b) => b.onclick = () => { treino.piso = b.dataset.piso; gravaTreino(); desenharTreino(); });
+    corpo.querySelectorAll("[data-dia]").forEach((b) => b.onclick = () => {
+      const d = +b.dataset.dia;
+      treino.dias = treino.dias.includes(d) ? treino.dias.filter((x) => x !== d) : treino.dias.concat(d).sort();
+      b.classList.toggle("on", treino.dias.includes(d));
+      gravaTreino();
+    });
+    $("#trLigar").onclick = async () => {
+      const msg = $("#trAvisoMsg");
+      if (treino.aviso) {
+        treino.aviso = false; guarda.gravar("pm-treino", treino);
+        if (window.pmPush) window.pmPush.etiquetas({});
+        return desenharTreino();
+      }
+      if (!treino.dias.length) { msg.textContent = "Escolha pelo menos um dia."; return; }
+      if (!window.pmPush) { msg.textContent = "Os avisos não estão disponíveis agora. Tenta de novo daqui a pouco."; return; }
+      msg.textContent = "Ligando…";
+      const r = await window.pmPush.ligar();
+      if (r === "ok") {
+        treino.aviso = true; gravaTreino();
+        (window.pmEventos = window.pmEventos || []).push("ativou-aviso-treino");
+        desenharTreino();
+        $("#trAvisoMsg").textContent = "Pronto! Na véspera dos seus treinos, às 20h30, chega o aviso.";
+      } else msg.innerHTML = {
+        instalar: "No iPhone, primeiro instale o app: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Abra pelo ícone novo e ligue aqui.",
+        carregando: "Carregando… tenta de novo em alguns segundos.",
+        "nao-suporta": "Esse navegador não aceita notificações. Tenta pelo Chrome ou instalando o app.",
+        bloqueado: "As notificações estão bloqueadas. Libere nas configurações do celular para o Praiômetro."
+      }[r] || "Não deu certo agora. Tenta de novo daqui a pouco.";
+    };
+    corpo.querySelectorAll("[data-fb]").forEach((b) => b.onclick = () => {
+      guarda.gravar(chaveFb, b.dataset.fb);
+      // vai pro contador (sem dado pessoal): esporte, resposta e o vento/temperatura que a previsão dava
+      (window.pmEventos = window.pmEventos || []).push(`fb-${treino.esp}-${b.dataset.fb}-v${qHoje.v ?? "x"}-r${qHoje.raj ?? "x"}-t${Math.round(qHoje.t)}`);
+      b.closest(".tr-fb").innerHTML = "<p>Valeu! Isso ajuda a deixar o Treino cedo mais preciso. 🙌</p>";
+    });
+    desenharBotaoTreino();
   }
 
   // ---------- dias ----------
@@ -692,8 +880,18 @@
       PASSARO.replace('class="passaro"', `class="passaro" style="top:3px;animation-duration:9s;animation-delay:-${(k * 2.7) % 9}s"`) +
       nuvensDia(k, pct, .6),
     nublado: (k, pct) => nuvensDia(k, Math.max(pct, 75), .55),
-    chuva: (k, pct) => '<b class="gotas"></b><b class="gotas g2"></b>' + NUVEM(-7, 18, (k * 6) % 18, 1, true) + NUVEM(-9, 22, (k * 4 + 12) % 22, .85, false)
+    chuva: (k, pct) => gotasDia(k) + NUVEM(-7, 18, (k * 6) % 18, 1, true) + NUVEM(-9, 22, (k * 4 + 12) % 22, .85, false)
   };
+  // chuva: cada gota cai sozinha, com posição, tamanho, velocidade e atraso diferentes (não vira um "replay")
+  function gotasDia(k) {
+    let out = "", sem = 9301 + k * 49297;
+    const rnd = () => (sem = (sem * 233280 + 49297) % 1000003) / 1000003;
+    for (let i = 0; i < 30; i++) {
+      const x = (i / 30 * 100 + rnd() * 6).toFixed(1), dur = (0.55 + rnd() * 0.45).toFixed(2), atraso = (rnd() * 1.6).toFixed(2), alt = (7 + rnd() * 6).toFixed(0), op = (0.45 + rnd() * 0.45).toFixed(2);
+      out += `<b class="gota" style="left:${x}%;height:${alt}px;opacity:${op};animation-duration:${dur}s;animation-delay:-${atraso}s"></b>`;
+    }
+    return out;
+  }
   const cenaDia = (ceu, k, pct) => `<span class="cena-dia" aria-hidden="true">${CENA_DIA[ceu](k, pct)}</span>`;
 
   function desenharDias() {
@@ -2415,13 +2613,15 @@
     contarFavoritas();
     $("#abrirFav").onclick = abrirFavoritas;
     $("#abrirSurfe").onclick = abrirSurfe;
+    $("#abrirTreino").onclick = abrirTreino;
+    $("#fecharTreino").onclick = fecharTreino;
     $("#fecharRel").onclick = fecharRelatorio;
     $("#relTela").addEventListener("click", (e) => { if (e.target.id === "relTela") fecharRelatorio(); });
     ligarArrasteCartao();
     $("#fecharSurfe").onclick = fecharSurfe;
     $("#surfeVoltar").onclick = () => { if (surfeAberta) surfeAberta = null; else surfeVerFav = false; desenharSurfe(); };
     $("#fecharFav").onclick = fecharFavoritas;
-    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); if (e.key === "Escape" && !$("#surfeTela").hidden) fecharSurfe(); if (e.key === "Escape" && !$("#relTela").hidden) fecharRelatorio(); });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#favTela").hidden) fecharFavoritas(); if (e.key === "Escape" && !$("#surfeTela").hidden) fecharSurfe(); if (e.key === "Escape" && !$("#relTela").hidden) fecharRelatorio(); if (e.key === "Escape" && !$("#treinoTela").hidden) fecharTreino(); });
     $("#regioes").innerHTML = Object.entries(REGIOES).map(([k, v]) => `<button data-r="${k}" aria-pressed="${k === estado.regiao}">${v.nome}</button>`).join("");
     document.querySelectorAll("#regioes button").forEach((b) => b.onclick = () => irParaRegiao(b.dataset.r));
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
@@ -2439,6 +2639,8 @@
       montar(dados);
       desenharDias();
       desenhar();
+      desenharBotaoTreino();
+      if (/[?&]treino\b/.test(location.search)) abrirTreino();
       avisoPrevisao(dados);
       if (dados.offline) ultimaBusca = Date.now() - (CACHE_MIN - 1) * 60000;    // sem internet: tenta de novo em 1 minuto
     } catch (e) {
@@ -2464,6 +2666,7 @@
         // mapa de ondulação: marca como velho e recarrega se estiver aberto
         invalidarOnd();
         if (!$("#surfeTela").hidden) desenharSurfe();
+        if (!$("#treinoTela").hidden) desenharTreino(); else desenharBotaoTreino();
         // relatório aberto: redesenha com os dados novos, no mesmo horário
         if (!$("#relTela").hidden && relAberto) {
           const ra = { ...relAberto }, l = linhas.find((q) => q.p.id === ra.id);
@@ -2493,7 +2696,7 @@
     wrap.appendChild(ind);
     const raios = ind.querySelectorAll(".raio"), LIMITE = 70, PARADO = 72;
     let y0 = null, x0 = 0, puxando = false, dist = 0, ocupado = false, blocos = [];
-    const telaAberta = () => ["#surfeTela", "#favTela", "#relTela"].some((q) => $(q) && !$(q).hidden);
+    const telaAberta = () => ["#surfeTela", "#favTela", "#relTela", "#treinoTela"].some((q) => $(q) && !$(q).hidden);
     const mover = (d, anim) => {
       blocos.forEach((b) => { b.style.transition = anim ? "transform .3s ease" : "none"; b.style.transform = d ? `translateY(${d}px)` : ""; });
       ind.style.transition = anim ? "transform .3s ease, opacity .2s" : "none";

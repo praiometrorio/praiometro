@@ -59,4 +59,24 @@
     OneSignal.User.PushSubscription.addEventListener("change", mostrar);
     mostrar();
   });
+
+  // usado pelo Treino cedo: liga a notificação e guarda as escolhas (esporte|praia|hora por dia) como etiquetas no OneSignal
+  window.pmPush = {
+    async ligar() {
+      if (ios && !instalado) return "instalar";
+      if (!OS) return "carregando";
+      if (!OS.Notifications.isPushSupported()) return "nao-suporta";
+      try { await OS.User.PushSubscription.optIn(); } catch (e) { return "erro"; }
+      if (OS.User.PushSubscription.optedIn) { mostrar(); return "ok"; }
+      return window.Notification && Notification.permission === "denied" ? "bloqueado" : "erro";
+    },
+    async etiquetas(novas) {
+      if (!OS) return false;
+      try {
+        await OS.User.removeTags(["t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7"]);
+        if (novas && Object.keys(novas).length) await OS.User.addTags(novas);
+        return true;
+      } catch (e) { return false; }
+    }
+  };
 })();
