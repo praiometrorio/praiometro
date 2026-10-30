@@ -671,16 +671,30 @@
   const NUVEM = (top, dur, atraso, opac, g) => `<b class="nuvem" style="top:${top}px;animation-duration:${dur}s;animation-delay:-${atraso}s;opacity:${opac}">` +
     (g ? '<i style="left:0;top:8px;width:30px;height:14px"></i><i style="left:9px;top:0;width:18px;height:18px"></i><i style="left:20px;top:5px;width:20px;height:15px"></i>'
        : '<i style="left:0;top:8px;width:24px;height:12px"></i><i style="left:6px;top:1px;width:15px;height:15px"></i><i style="left:15px;top:5px;width:17px;height:13px"></i>') + "</b>";
-  const CENA_DIA = {
-    sol: (k) => '<svg class="raios" viewBox="0 0 74 74"><path d="M37 2v10M37 62v10M2 37h10M62 37h10M12 12l7 7M55 55l7 7M12 62l7-7M55 19l7-7"/></svg><b class="astro"></b>' +
-      PASSARO.replace('class="passaro"', `class="passaro" style="top:9px;animation-delay:-${(k * 2.3) % 7}s"`) +
-      PASSARO.replace('class="passaro"', `class="passaro" style="top:16px;animation-duration:8.5s;animation-delay:-${(k * 3.1 + 2) % 8}s"`),
-    parcial: (k) => '<b class="astro peq"></b>' + NUVEM(-2, 16, (k * 5) % 16, 1, false) +
-      PASSARO.replace('class="passaro"', `class="passaro" style="top:30px;animation-duration:9s;animation-delay:-${(k * 2.7) % 9}s"`),
-    nublado: (k) => NUVEM(0, 14, (k * 4) % 14, .95, false) + NUVEM(20, 19, (k * 7 + 9) % 19, .75, true) + NUVEM(9, 24, (k * 5 + 15) % 24, .6, false),
-    chuva: (k) => '<b class="gotas"></b><b class="gotas g2"></b>' + NUVEM(-7, 18, (k * 6) % 18, 1, true) + NUVEM(-9, 22, (k * 4 + 12) % 22, .85, false)
+  // mais nuvem prevista = mais nuvens passando na aba (média das 9h às 17h daquele dia)
+  const NUVENS_POS = [[-4, 16], [18, 16], [4, 16], [24, 16], [9, 16], [-7, 16], [19, 16]];
+  const nuvensDia = (k, pct, opacBase) => {
+    const qtd = Math.max(0, Math.min(NUVENS_POS.length, Math.round(pct / 15)));
+    let out = "";
+    for (let i = 0; i < qtd; i++) {
+      const [top, dur] = NUVENS_POS[i];
+      const fase = (i / qtd + k * 0.37) % 1;   // espalha as nuvens pela aba, para nunca ficar vazia
+      out += NUVEM(top, dur, (fase * dur).toFixed(1), Math.min(1, opacBase + pct / 300).toFixed(2), i % 2 === 1);
+    }
+    return out;
   };
-  const cenaDia = (ceu, k) => `<span class="cena-dia" aria-hidden="true">${CENA_DIA[ceu](k)}</span>`;
+  const CENA_DIA = {
+    sol: (k, pct) => '<svg class="raios" viewBox="0 0 74 74"><path d="M37 2v10M37 62v10M2 37h10M62 37h10M12 12l7 7M55 55l7 7M12 62l7-7M55 19l7-7"/></svg><b class="astro"></b>' +
+      PASSARO.replace('class="passaro"', `class="passaro" style="top:3px;animation-delay:-${(k * 2.3) % 7}s"`) +
+      PASSARO.replace('class="passaro"', `class="passaro" style="top:7px;animation-duration:8.5s;animation-delay:-${(k * 3.1 + 2) % 8}s;transform:scale(.85)"`) +
+      nuvensDia(k, pct, .45),
+    parcial: (k, pct) => '<b class="astro peq"></b>' +
+      PASSARO.replace('class="passaro"', `class="passaro" style="top:3px;animation-duration:9s;animation-delay:-${(k * 2.7) % 9}s"`) +
+      nuvensDia(k, pct, .6),
+    nublado: (k, pct) => nuvensDia(k, Math.max(pct, 75), .55),
+    chuva: (k, pct) => '<b class="gotas"></b><b class="gotas g2"></b>' + NUVEM(-7, 18, (k * 6) % 18, 1, true) + NUVEM(-9, 22, (k * 4 + 12) % 22, .85, false)
+  };
+  const cenaDia = (ceu, k, pct) => `<span class="cena-dia" aria-hidden="true">${CENA_DIA[ceu](k, pct)}</span>`;
 
   function desenharDias() {
     $("#dias").innerHTML = datas.map((data, d) => {
@@ -688,7 +702,8 @@
       const nome = d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[dt.getDay()];
       const x = previsao.ipanema[d], a = analisar(x, PRAIAS.find((p) => p.id === "ipanema"));
       const ceu = CENA_DIA[a.ceu] ? a.ceu : "sol";
-      return `<button class="dia c-${ceu}" data-d="${d}" aria-pressed="${d === estado.dia}">${cenaDia(ceu, d)}${IC[a.ceu]}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
+      const hsDia = (x.horas || []).filter((y) => y.h >= 9 && y.h <= 17), pct = hsDia.length ? hsDia.reduce((s, y) => s + y.nuvens, 0) / hsDia.length : 30;
+      return `<button class="dia c-${ceu}" data-d="${d}" aria-pressed="${d === estado.dia}">${cenaDia(ceu, d, pct)}${IC[a.ceu]}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
     }).join("");
     document.querySelectorAll(".dia").forEach((b) => b.onclick = () => { estado.dia = +b.dataset.d; estado.minuto = null; desenhar(); });
   }
