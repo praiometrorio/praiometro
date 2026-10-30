@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=7.0">
+  <link rel="stylesheet" href="css/estilo.css?v=7.1">
 </head>
 <body>
 <div class="wrap">
@@ -82,7 +82,8 @@
 
   <div class="fav-tela treino-tela" id="treinoTela" hidden role="dialog" aria-modal="true" aria-labelledby="treinoTitulo">
     <div class="fav-topo">
-      <div><h2 id="treinoTitulo">Treino cedo</h2><small>Beach tennis, vôlei, futevôlei, altinha, frescobol e corrida</small></div>
+      <button id="treinoVoltar" class="fav-x" aria-label="Voltar" hidden>‹</button>
+      <div class="st-tit"><h2 id="treinoTitulo">Treino cedo</h2></div>
       <button id="fecharTreino" class="fav-x" aria-label="Fechar">×</button>
     </div>
     <div class="treino-corpo" id="treinoCorpo"></div>
@@ -159,11 +160,11 @@
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=4"></script>
-<script src="js/app.js?v=8.8"></script>
+<script src="js/app.js?v=9.0"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
-<script src="js/alerta.js?v=5"></script>
+<script src="js/alerta.js?v=6"></script>
 <!-- Contador de visitas (GoatCounter: sem cookies, não guarda dados pessoais) -->
 <script>
   // separa quem abriu pelo app instalado na tela de início de quem abriu pelo navegador

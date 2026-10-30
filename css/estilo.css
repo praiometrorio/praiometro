@@ -733,3 +733,34 @@ html,body{overscroll-behavior-y:none}
 .tr-aviso-msg{margin:8px 0 0;font-size:13.5px;color:var(--muted)}
 .tr-aviso-msg:empty{display:none}
 .tr-h .hr{background:none;padding:0;border-radius:0;min-width:0}
+
+/* treino cedo: meus treinos */
+.treino-tela .fav-topo{gap:10px}
+.treino-tela .st-tit{flex:1}
+.tr-ceu.curto{min-height:190px}
+.tr-ceu.curto .tr-veredito{margin-top:4px}
+.tr-esportes{display:grid}
+.tr-form{display:grid;gap:4px}
+.tr-form .tr-rot{margin:12px 0 6px}
+.tr-form-esp{display:flex;align-items:center;gap:10px;margin:0;font:700 20px var(--f-display)}
+.tr-form-esp span{font-size:30px}
+.tr-form .tr-dias{margin-bottom:0}
+.tr-select{width:100%;border:0;border-radius:14px;padding:12px 14px;background:#F6EFE3;font:700 15px var(--f-body);color:var(--ink)}
+.tr-form .tr-ligar{margin-top:16px}
+.tr-remover,.tr-agora-nao{width:100%;border:0;background:none;color:#B3402A;font:700 14px var(--f-body);padding:12px;cursor:pointer}
+.tr-agora-nao{color:var(--muted)}
+.tr-item{display:block;width:100%;text-align:left;border:0;cursor:pointer;font:inherit}
+.tr-item-topo{display:flex;align-items:center;gap:12px}
+.tr-item-topo>div{flex:1;display:grid}
+.tr-item-topo b{font-size:17px}
+.tr-item-topo small{color:var(--muted);font-weight:600;font-size:13px}
+.tr-item-ic{font-size:30px}
+.tr-item-quando{margin:10px 0 8px;font-weight:700;font-size:14px}
+.tr-faixa.mini .tr-h{padding:5px 2px;border-radius:10px}
+.tr-faixa.mini .tr-h .v{font-size:13px}
+.tr-faixa.mini .tr-h .hr{font-size:11.5px;margin-bottom:1px}
+.tr-add{width:100%;border:2px dashed rgba(255,255,255,.45);background:rgba(255,255,255,.08);color:#fff;border-radius:20px;padding:15px;font:800 15px var(--f-body);cursor:pointer}
+.tr-editar{width:100%;border:0;border-radius:16px;padding:14px;background:rgba(255,255,255,.15);color:#fff;font:800 15px var(--f-body);cursor:pointer}
+.tr-ceu.curto .tr-disco{left:86%;width:54px;height:54px;margin-left:-27px;bottom:42px}
+.tr-ceu.curto .tr-reflexo{left:86%;width:44px;margin-left:-22px}
+.tr-ceu.curto .tr-veredito{max-width:76%}

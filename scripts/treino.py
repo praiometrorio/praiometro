@@ -1,8 +1,9 @@
 # Robô do aviso do Treino cedo.
 # Todo fim de tarde olha a previsão de AMANHÃ das 5h às 9h e, para cada combinação esporte + praia + hora,
 # agenda uma notificação para as 20h30 só para quem marcou esse dia da semana no app.
-# As escolhas de cada pessoa ficam como etiquetas no OneSignal (o app grava):
-#   t1..t7 = segunda..domingo, t0 = todos os dias; valor "esporte|praia|hora" (ex.: "beach|ipanema|6")
+# Os treinos de cada pessoa ficam como etiquetas no OneSignal (o app grava), uma por treino:
+#   nome "tr_esporte_praia_hora" (ex.: "tr_beach_ipanema_6"), valor = dias da semana somados como bits
+#   (seg = 1, ter = 2, qua = 4, qui = 8, sex = 16, sáb = 32, dom = 64; ex.: seg+qua+sex = 21)
 # Os limites e as contas são OS MESMOS do app (js/app.js: ESPORTES, notaTreino, bulbo). Se mudar lá, mude aqui.
 import json, os, time, datetime, urllib.request, urllib.parse
 from praiao import PRAIAS, MODELOS, FUSO, SITE, baixar
@@ -90,7 +91,7 @@ def mensagem(esp, nome_praia, hr, q):
     elif n == 1:
         frase = {"vento": "o vento", "vento forte": "o vento forte", "chance de chuva": "a chance de chuva", "abafado": "o abafado"}
         titulo = f"{ic} Amanhã {hr}h dá, mas {' e '.join(frase.get(x, x) for x in motivos)} {'podem' if len(motivos) > 1 else 'pode'} atrapalhar"
-    else: titulo = f"{'🌧️' if 'chuva' in motivos else '💨' if 'vento' in ' '.join(motivos) else '🥵'} Amanhã {hr}h: melhor remarcar {oque}"
+    else: titulo = f"{'🌧️' if 'chuva' in motivos else '💨' if 'vento' in ' '.join(motivos) else '🥵'} Amanhã {hr}h: condição ruim pr{oque[0]} {oque[2:]}"
     if esp == "corrida":
         dados = f"{round(q['t'])}°, chuva {q['chuva']}%"
     else:
@@ -113,6 +114,19 @@ def enviar(titulo, texto, filtros, quando, chave):
         erro = e.read().decode()[:200]
         if "not subscribed" not in erro.lower(): print("  erro do OneSignal:", e.code, erro)
 
+def filtros_dia(chave, dia_sem):
+    """quem tem o bit do dia (1 = seg ... 7 = dom) ligado na etiqueta. O OneSignal não tem "contém",
+    então junta faixas de números (com OU): ex. sábado (32) = 32 a 63 ou 96 a 127."""
+    b = 1 << (dia_sem - 1); filtros = []
+    for ini in range(b, 128, 2 * b):
+        fim = ini + b - 1
+        if filtros: filtros.append({"operator": "OR"})
+        if ini == fim: filtros.append({"field": "tag", "key": chave, "relation": "=", "value": str(ini)})
+        else:
+            filtros.append({"field": "tag", "key": chave, "relation": ">", "value": str(ini - 1)})
+            filtros.append({"field": "tag", "key": chave, "relation": "<", "value": str(fim + 1)})
+    return filtros
+
 def main():
     br = datetime.timezone(datetime.timedelta(hours=-3))
     hoje = datetime.datetime.now(br).date(); amanha = hoje + datetime.timedelta(days=1)
@@ -125,10 +139,8 @@ def main():
             for hr in HORAS:
                 if hr not in horas: continue
                 titulo, texto = mensagem(esp, nome_praia, hr, horas[hr])
-                valor = f"{esp}|{pid}|{hr}"
-                filtros = [{"field": "tag", "key": f"t{dia_sem}", "relation": "=", "value": valor}, {"operator": "OR"},
-                           {"field": "tag", "key": "t0", "relation": "=", "value": valor}]
-                enviar(titulo, texto, filtros, quando, f"tr-{amanha}-{valor}")
+                chave = f"tr_{esp}_{pid}_{hr}"
+                enviar(titulo, texto, filtros_dia(chave, dia_sem), quando, f"tr-{amanha}-{chave}")
                 time.sleep(0.12)
 
 if __name__ == "__main__":

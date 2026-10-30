@@ -666,6 +666,7 @@
   // ---------- treino cedo ----------
   // Limites de vento (vento médio da previsão, km/h): [bom até, atrapalha até]; acima disso é ruim.
   // Estimativa a partir do peso/tamanho oficial de cada bola e de quanto o vento desvia a jogada; ajustável com o feedback.
+  // (o robô scripts/treino.py usa os MESMOS limites: se mudar aqui, mude lá)
   const ESPORTES = {
     beach:  { nome: "Beach tennis", ic: "🎾", vento: [7, 13] },
     volei:  { nome: "Vôlei", ic: "🏐", vento: [8, 15] },
@@ -675,19 +676,25 @@
     corrida:{ nome: "Corrida", ic: "🏃", vento: [25, 35] }
   };
   const HORAS_TREINO = [5, 6, 7, 8, 9];
-  let treino = Object.assign({ esp: "beach", praia: "ipanema", hora: 6, piso: "orla", dias: [1, 3, 5], aviso: false }, guarda.ler("pm-treino") || {});
-  // aviso na véspera: o robô (scripts/treino.py) manda às 20h30 para quem tem a etiqueta do dia seguinte
-  // etiquetas: t1..t7 = segunda..domingo, valor "esporte|praia|hora"; t0 = todos os dias
-  const etiquetasTreino = () => {
-    if (!treino.aviso || !treino.dias.length) return {};
-    const v = `${treino.esp}|${treino.praia}|${treino.hora}`;
-    return treino.dias.length === 7 ? { t0: v } : Object.fromEntries(treino.dias.map((d) => ["t" + d, v]));
-  };
-  const gravaTreino = () => {
-    guarda.gravar("pm-treino", treino);
-    if (treino.aviso && window.pmPush) window.pmPush.etiquetas(etiquetasTreino());
-  };
   const SEMANA_CURTA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+  const MAX_TREINOS = 5;
+  // meus treinos: [{ id, esp, praia, hora, dias: [1..7 = seg..dom], piso }] e se o aviso da véspera está ligado
+  let treinos = guarda.ler("pm-treinos") || [];
+  let avisoTreino = !!guarda.ler("pm-treino-aviso");
+  let trTela = { modo: null, id: null, rascunho: null };     // modo: escolher | form | notif | lista | detalhe
+  // aviso na véspera: uma etiqueta por treino no OneSignal. Nome "tr_esporte_praia_hora", valor = dias da semana
+  // somados como bits (seg = 1, ter = 2, qua = 4, ... dom = 64). O robô manda para quem tem o bit do dia seguinte.
+  const etiquetasTreino = () => {
+    if (!avisoTreino) return {};
+    const tags = {};
+    treinos.forEach((t) => { const k = `tr_${t.esp}_${t.praia}_${t.hora}`; tags[k] = String((+tags[k] || 0) | t.dias.reduce((s, d) => s | (1 << (d - 1)), 0)); });
+    return tags;
+  };
+  const gravaTreinos = () => {
+    guarda.gravar("pm-treinos", treinos);
+    guarda.gravar("pm-treino-aviso", avisoTreino);
+    if (window.pmPush) window.pmPush.etiquetas(etiquetasTreino());
+  };
   // calor + umidade: "temperatura de bulbo úmido de globo" (WBGT) na sombra, que é o que o ACSM usa para corridas.
   // Bulbo úmido pela fórmula de Stull (2011); na sombra, WBGT ≈ 0,7 × bulbo úmido + 0,3 × temperatura.
   const bulbo = (t, ur) => {
@@ -713,135 +720,212 @@
     }
     return { n, motivos };
   }
-  const NOTA_TXT = ["Ótimo pra jogar", "Dá, mas atrapalha", "Melhor remarcar"];
-  // próximo treino: hoje se o horário ainda não passou, senão amanhã
-  function proximoTreino() {
-    const agora = horaAgora();
-    const d = agora.h < treino.hora ? 0 : 1;
-    return { d: Math.min(d, datas.length - 1), quando: d === 0 ? "Hoje" : "Amanhã" };
-  }
+  const NOTA_TXT = (esp) => { const v = esp === "corrida" ? "correr" : "jogar"; return [`Ótimo pra ${v}`, "Dá, mas atrapalha", `Ruim pra ${v}`]; };
+  const NOTA_CURTA = ["ótimo", "atrapalha", "ruim"];
   function horaAgora() {
     const p = new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()).split(":");
     return { h: +p[0], m: +p[1] };
   }
-  function resumoTreino() {
-    const x = previsao[treino.praia] && previsao[treino.praia][proximoTreino().d];
-    if (!x || !x.cedo) return null;
-    const q = x.cedo.find((y) => y.h === treino.hora); if (!q) return null;
-    return { x, q, nota: notaTreino(q, treino.esp) };
+  const diaSemana = (data) => { const w = new Date(data + "T12:00:00Z").getUTCDay(); return w === 0 ? 7 : w; };   // 1 seg ... 7 dom
+  const nomeDiaTreino = (d) => d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA_CURTA[diaSemana(datas[d]) - 1];
+  // próxima sessão desse treino dentro da previsão (hoje só se o horário ainda não passou)
+  function proximaSessao(t) {
+    const agora = horaAgora();
+    for (let d = 0; d < datas.length; d++) {
+      if (!t.dias.includes(diaSemana(datas[d]))) continue;
+      if (d === 0 && agora.h >= t.hora) continue;
+      const x = previsao[t.praia] && previsao[t.praia][d], q = x && x.cedo ? x.cedo.find((y) => y.h === t.hora) : null;
+      if (q) return { d, x, q, nota: notaTreino(q, t.esp) };
+    }
+    return null;
   }
+  const textoDias = (dias) => dias.length === 7 ? "Todo dia" : dias.slice().sort().map((d) => SEMANA_CURTA[d - 1]).join(", ");
+  const nomePraia = (id) => (PRAIAS.find((p) => p.id === id) || {}).nome || id;
+
   function desenharBotaoTreino() {
     const b = $("#abrirTreino"); if (!b) return;
-    const r = resumoTreino(), E = ESPORTES[treino.esp], pt = proximoTreino();
-    const jaEscolheu = !!guarda.ler("pm-treino");
-    b.querySelector("small").textContent = !jaEscolheu || !r ? "Vai treinar cedo? Veja se dá jogo"
-      : `${pt.quando} ${treino.hora}h · ${E.nome}: ${["ótimo", "atrapalha", "ruim"][r.nota.n]}`;
+    const prox = treinos.map((t) => ({ t, s: proximaSessao(t) })).filter((z) => z.s).sort((a, b2) => a.s.d - b2.s.d || a.t.hora - b2.t.hora)[0];
+    b.querySelector("small").textContent = prox
+      ? `${nomeDiaTreino(prox.s.d)} ${prox.t.hora}h · ${ESPORTES[prox.t.esp].nome}: ${NOTA_CURTA[prox.s.nota.n]}`
+      : treinos.length ? "Seus treinos: veja como vai estar" : "Vai treinar cedo? Veja se dá jogo";
   }
-  function abrirTreino() { desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function abrirTreino() {
+    trTela = { modo: treinos.length ? "lista" : "escolher", id: null, rascunho: null };
+    desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden";
+  }
   function fecharTreino() { $("#treinoTela").hidden = true; document.body.style.overflow = ""; desenharBotaoTreino(); }
+  const irTreino = (modo, extra) => { trTela = Object.assign({ modo, id: null, rascunho: null }, extra || {}); desenharTreino(); $("#treinoTela").scrollTop = 0; };
+
+  // faixa hora a hora (5h às 10h) de um treino num dia
+  function faixaTreino(t, x, mini) {
+    const cls = ["bom", "medio", "ruim"], corrida = t.esp === "corrida";
+    return `<div class="tr-faixa${mini ? " mini" : ""}">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => { const nt = notaTreino(y, t.esp);
+      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${corrida ? Math.round(y.t) + "°" : (y.v ?? "–")}</span>${mini ? "" : `<span class="u">${corrida ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : "km/h"}</span>`}</div>`; }).join("")}</div>`;
+  }
+  const CEU_TREINO = '<span class="tr-disco"></span><span class="tr-mar"></span><span class="tr-reflexo"></span>';
+  const NOTA_RODAPE = '<p class="tr-nota">* Os limites de vento são estimativas e estão sujeitos a mudanças. Contamos também com o seu feedback para melhorar cada vez mais a nossa precisão.</p>';
+
   function desenharTreino() {
-    const E = ESPORTES[treino.esp], pt = proximoTreino(), p = PRAIAS.find((z) => z.id === treino.praia) || PRAIAS[0];
-    const x = previsao[p.id][pt.d], r = resumoTreino();
-    const cls = ["bom", "medio", "ruim"];
-    const ladoAreia = treino.esp === "corrida";
-    // a partir de que hora o vento (ou o calor) piora
-    let piora = "";
-    if (r) { const pior = x.cedo.find((y) => y.h > treino.hora && notaTreino(y, treino.esp).n > r.nota.n); if (pior) piora = treino.esp === "corrida" ? ` Piora a partir das ${pior.h}h.` : ` O vento aperta a partir das ${pior.h}h.`; }
-    const frase = !r ? "Sem previsão para esse horário." : r.nota.n === 0
-      ? (treino.esp === "corrida" ? "Temperatura boa e sem chuva." : "Vento fraco e sem chuva.") + piora
-      : "Por causa de " + r.nota.motivos.join(" e ") + "." + piora;
-    // maré (corrida na areia): baixa = faixa de areia dura e larga
-    const nivs = (x.mareDia || []).map((q) => q.n), mn = Math.min(...nivs), mx = Math.max(...nivs);
-    const mareTxt = (n) => n == null || !nivs.length ? "—" : (n - mn) / ((mx - mn) || 1) < 0.35 ? "baixa · faixa larga" : (n - mn) / ((mx - mn) || 1) > 0.65 ? "alta · faixa estreita" : "média";
-    const uvAlto = (x.cedo || []).concat(x.horas || []).find((y) => y.uv != null && y.uv >= 6);
-    const sens = r ? bulbo(r.q.t, r.q.ur) : null;
-    // feedback do treino de hoje (depois do horário)
-    const agora = horaAgora(), hojeX = previsao[p.id][0], qHoje = hojeX && hojeX.cedo ? hojeX.cedo.find((y) => y.h === treino.hora) : null;
-    const chaveFb = "pm-fb-" + hojeX.data + "-" + treino.esp;
-    const mostraFb = qHoje && agora.h >= treino.hora + 1 && !guarda.ler(chaveFb);
-    $("#treinoCorpo").innerHTML = `
-      <div class="tr-ceu">
-        <span class="tr-disco"></span><span class="tr-mar"></span><span class="tr-reflexo"></span>
-        <div class="tr-esc">
-          <button class="tr-chip" data-ir="esp">${E.ic} ${E.nome}</button>
-          <label class="tr-chip">📍 <select id="trPraia">${PRAIAS.filter((z) => !z.baia || z.id === treino.praia).map((z) => `<option value="${z.id}"${z.id === p.id ? " selected" : ""}>${z.nome}</option>`).join("")}</select></label>
-          <label class="tr-chip">⏰ <select id="trHora">${HORAS_TREINO.map((hh) => `<option value="${hh}"${hh === treino.hora ? " selected" : ""}>${hh}h</option>`).join("")}</select></label>
+    const corpo = $("#treinoCorpo"), m = trTela.modo;
+    $("#treinoVoltar").hidden = m === "lista" || (m === "escolher" && !treinos.length) || m === "notif";
+
+    if (m === "escolher") {
+      corpo.innerHTML = `
+        <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>${treinos.length ? "Mais um esporte" : "Quais esportes você pratica?"}</h3>
+          <p>${treinos.length ? "Escolha o esporte que você quer adicionar." : "Escolha um para começar. Depois dá pra adicionar outros."}</p></div></div>
+        <div class="tr-card tr-esportes">${Object.entries(ESPORTES).map(([k, e]) => `<button data-esp="${k}"><span>${e.ic}</span>${e.nome}</button>`).join("")}</div>`;
+      corpo.querySelectorAll("[data-esp]").forEach((b) => b.onclick = () =>
+        irTreino("form", { rascunho: { id: null, esp: b.dataset.esp, praia: "ipanema", hora: 6, dias: [], piso: "orla" } }));
+      return;
+    }
+
+    if (m === "form") {
+      const r = trTela.rascunho, E = ESPORTES[r.esp];
+      corpo.innerHTML = `
+        <div class="tr-card tr-form">
+          <p class="tr-form-esp"><span>${E.ic}</span>${E.nome}</p>
+          <p class="tr-rot">Em que dias?</p>
+          <div class="tr-dias">${SEMANA_CURTA.map((nm, i) => `<button data-dia="${i + 1}" class="${r.dias.includes(i + 1) ? "on" : ""}">${nm}</button>`).join("")}</div>
+          <p class="tr-rot">Que horas?</p>
+          <div class="tr-dias">${HORAS_TREINO.map((hh) => `<button data-hora="${hh}" class="${hh === r.hora ? "on" : ""}">${hh}h</button>`).join("")}</div>
+          <p class="tr-rot">Em que praia?</p>
+          <select class="tr-select" id="trPraia">${PRAIAS.filter((z) => !z.baia).map((z) => `<option value="${z.id}"${z.id === r.praia ? " selected" : ""}>${z.nome}</option>`).join("")}</select>
+          ${r.esp === "corrida" ? `<p class="tr-rot">Onde você corre?</p><div class="tr-dias"><button data-piso="orla" class="${r.piso === "orla" ? "on" : ""}">Orla</button><button data-piso="areia" class="${r.piso === "areia" ? "on" : ""}">Areia</button></div>` : ""}
+          <button class="tr-ligar" id="trSalvar">Salvar</button>
+          <p class="tr-aviso-msg" id="trFormMsg"></p>
+          ${r.id ? '<button class="tr-remover" id="trRemover">Remover esse treino</button>' : ""}
+        </div>`;
+      corpo.querySelectorAll("[data-dia]").forEach((b) => b.onclick = () => { const d = +b.dataset.dia;
+        r.dias = r.dias.includes(d) ? r.dias.filter((z) => z !== d) : r.dias.concat(d).sort(); b.classList.toggle("on", r.dias.includes(d)); });
+      corpo.querySelectorAll("[data-hora]").forEach((b) => b.onclick = () => { r.hora = +b.dataset.hora; corpo.querySelectorAll("[data-hora]").forEach((z) => z.classList.toggle("on", z === b)); });
+      corpo.querySelectorAll("[data-piso]").forEach((b) => b.onclick = () => { r.piso = b.dataset.piso; corpo.querySelectorAll("[data-piso]").forEach((z) => z.classList.toggle("on", z === b)); });
+      $("#trPraia").onchange = (e) => { r.praia = e.target.value; };
+      $("#trSalvar").onclick = () => {
+        if (!r.dias.length) { $("#trFormMsg").textContent = "Escolha pelo menos um dia."; return; }
+        const primeiro = !treinos.length;
+        if (r.id) treinos = treinos.map((t) => t.id === r.id ? { ...r } : t);
+        else treinos.push({ ...r, id: Date.now().toString(36), criado: datas[0] });
+        gravaTreinos();
+        (window.pmEventos = window.pmEventos || []).push("treino-" + r.esp);
+        irTreino(primeiro && !avisoTreino ? "notif" : "lista");
+      };
+      if (r.id) $("#trRemover").onclick = () => { treinos = treinos.filter((t) => t.id !== r.id); gravaTreinos(); irTreino(treinos.length ? "lista" : "escolher"); };
+      return;
+    }
+
+    if (m === "notif") {
+      corpo.innerHTML = `
+        <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>🔔 Quer um aviso na noite anterior?</h3>
+          <p>Às 20h30 da véspera de cada treino, a gente diz como vai estar o vento e a chuva no seu horário.</p></div></div>
+        <div class="tr-card">
+          <button class="tr-ligar" id="trLigar">Ligar aviso</button>
+          <p class="tr-aviso-msg" id="trAvisoMsg"></p>
+          <button class="tr-agora-nao" id="trAgoraNao">Agora não</button>
+        </div>`;
+      $("#trLigar").onclick = () => ligarAvisoTreino(() => irTreino("lista"));
+      $("#trAgoraNao").onclick = () => irTreino("lista");
+      return;
+    }
+
+    if (m === "detalhe") {
+      const t = treinos.find((z) => z.id === trTela.id); if (!t) return irTreino("lista");
+      const E = ESPORTES[t.esp], s = proximaSessao(t), corrida = t.esp === "corrida";
+      if (!s) {
+        corpo.innerHTML = `<div class="tr-card"><p>Sem previsão para o próximo ${E.nome.toLowerCase()} (${textoDias(t.dias)} · ${t.hora}h) nos próximos dias.</p></div>`;
+        return;
+      }
+      const { x, q, nota } = s;
+      let piora = "";
+      const pior = x.cedo.find((y) => y.h > t.hora && notaTreino(y, t.esp).n > nota.n);
+      if (pior) piora = corrida ? ` Piora a partir das ${pior.h}h.` : ` O vento aperta a partir das ${pior.h}h.`;
+      const frase = nota.n === 0 ? (corrida ? "Temperatura boa e sem chuva." : "Vento fraco e sem chuva.") + piora : "Por causa de " + nota.motivos.join(" e ") + "." + piora;
+      const nivs = (x.mareDia || []).map((z) => z.n), mn = Math.min(...nivs), mx = Math.max(...nivs);
+      const mareTxt = (n) => n == null || !nivs.length ? "—" : (n - mn) / ((mx - mn) || 1) < 0.35 ? "baixa · faixa larga" : (n - mn) / ((mx - mn) || 1) > 0.65 ? "alta · faixa estreita" : "média";
+      const uvAlto = (x.cedo || []).concat(x.horas || []).find((y) => y.uv != null && y.uv >= 6);
+      const sens = bulbo(q.t, q.ur);
+      corpo.innerHTML = `
+        <div class="tr-ceu">${CEU_TREINO}
+          <div class="tr-esc"><span class="tr-chip">${E.ic} ${E.nome}</span><span class="tr-chip">📍 ${nomePraia(t.praia)}</span><span class="tr-chip">⏰ ${t.hora}h</span></div>
+          <div class="tr-veredito"><span class="tr-selo n${nota.n}">${NOTA_TXT(t.esp)[nota.n]}</span><h3>${nomeDiaTreino(s.d)}, ${t.hora}h</h3><p>${frase}</p></div>
         </div>
-        <div class="tr-veredito">${r ? `<span class="tr-selo n${r.nota.n}">${NOTA_TXT[r.nota.n]}</span>` : ""}<h3>${pt.quando}, ${treino.hora}h</h3><p>${frase}</p></div>
-      </div>
-      ${r ? `<div class="tr-card tr-dados">
-        <div><b>${r.q.v == null ? "–" : r.q.v}</b><span>vento km/h</span></div>
-        <div><b>${r.q.raj == null ? "–" : r.q.raj}</b><span>rajada km/h</span></div>
-        <div><b>${r.q.chuva}%</b><span>chuva</span></div>
-        <div><b>${Math.round(r.q.t)}°</b><span>temperatura</span></div>
-      </div>` : ""}
-      <div class="tr-card">
-        <p class="tr-rot">Hora a hora · ${ladoAreia ? "calor e chuva" : "vento pra bola"}</p>
-        <div class="tr-faixa">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => { const nt = notaTreino(y, treino.esp);
-          return `<div class="tr-h ${cls[nt.n]}${y.h === treino.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${ladoAreia ? Math.round(y.t) + "°" : (y.v ?? "–")}</span><span class="u">${ladoAreia ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : "km/h"}</span></div>`; }).join("")}</div>
-        <div class="tr-leg"><span><i class="bom"></i>bom</span><span><i class="medio"></i>atrapalha</span><span><i class="ruim"></i>ruim</span></div>
-        ${ladoAreia ? "" : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
-      </div>
-      <div class="tr-card tr-linhas">
-        <div><span>Nascer do sol</span><b>${(x.nascer || "").replace(/^0/, "").replace(":", "h")}</b></div>
-        <div><span>UV alto</span><b>${uvAlto ? "a partir das " + uvAlto.h + "h" : "não fica alto"}</b></div>
-        ${ladoAreia ? `<div><span>Onde você corre</span><b><button class="tr-piso${treino.piso === "orla" ? " on" : ""}" data-piso="orla">Orla</button><button class="tr-piso${treino.piso === "areia" ? " on" : ""}" data-piso="areia">Areia</button></b></div>
-        ${treino.piso === "areia" && r ? `<div><span>Maré às ${treino.hora}h</span><b>${mareTxt(r.q.mare)}</b></div>` : ""}
-        ${sens != null ? `<div><span>Calor + umidade</span><b>${sens < 23 ? "tranquilo" : sens < 28 ? "abafado, vá com calma" : "perigoso, evite"}</b></div>` : ""}` : ""}
-      </div>
+        <div class="tr-card tr-dados">
+          <div><b>${q.v ?? "–"}</b><span>vento km/h</span></div><div><b>${q.raj ?? "–"}</b><span>rajada km/h</span></div>
+          <div><b>${q.chuva}%</b><span>chuva</span></div><div><b>${Math.round(q.t)}°</b><span>temperatura</span></div>
+        </div>
+        <div class="tr-card">
+          <p class="tr-rot">Hora a hora · ${corrida ? "calor e chuva" : "vento pra bola"}</p>
+          ${faixaTreino(t, x)}
+          <div class="tr-leg"><span><i class="bom"></i>bom</span><span><i class="medio"></i>atrapalha</span><span><i class="ruim"></i>ruim</span></div>
+          ${corrida ? "" : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
+        </div>
+        <div class="tr-card tr-linhas">
+          <div><span>Seus dias</span><b>${textoDias(t.dias)}</b></div>
+          <div><span>Nascer do sol</span><b>${(x.nascer || "").replace(/^0/, "").replace(":", "h")}</b></div>
+          <div><span>UV alto</span><b>${uvAlto ? "a partir das " + uvAlto.h + "h" : "não fica alto"}</b></div>
+          ${corrida ? `<div><span>Onde você corre</span><b>${t.piso === "areia" ? "Areia" : "Orla"}</b></div>
+            ${t.piso === "areia" ? `<div><span>Maré às ${t.hora}h</span><b>${mareTxt(q.mare)}</b></div>` : ""}
+            ${sens != null ? `<div><span>Calor + umidade</span><b>${sens < 23 ? "tranquilo" : sens < 28 ? "abafado, vá com calma" : "perigoso, evite"}</b></div>` : ""}` : ""}
+        </div>
+        <button class="tr-editar" id="trEditar">Editar dias, horário e praia</button>
+        ${NOTA_RODAPE}`;
+      $("#trEditar").onclick = () => irTreino("form", { rascunho: { ...t, dias: t.dias.slice() } });
+      return;
+    }
+
+    // lista: meus treinos
+    const agora = horaAgora(), hojeData = datas[0], hojeSem = diaSemana(hojeData);
+    // pergunta como foi o treino de hoje (só depois do horário, e não no dia em que o treino foi criado)
+    const pendFb = treinos.filter((t) => t.dias.includes(hojeSem) && agora.h >= t.hora + 1 && t.criado !== hojeData && !guarda.ler(`pm-fb-${hojeData}-${t.id}`));
+    corpo.innerHTML = `
+      <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>Meus treinos</h3><p>Toque num treino para ver hora a hora.</p></div></div>
+      ${pendFb.map((t) => `<div class="tr-card tr-fb" data-fbid="${t.id}"><p>Como estava ${t.esp === "corrida" ? "a corrida" : "o vento pro " + ESPORTES[t.esp].nome.toLowerCase()} hoje às ${t.hora}h?</p>
+        <div><button data-fb="bom">👍 Bom</button><button data-fb="atrapalhou">😐 Atrapalhou</button><button data-fb="ruim">👎 Ruim</button></div></div>`).join("")}
+      ${treinos.map((t) => { const E = ESPORTES[t.esp], s = proximaSessao(t);
+        return `<button class="tr-card tr-item" data-abrir="${t.id}">
+          <div class="tr-item-topo"><span class="tr-item-ic">${E.ic}</span><div><b>${E.nome}</b><small>${textoDias(t.dias)} · ${t.hora}h · ${nomePraia(t.praia)}${t.esp === "corrida" ? " · " + (t.piso === "areia" ? "areia" : "orla") : ""}</small></div>
+            ${s ? `<span class="tr-selo n${s.nota.n}">${NOTA_CURTA[s.nota.n]}</span>` : ""}</div>
+          ${s ? `<p class="tr-item-quando">${nomeDiaTreino(s.d)}, ${t.hora}h${s.nota.n ? " · " + s.nota.motivos.join(" e ") : ""}</p>${faixaTreino(t, s.x, true)}` : '<p class="tr-item-quando">Sem previsão nos próximos dias</p>'}
+        </button>`; }).join("")}
+      ${treinos.length < MAX_TREINOS ? '<button class="tr-add" id="trAdd">+ Adicionar outro esporte</button>' : ""}
       <div class="tr-card tr-aviso">
         <p class="tr-rot">🔔 Aviso na véspera, às 20h30</p>
-        <p class="tr-aviso-txt">Escolha os dias em que você treina. Na noite anterior, chega uma notificação dizendo como vai estar às ${treino.hora}h em ${p.nome}.</p>
-        <div class="tr-dias">${SEMANA_CURTA.map((nm, i) => `<button data-dia="${i + 1}" class="${treino.dias.includes(i + 1) ? "on" : ""}">${nm}</button>`).join("")}</div>
-        <button class="tr-ligar${treino.aviso ? " ligado" : ""}" id="trLigar">${treino.aviso ? "✓ Aviso ligado · desligar" : "Ligar aviso"}</button>
+        <p class="tr-aviso-txt">${avisoTreino ? "Ligado: na noite anterior a cada treino, chega como vai estar no seu horário." : "Na noite anterior a cada treino, a gente avisa como vai estar no seu horário."}</p>
+        <button class="tr-ligar${avisoTreino ? " ligado" : ""}" id="trLigar">${avisoTreino ? "✓ Aviso ligado · desligar" : "Ligar aviso"}</button>
         <p class="tr-aviso-msg" id="trAvisoMsg"></p>
       </div>
-      ${mostraFb ? `<div class="tr-card tr-fb"><p>Como estava ${ladoAreia ? "a corrida" : "o vento pro seu jogo"} hoje às ${treino.hora}h?</p>
-        <div><button data-fb="bom">👍 Bom</button><button data-fb="atrapalhou">😐 Atrapalhou</button><button data-fb="ruim">👎 Ruim</button></div></div>` : ""}
-      <div class="tr-card tr-esportes" id="trEsportes" hidden>${Object.entries(ESPORTES).map(([k, e]) => `<button data-esp="${k}"${k === treino.esp ? ' class="on"' : ""}><span>${e.ic}</span>${e.nome}</button>`).join("")}</div>
-      <p class="tr-nota">* Os limites de vento são estimativas e estão sujeitos a mudanças. Contamos também com o seu feedback para melhorar cada vez mais a nossa precisão.</p>`;
-    const corpo = $("#treinoCorpo");
-    corpo.querySelector('[data-ir="esp"]').onclick = () => { const el = $("#trEsportes"); el.hidden = !el.hidden; if (!el.hidden) el.scrollIntoView({ behavior: "smooth", block: "center" }); };
-    corpo.querySelectorAll("[data-esp]").forEach((b) => b.onclick = () => { treino.esp = b.dataset.esp; gravaTreino(); desenharTreino(); });
-    $("#trPraia").onchange = (e) => { treino.praia = e.target.value; gravaTreino(); desenharTreino(); };
-    $("#trHora").onchange = (e) => { treino.hora = +e.target.value; gravaTreino(); desenharTreino(); };
-    corpo.querySelectorAll("[data-piso]").forEach((b) => b.onclick = () => { treino.piso = b.dataset.piso; gravaTreino(); desenharTreino(); });
-    corpo.querySelectorAll("[data-dia]").forEach((b) => b.onclick = () => {
-      const d = +b.dataset.dia;
-      treino.dias = treino.dias.includes(d) ? treino.dias.filter((x) => x !== d) : treino.dias.concat(d).sort();
-      b.classList.toggle("on", treino.dias.includes(d));
-      gravaTreino();
-    });
-    $("#trLigar").onclick = async () => {
-      const msg = $("#trAvisoMsg");
-      if (treino.aviso) {
-        treino.aviso = false; guarda.gravar("pm-treino", treino);
-        if (window.pmPush) window.pmPush.etiquetas({});
-        return desenharTreino();
-      }
-      if (!treino.dias.length) { msg.textContent = "Escolha pelo menos um dia."; return; }
-      if (!window.pmPush) { msg.textContent = "Os avisos não estão disponíveis agora. Tenta de novo daqui a pouco."; return; }
-      msg.textContent = "Ligando…";
-      const r = await window.pmPush.ligar();
-      if (r === "ok") {
-        treino.aviso = true; gravaTreino();
-        (window.pmEventos = window.pmEventos || []).push("ativou-aviso-treino");
-        desenharTreino();
-        $("#trAvisoMsg").textContent = "Pronto! Na véspera dos seus treinos, às 20h30, chega o aviso.";
-      } else msg.innerHTML = {
-        instalar: "No iPhone, primeiro instale o app: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Abra pelo ícone novo e ligue aqui.",
-        carregando: "Carregando… tenta de novo em alguns segundos.",
-        "nao-suporta": "Esse navegador não aceita notificações. Tenta pelo Chrome ou instalando o app.",
-        bloqueado: "As notificações estão bloqueadas. Libere nas configurações do celular para o Praiômetro."
-      }[r] || "Não deu certo agora. Tenta de novo daqui a pouco.";
+      ${NOTA_RODAPE}`;
+    corpo.querySelectorAll("[data-abrir]").forEach((b) => b.onclick = () => irTreino("detalhe", { id: b.dataset.abrir }));
+    const add = $("#trAdd"); if (add) add.onclick = () => irTreino("escolher");
+    $("#trLigar").onclick = () => {
+      if (avisoTreino) { avisoTreino = false; gravaTreinos(); if (window.pmPush) window.pmPush.etiquetas({}); return desenharTreino(); }
+      ligarAvisoTreino(() => desenharTreino());
     };
-    corpo.querySelectorAll("[data-fb]").forEach((b) => b.onclick = () => {
-      guarda.gravar(chaveFb, b.dataset.fb);
+    corpo.querySelectorAll("[data-fbid]").forEach((card) => card.querySelectorAll("[data-fb]").forEach((b) => b.onclick = () => {
+      const t = treinos.find((z) => z.id === card.dataset.fbid), x = previsao[t.praia][0], q = x && x.cedo ? x.cedo.find((y) => y.h === t.hora) : null;
+      guarda.gravar(`pm-fb-${hojeData}-${t.id}`, b.dataset.fb);
       // vai pro contador (sem dado pessoal): esporte, resposta e o vento/temperatura que a previsão dava
-      (window.pmEventos = window.pmEventos || []).push(`fb-${treino.esp}-${b.dataset.fb}-v${qHoje.v ?? "x"}-r${qHoje.raj ?? "x"}-t${Math.round(qHoje.t)}`);
-      b.closest(".tr-fb").innerHTML = "<p>Valeu! Isso ajuda a deixar o Treino cedo mais preciso. 🙌</p>";
-    });
+      (window.pmEventos = window.pmEventos || []).push(`fb-${t.esp}-${b.dataset.fb}-v${q ? q.v ?? "x" : "x"}-r${q ? q.raj ?? "x" : "x"}-t${q ? Math.round(q.t) : "x"}`);
+      card.innerHTML = "<p>Valeu! Isso ajuda a deixar o Treino cedo mais preciso. 🙌</p>";
+    }));
     desenharBotaoTreino();
+  }
+
+  async function ligarAvisoTreino(depois) {
+    const msg = $("#trAvisoMsg");
+    if (!window.pmPush) { msg.textContent = "Os avisos não estão disponíveis agora. Tenta de novo daqui a pouco."; return; }
+    msg.textContent = "Ligando…";
+    const r = await window.pmPush.ligar();
+    if (r === "ok") {
+      avisoTreino = true; gravaTreinos();
+      (window.pmEventos = window.pmEventos || []).push("ativou-aviso-treino");
+      depois();
+      const m2 = $("#trAvisoMsg"); if (m2) m2.textContent = "Pronto! Na véspera dos seus treinos, às 20h30, chega o aviso.";
+    } else msg.innerHTML = {
+      instalar: "No iPhone, primeiro instale o app: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Abra pelo ícone novo e ligue aqui.",
+      carregando: "Carregando… tenta de novo em alguns segundos.",
+      "nao-suporta": "Esse navegador não aceita notificações. Tenta pelo Chrome ou instalando o app.",
+      bloqueado: "As notificações estão bloqueadas. Libere nas configurações do celular para o Praiômetro."
+    }[r] || "Não deu certo agora. Tenta de novo daqui a pouco.";
   }
 
   // ---------- dias ----------
@@ -2615,6 +2699,7 @@
     $("#abrirSurfe").onclick = abrirSurfe;
     $("#abrirTreino").onclick = abrirTreino;
     $("#fecharTreino").onclick = fecharTreino;
+    $("#treinoVoltar").onclick = () => irTreino(treinos.length ? "lista" : "escolher");
     $("#fecharRel").onclick = fecharRelatorio;
     $("#relTela").addEventListener("click", (e) => { if (e.target.id === "relTela") fecharRelatorio(); });
     ligarArrasteCartao();

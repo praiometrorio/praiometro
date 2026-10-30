@@ -60,7 +60,7 @@
     mostrar();
   });
 
-  // usado pelo Treino cedo: liga a notificação e guarda as escolhas (esporte|praia|hora por dia) como etiquetas no OneSignal
+  // usado pelo Treino cedo: liga a notificação e guarda os treinos como etiquetas no OneSignal (tr_esporte_praia_hora = dias)
   window.pmPush = {
     async ligar() {
       if (ios && !instalado) return "instalar";
@@ -73,8 +73,14 @@
     async etiquetas(novas) {
       if (!OS) return false;
       try {
-        await OS.User.removeTags(["t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7"]);
-        if (novas && Object.keys(novas).length) await OS.User.addTags(novas);
+        novas = novas || {};
+        let atuais = {};
+        try { atuais = (OS.User.getTags && OS.User.getTags()) || {}; } catch (e) {}
+        // tira as etiquetas de treino que não valem mais (e as do formato antigo t0..t7)
+        const tirar = Object.keys(atuais).filter((k) => (/^tr_/.test(k) || /^t\d$/.test(k)) && !(k in novas))
+          .concat(["t0", "t1", "t2", "t3", "t4", "t5", "t6", "t7"].filter((k) => !(k in atuais)));
+        if (tirar.length) await OS.User.removeTags(tirar);
+        if (Object.keys(novas).length) await OS.User.addTags(novas);
         return true;
       } catch (e) { return false; }
     }
