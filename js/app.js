@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v12";
+  const CACHE_CHAVE = "pm-previsao-v14";
   const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -92,7 +92,10 @@
     const pancada = dia.find((y) => y.chuva >= 50);
     const nucleo = x.horas.filter((y) => y.h >= 9 && y.h <= 16);
     const n = (e) => nucleo.filter((y) => y.est === e).length;
-    const ceu = n("chuva") >= 2 ? "chuva" : n("sol") >= 5 ? "sol" : n("sol") + n("parcial") >= 4 ? "parcial" : "nublado";
+    // chuva só à tarde depois de uma manhã de sol: não é "dia de chuva", é sol entre nuvens com chuva depois (o meio-termo)
+    const manha = nucleo.filter((y) => y.h <= 12), chuvaNuc = nucleo.find((y) => y.est === "chuva");
+    const chuvaTarde = n("chuva") >= 2 && chuvaNuc && chuvaNuc.h >= 13 && manha.filter((y) => y.est === "sol" || y.est === "parcial").length >= 3;
+    const ceu = chuvaTarde ? "parcial" : n("chuva") >= 2 ? "chuva" : n("sol") >= 5 ? "sol" : n("sol") + n("parcial") >= 4 ? "parcial" : "nublado";
     const tam = (j) => j ? j.fim - j.ini : 0;
     // ondas: hoje, só das horas que ainda vêm (a manhã que já passou não conta)
     const horaO = +relogio.format(new Date()).slice(0, 2);
@@ -101,7 +104,8 @@
 
     // --- selos ---
     const selos = [];
-    if (ceu === "chuva") selos.push({ cls: "neutro", ic: IC.chuva, t: "Dia de chuva", s: pancada ? `Chuva a partir das ${pancada.h}h` : "Chuva em boa parte do dia" });
+    if (chuvaTarde) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol de manhã", s: `Chuva a partir das ${chuvaNuc.h}h` });
+    else if (ceu === "chuva") selos.push({ cls: "neutro", ic: IC.chuva, t: "Dia de chuva", s: pancada ? `Chuva a partir das ${pancada.h}h` : "Chuva em boa parte do dia" });
     else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: IC.sol, t: tam(janela) >= 5 ? "Solzão" : "Sol", s: `Céu limpo das ${janela.ini}h às ${janela.fim}h` });
     else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol entre nuvens", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
     else selos.push({ cls: "neutro", ic: IC.nublado, t: "Céu fechado", s: "Sem sol firme hoje" });
@@ -162,7 +166,8 @@
 
     // --- frase do dia ---
     let ceuTxt;
-    if (ceu === "chuva") ceuTxt = pancada ? `Dia de chuva, a partir das ${pancada.h}h` : "Dia de chuva";
+    if (chuvaTarde) ceuTxt = `Sol de manhã, chuva a partir das ${chuvaNuc.h}h`;
+    else if (ceu === "chuva") ceuTxt = pancada ? `Dia de chuva, a partir das ${pancada.h}h` : "Dia de chuva";
     else if (tam(janela) >= 5) ceuTxt = `Solzão das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janela) >= 2) ceuTxt = `Sol das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janelaParcial) >= 2) ceuTxt = tam(janelaParcial) <= 3 && ceu === "nublado"
@@ -181,11 +186,11 @@
       : ((horasSol <= 1 && (ceu === "nublado" || ceu === "chuva")) || (ceu === "chuva" && x.chuvaMax >= 70)) ? "ruim" : "medio";
     // frase curta: o céu, a chuva e só o que for muito importante (o resto está nos selos)
     const fecho = tom === "bom" ? " Dia de praia raiz!" : "";
-    const chuvaTxt = ceu !== "chuva" && pancada ? `, com chance de pancada de chuva às ${pancada.h}h` : "";
+    const chuvaTxt = ceu !== "chuva" && !chuvaTarde && pancada ? `, com chance de pancada de chuva às ${pancada.h}h` : "";
     const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 20 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
-    const resumo = [ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
+    const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       ventoRef > 20 ? "ventania" : ventoRef > 15 ? "ventando" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
     const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.propria == null && x.aguaTotal ? (x.aguaOk / x.aguaTotal - 0.5) * 2 : 0);
@@ -327,9 +332,10 @@
     } else o = tot * expoOnda(p, g("wave_direction"));
     return p.baia ? Math.min(o, 0.5) : o;
   };
+  const CHUVA_MM = 0.3;   // mm numa hora para um modelo "contar" como chuva
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,precipitation&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,secondary_swell_wave_height,secondary_swell_wave_direction,secondary_swell_wave_period,wind_wave_height,wind_wave_direction,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
@@ -555,7 +561,7 @@
     PRAIAS.forEach((p, i) => {
       const t = T[i], m = M[i], h = t.hourly;
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
-      const nuvemMedia = {}, ventoMeio = {}, dirMeio = {};
+      const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {};
       // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
       // alta (o véu fino lá em cima) deixa o sol passar. Sem as camadas, usa o total do modelo.
       const nuvemQueTapa = (nh, md, k) => {
@@ -568,6 +574,9 @@
         nh.time.forEach((ts, k) => {
           const xs = MODELOS_NUVEM.map((md) => nuvemQueTapa(nh, md, k)).filter((v) => v != null);
           if (xs.length >= 3) nuvemMedia[ts] = media(xs);
+          // chance de chuva: quantos dos 9 modelos põem chuva de verdade (0,3 mm ou mais) naquela hora
+          const ps = MODELOS_NUVEM.map((md) => (nh["precipitation_" + md] || [])[k]).filter((v) => v != null);
+          if (ps.length >= 3) chuvaModelos[ts] = Math.round(100 * ps.filter((v) => v >= CHUVA_MM).length / ps.length);
           // vento: o valor do meio entre os modelos (um modelo exagerado sozinho não manda mais)
           const vs = MODELOS_NUVEM.map((md) => (nh["wind_speed_10m_" + md] || [])[k]).filter((v) => v != null).sort((a, b) => a - b);
           if (vs.length >= 3) ventoMeio[ts] = vs.length % 2 ? vs[(vs.length - 1) / 2] : (vs[vs.length / 2 - 1] + vs[vs.length / 2]) / 2;
@@ -610,7 +619,9 @@
           const f = vb > 3 ? Math.min(2.2, Math.max(1.1, g / vb)) : 1.5;
           return Math.max(v + 1, Math.round(v * f));
         };
-        const temps = val(h.temperature_2m), chuvas = val(h.precipitation_probability), ventos = idx.map(ventoEm).filter((v) => v != null);
+        // chance de chuva da hora: a dos 9 modelos; sem eles, a da previsão padrão
+        const chuvaEm = (k) => chuvaModelos[h.time[k]] ?? (h.precipitation_probability[k] || 0);
+        const temps = val(h.temperature_2m), chuvas = idx.map(chuvaEm), ventos = idx.map(ventoEm).filter((v) => v != null);
         let ondas = null, aguaT = null;
         if (m && m.hourly) {
           const mi = [];
@@ -673,13 +684,22 @@
           cedo: Array.from({ length: 8 }, (_, i) => 4 + i).map((hr) => {
             const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
             const ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
-            return { h: hr, t: h.temperature_2m[k], ur, chuva: h.precipitation_probability[k] || 0, v: ventoEm(k), raj: rajEm(k),
+            return { h: hr, t: h.temperature_2m[k], ur, chuva: chuvaEm(k), v: ventoEm(k), raj: rajEm(k),
               uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr) };
+          }).filter(Boolean),
+          // as 24 horas do dia (para o "Céu hora a hora" estilo iPhone: madrugada e noite também)
+          dia24: Array.from({ length: 24 }, (_, hr) => {
+            const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0 || h.temperature_2m[k] == null) return null;
+            const chuva = chuvaEm(k), nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
+            const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
+            return { h: hr, t: h.temperature_2m[k], ur: h.relative_humidity_2m ? h.relative_humidity_2m[k] : null, chuva, nuvens,
+              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
-            const chuva = h.precipitation_probability[k] || 0;
+            const chuva = chuvaEm(k);
             const nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
             const hr = +h.time[k].slice(11, 13);
             // hora sem sol (antes do nascer ou depois do pôr): mostra noite, a não ser que chova
@@ -794,8 +814,8 @@
     const b = $("#abrirTreino"); if (!b) return;
     const prox = treinos.map((t) => ({ t, s: proximaSessao(t) })).filter((z) => z.s).sort((a, b2) => a.s.d - b2.s.d || a.t.hora - b2.t.hora)[0];
     b.querySelector("small").textContent = prox
-      ? `${nomeDiaTreino(prox.s.d)} ${prox.t.hora}h · ${ESPORTES[prox.t.esp].nome}: ${NOTA_CURTA[prox.s.nota.n]}`
-      : treinos.length ? "Seus treinos: veja como vai estar" : "Vai treinar cedo? Veja se dá jogo";
+      ? `${nomeDiaTreino(prox.s.d)} ${prox.t.hora}h: ${NOTA_CURTA[prox.s.nota.n]}`
+      : treinos.length ? "Seus treinos" : "Dá jogo amanhã?";
   }
   function abrirTreino() {
     trTela = { modo: treinos.length ? "lista" : "escolher", id: null, rascunho: null };
@@ -996,12 +1016,22 @@
   }
 
   // ---------- dias ----------
-  function ehPraiao(d) {
-    const boas = PRAIAS.filter((p) => !p.baia).filter((p) => {
-      const x = previsao[p.id][d], a = analisar(x, p);
-      return a.horasSol >= 6 && x.vento <= 15 && x.chuvaMax < 40;
-    });
-    return boas.length >= 4 ? boas.length : 0;
+  // praião: só o horário de praia (9h às 17h); hora de sol = 1 ponto, entre nuvens = meio ponto (igual ao robô scripts/praiao.py)
+  const pontosPraia = (x, de = 9, ate = 17) => x.horas.filter((y) => y.h >= de && y.h <= ate).reduce((s, y) => s + (y.est === "sol" ? 1 : y.est === "parcial" ? 0.5 : 0), 0);
+  const tipoPraiao = (x) => {
+    const tot = pontosPraia(x), manha = pontosPraia(x, 9, 13), tarde = pontosPraia(x, 14, 17);
+    return tot >= 8 ? "todo" : manha >= 4 && tarde <= 1.5 ? "manha" : tarde >= 3.5 && manha <= 2 ? "tarde" : "nuvens";
+  };
+  const JEITO_PRAIAO = { todo: "praião o dia todo", manha: "praião, mais pela manhã", tarde: "praião, mais à tarde", nuvens: "praião com visitas de algumas nuvens" };
+  const ehPraiao = (d) => praiaoDia(d).n;
+  function praiaoDia(d) {
+    const boas = PRAIAS.filter((p) => !p.baia).filter((p) => { const x = previsao[p.id][d]; // chuva: só nas horas boas (sol ou entre nuvens, 9h às 17h); chuva só depois vira "mais pela manhã"
+      const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
+      return pontosPraia(x) >= 5 && x.vento <= 15 && chuvaBoa < 40; });
+    if (boas.length < 4) return { n: 0 };
+    const conta = {}; boas.forEach((p) => { const t = tipoPraiao(previsao[p.id][d]); conta[t] = (conta[t] || 0) + 1; });
+    const tipo = ["todo", "manha", "tarde", "nuvens"].reduce((m, t) => ((conta[t] || 0) > (conta[m] || 0) ? t : m), "todo");
+    return { n: boas.length, tipo };
   }
   const nomeDia = (d) => d === 0 ? "hoje" : d === 1 ? "amanhã" : SEMANA_LONGA[new Date(datas[d] + "T12:00:00").getDay()];
 
@@ -1261,10 +1291,10 @@
       pin.el.classList.toggle("on", p.id === atual.p.id);
     });
 
-    const n = ehPraiao(estado.dia);
+    const pr = praiaoDia(estado.dia), n = pr.n;
     const banner = $("#praiao");
     banner.hidden = !n;
-    if (n) banner.innerHTML = `${IC.sol}<div>${nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase())} é dia de praião!<small>${n} praias com solzão e vento tranquilo</small></div>`;
+    if (n) banner.innerHTML = `${IC.sol}<div>${nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase())} tem ${JEITO_PRAIAO[pr.tipo]}!<small>${n} praias com sol e vento tranquilo</small></div>`;
 
     carregarHorizonte(atual.p);      // usa o relevo guardado na hora, ou busca e redesenha quando chegar
     desenharCartao(atual);
@@ -1329,11 +1359,6 @@
       <div class="horario" id="horas" role="list" aria-label="Céu hora a hora">${horas.join("")}</div>
       <div class="corpo">
         <p class="veredito">${a.veredito}</p>
-        ${window.CEU && CEU.suportado() ? `<button id="verCeu" class="ver-ceu">
-          <span class="vc-ic">${IC.camera}</span>
-          <span class="vc-txt"><b>Veja o trajeto do sol</b><small>Aponte a câmera para o céu</small></span>
-          <span class="vc-novo">NOVO</span>
-        </button>` : ""}
         <div class="selos">${a.selos.map((s) => `<button class="selo ${s.cls}" data-k="${s.k}" aria-label="${s.t}. ${s.s}. Toque para ver o detalhe hora a hora">${s.ic}<b>${s.t}</b><span>${s.s}</span><i class="selo-mais" aria-hidden="true">›</i></button>`).join("")}</div>
         <div class="info sombra" id="sombra">${IC.sombra}<span>${sombraTxt}</span></div>
         ${htmlMetro(p)}
@@ -1366,7 +1391,9 @@
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     $("#compartilhar").onclick = () => compartilhar(l);
     document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => abrirRelatorio(b.dataset.k, l));
-    if ($("#verCeu")) $("#verCeu").onclick = () => CEU.abrir(p);
+    // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
+    const sol = $("#abrirSol"), temCeu = !!(window.CEU && CEU.suportado());
+    if (sol) { sol.hidden = !temCeu; $("#atalhos").classList.toggle("so3", !temCeu); sol.onclick = () => CEU.abrir(p); }
     $("#minuto").addEventListener("input", (e) => {
       estado.minuto = +e.target.value;
       $("#minutoTxt").textContent = textoMin(estado.minuto);
@@ -2564,7 +2591,101 @@
         leg: [["#7CC99A", "Fraco"], ["#F2C12E", "Brisa"], ["#F08A3C", "Moderado"], ["#D9534F", "Ventania"]] }; }
     return null;
   }
+  // ---------- "Céu hora a hora" no estilo do app Tempo do iPhone: dias em cima, curva de temperatura e chance de chuva, régua arrastável ----------
+  const LETRA_DIA = ["D", "S", "T", "Q", "Q", "S", "S"];
+  const MES_LONGO = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
+  // curva suave passando pelos pontos (Catmull-Rom)
+  const curva = (P) => P.length < 2 ? "" : P.map((q, i) => {
+    if (!i) return `M${q[0].toFixed(1)},${q[1].toFixed(1)}`;
+    const a = P[i - 2] || P[i - 1], b = P[i - 1], c = q, e = P[i + 1] || q;
+    // os pontos de controle ficam entre as duas alturas: a curva não passa do valor real (nada de chuva "abaixo de 0%")
+    const lo = Math.min(b[1], c[1]), hi = Math.max(b[1], c[1]), cl = (v) => Math.min(hi, Math.max(lo, v));
+    return `C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)},${cl(b[1] + (c[1] - a[1]) / 6).toFixed(1)} ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)},${cl(c[1] - (e[1] - b[1]) / 6).toFixed(1)} ${c[0].toFixed(1)},${c[1].toFixed(1)}`;
+  }).join(" ");
+  let ceuSt = null;
+  function abrirCeu(p, d) {
+    ceuSt = { p, d, min: null };
+    $("#relTela").classList.add("ceu24");
+    $("#relTitulo").textContent = "Céu hora a hora";
+    $("#relLocal").textContent = p.nome;
+    desenharCeu();
+    $("#relTela").hidden = false; document.body.style.overflow = "hidden";
+  }
+  function desenharCeu() {
+    const { p, d } = ceuSt, x = previsao[p.id][d], hs = x.dia24 && x.dia24.length ? x.dia24 : x.horas;
+    const dt = new Date(datas[d] + "T12:00:00");
+    const W = 340, esq = 4, dir = 42, larg = W - esq - dir, X = (min) => esq + larg * min / 1440;
+    const temp = (y) => y.t;
+    const ts = hs.map(temp), lo = Math.floor((Math.min(...ts) - 4) / 5) * 5, hi = Math.ceil((Math.max(...ts) + 4) / 5) * 5;
+    // gráfico de temperatura
+    const T0 = 46, T1 = 196, YT = (v) => T1 - (T1 - T0) * (v - lo) / (hi - lo);
+    const PT = hs.map((y) => [X(y.h * 60 + 30), YT(temp(y))]);
+    let gT = "";
+    for (let v = lo; v <= hi; v += 5) gT += `<line x1="${esq}" x2="${W - dir}" y1="${YT(v).toFixed(1)}" y2="${YT(v).toFixed(1)}" class="cg"/><text x="${W - dir + 6}" y="${(YT(v) + 4).toFixed(1)}" class="ct">${v}°</text>`;
+    for (const h of [6, 12, 18]) gT += `<line x1="${X(h * 60)}" x2="${X(h * 60)}" y1="${T0 - 8}" y2="${T1 + 22}" class="cv"/>`;
+    for (const h of [0, 6, 12, 18]) gT += `<text x="${X(h * 60) + 4}" y="${T1 + 20}" class="cx">${pad(h)}</text>`;
+    const icones = hs.filter((y) => y.h % 2 === 0).map((y) => `<g transform="translate(${(X(y.h * 60 + 60) - 9).toFixed(1)} 6)" class="ci ${y.est}">${IC[y.est].replace("<svg", '<svg width="18" height="18"')}</g>`).join("");
+    const kMin = ts.indexOf(Math.min(...ts)), kMax = ts.indexOf(Math.max(...ts));
+    const marca = (k, nome, cima) => `<circle cx="${PT[k][0].toFixed(1)}" cy="${PT[k][1].toFixed(1)}" r="5" class="cm"/><text x="${PT[k][0].toFixed(1)}" y="${(PT[k][1] + (cima ? -12 : 20)).toFixed(1)}" class="cmt">${nome}</text>`;
+    const linhaT = curva(PT), fundoT = `${linhaT} L${PT[PT.length - 1][0].toFixed(1)},${T1} L${PT[0][0].toFixed(1)},${T1} Z`;
+    // gráfico de chuva
+    const C0 = 14, C1 = 120, YC = (v) => C1 - (C1 - C0) * v / 100;
+    const PC = hs.map((y) => [X(y.h * 60 + 30), YC(y.chuva || 0)]);
+    let gC = "";
+    for (const v of [0, 20, 40, 60, 80, 100]) gC += `<line x1="${esq}" x2="${W - dir}" y1="${YC(v)}" y2="${YC(v)}" class="cg"/><text x="${W - dir + 6}" y="${YC(v) + 4}" class="ct">${v}%</text>`;
+    for (const h of [6, 12, 18]) gC += `<line x1="${X(h * 60)}" x2="${X(h * 60)}" y1="${C0}" y2="${C1 + 22}" class="cv"/>`;
+    for (const h of [0, 6, 12, 18]) gC += `<text x="${X(h * 60) + 4}" y="${C1 + 20}" class="cx">${pad(h)}</text>`;
+    // chuva em colunas, uma por hora (mais forte = azul mais escuro)
+    const bw = larg / 24;
+    const barrasC = hs.map((y) => { const v = y.chuva || 0, yy = YC(Math.max(v, 1.5));
+      const cor = v >= 50 ? "#1E6FB0" : v >= 25 ? "#4FA3DB" : "#A9D4EF";
+      return `<rect x="${(X(y.h * 60) + 1.5).toFixed(1)}" y="${yy.toFixed(1)}" width="${(bw - 3).toFixed(1)}" height="${(C1 - yy).toFixed(1)}" rx="3" fill="${cor}"/>`; }).join("");
+    const maxC = Math.max(0, ...hs.map((y) => y.chuva || 0));
+    const regua = (id, y0, y1) => `<g id="${id}" class="cr"><line y1="${y0}" y2="${y1}"/><circle r="7"/></g>`;
+    $("#relCorpo").innerHTML = `
+      <div class="c24-dias">${datas.map((dd, i) => { const q = new Date(dd + "T12:00:00"); return `<button data-d="${i}" class="${i === d ? "on" : ""}"><small>${LETRA_DIA[q.getDay()]}</small><b>${q.getDate()}</b></button>`; }).join("")}</div>
+      <p class="c24-data">${SEMANA_LONGA[dt.getDay()].replace(/^./, (c) => c.toUpperCase())}${dt.getDay() % 6 ? "-feira" : ""}, ${dt.getDate()} de ${MES_LONGO[dt.getMonth()]}</p>
+      <div class="c24-agora"><small id="c24H"></small><div><span id="c24I"></span><b id="c24T"></b></div><span id="c24D"></span></div>
+      <svg viewBox="0 0 ${W} ${T1 + 28}" class="c24-g" id="c24Temp">
+        <defs><linearGradient id="c24gF" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#FFB627" stop-opacity=".55"/><stop offset=".6" stop-color="#FFD98A" stop-opacity=".35"/><stop offset="1" stop-color="#F6EFE3" stop-opacity=".2"/></linearGradient>
+          <linearGradient id="c24gL" x1="0" y1="${T0}" x2="0" y2="${T1}" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#E8562A"/><stop offset="1" stop-color="#FFB627"/></linearGradient></defs>
+        ${icones}${gT}<path d="${fundoT}" fill="url(#c24gF)"/><path d="${linhaT}" fill="none" stroke="url(#c24gL)" stroke-width="3.5" stroke-linecap="round"/>
+        ${marca(kMin, "MÍN", true)}${marca(kMax, "MÁX", true)}${regua("c24R1", T0 - 8, T1)}
+      </svg>
+      <h3 class="c24-h">Chance de chuva</h3><p class="c24-sub">Maior chance no dia: ${maxC}%</p>
+      <svg viewBox="0 0 ${W} ${C1 + 28}" class="c24-g" id="c24Chuva">
+        ${gC}${barrasC}${regua("c24R2", C0, C1)}
+      </svg>
+      <p class="c24-nota">Cada coluna é uma hora. A chance é quantos dos 9 modelos de previsão põem chuva naquela hora. Arraste nos gráficos para ver cada horário.</p>`;
+    const mover = (min) => {
+      const mn = Math.max(hs[0].h * 60, Math.min(hs[hs.length - 1].h * 60 + 59, min)), y = hs.find((z) => z.h === Math.floor(mn / 60)) || hs[0];
+      ceuSt.min = mn;
+      const cx = X(mn), vt = temp(y);
+      // ponto da curva na posição exata da régua (interpola entre as horas)
+      const f = (mn - (y.h * 60 + 30)) / 60, viz = hs.find((z) => z.h === y.h + (f >= 0 ? 1 : -1)) || y, peso = Math.abs(f);
+      const vT = vt + (temp(viz) - vt) * peso;
+      $("#c24R1").setAttribute("transform", `translate(${cx.toFixed(1)} 0)`); $("#c24R1 circle").setAttribute("cy", YT(vT).toFixed(1));
+      $("#c24R2").setAttribute("transform", `translate(${cx.toFixed(1)} 0)`); $("#c24R2 circle").setAttribute("cy", YC(y.chuva || 0).toFixed(1));
+      $("#c24H").textContent = `${pad(Math.floor(mn / 60))}:${pad(mn % 60)}`;
+      $("#c24I").innerHTML = IC[y.est];
+      $("#c24I").className = "ci " + y.est;
+      $("#c24T").textContent = Math.round(vt) + "°";
+      $("#c24D").textContent = `${NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
+    };
+    const agora = relogio.format(new Date()), minAg = +agora.slice(0, 2) * 60 + +agora.slice(3, 5);
+    mover(ceuSt.min ?? (d === 0 ? minAg : 12 * 60));
+    ["#c24Temp", "#c24Chuva"].forEach((sel) => {
+      const el = $(sel); let arr = false;
+      const paraMin = (ev) => { const r = el.getBoundingClientRect(); return Math.round(((ev.clientX - r.left) * W / r.width - esq) / larg * 1440); };
+      el.addEventListener("pointerdown", (ev) => { arr = true; el.setPointerCapture(ev.pointerId); mover(paraMin(ev)); });
+      el.addEventListener("pointermove", (ev) => { if (arr) mover(paraMin(ev)); });
+      el.addEventListener("pointerup", () => { arr = false; }); el.addEventListener("pointercancel", () => { arr = false; });
+    });
+    document.querySelectorAll(".c24-dias button").forEach((b) => b.onclick = () => { ceuSt.d = +b.dataset.d; ceuSt.min = null; desenharCeu(); });
+  }
   function abrirRelatorio(k, l) {
+    $("#relTela").classList.remove("ceu24");
+    if (k === "ceu") { abrirCeu(l.p, estado.dia); return; }
     relAberto = { k, id: l.p.id, min: null };
     if (k === "surfe" && l.p.mar != null) { surfeDia = estado.dia; surfeAberta = l.p.id; surfeHora = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; return; }
     const sh = $("#relTela"), corpo = $("#relCorpo");

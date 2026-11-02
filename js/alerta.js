@@ -15,14 +15,15 @@
   function mostrar() {
     const ligado = !!(OS && OS.User.PushSubscription.optedIn);
     if (ligado && !ler("pm-contou-alerta")) { gravar("pm-contou-alerta", true); (window.pmEventos = window.pmEventos || []).push("ativou-alerta"); }
-    banner.hidden = ligado || !!ler("pm-alerta-fechado");
+    banner.hidden = true;   // o cartão antigo deu lugar ao convite em tela cheia
+    if (ligado && convite && !convite.hidden && !convite.dataset.pronto) fecharConvite();
     rodape.hidden = false;
     rodape.innerHTML = ligado
       ? '🔔 Alerta de praião ligado · <button id="alertaDesligar">desligar</button>'
       : '🔔 <button id="alertaLigarRodape">Ativar alerta de praião</button>';
     const d = $("#alertaDesligar"), l = $("#alertaLigarRodape");
     if (d) d.onclick = async () => { await OS.User.PushSubscription.optOut(); mostrar(); };
-    if (l) l.onclick = () => { gravar("pm-alerta-fechado", false); banner.hidden = false; banner.scrollIntoView({ behavior: "smooth", block: "center" }); ativar(); };
+    if (l) l.onclick = () => abrirConvite(true);
   }
 
   async function ativar() {
@@ -39,6 +40,48 @@
       else if (window.Notification && Notification.permission === "denied") msg.textContent = "As notificações estão bloqueadas. Libere nas configurações do celular para o Praiômetro.";
     } catch (e) { msg.textContent = "Não deu certo agora. Tenta de novo daqui a pouco."; }
     setTimeout(mostrar, 2500);
+  }
+
+  // ---------- convite em tela cheia ----------
+  // Aparece sozinho na primeira vez que a pessoa abre o app (e de novo 3 semanas depois de um "Agora não").
+  // Explica o alerta ANTES do pedido do celular: quem entende o que vai receber aceita mais.
+  const convite = $("#convite"), cMsg = $("#conviteMsg");
+  const DIAS_DE_NOVO = 21;
+  function abrirConvite(pedido) {
+    if (!convite) return;
+    cMsg.hidden = true; cMsg.className = "convite-msg"; delete convite.dataset.pronto;
+    $("#conviteSim").hidden = false; $("#conviteNao").textContent = "Agora não";
+    convite.hidden = false; document.body.style.overflow = "hidden";
+    if (!pedido) (window.pmEventos = window.pmEventos || []).push("viu-convite");
+  }
+  function fecharConvite() { if (!convite) return; convite.hidden = true; document.body.style.overflow = ""; }
+  function avisoConvite(txt, ruim) { cMsg.innerHTML = txt; cMsg.hidden = false; cMsg.className = "convite-msg" + (ruim ? " ruim" : ""); }
+  if (convite) {
+    $("#conviteNao").onclick = () => { gravar("pm-convite", { t: Date.now(), r: "nao" }); fecharConvite(); };
+    $("#conviteSim").onclick = async () => {
+      const r = await window.pmPush.ligar();
+      if (r === "ok") {
+        gravar("pm-convite", { t: Date.now(), r: "sim" }); convite.dataset.pronto = "1";
+        avisoConvite("Pronto! Quando vier praião, você fica sabendo. ☀️");
+        $("#conviteSim").hidden = true; $("#conviteNao").textContent = "Fechar";
+        setTimeout(fecharConvite, 2200);
+      } else if (r === "instalar") avisoConvite("No iPhone, primeiro instale o app: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>. Abra pelo ícone novo e ative por lá.", true);
+      else if (r === "bloqueado") avisoConvite("As notificações estão bloqueadas. Libere nos Ajustes do celular, em Notificações › Praiômetro.", true);
+      else if (r === "nao-suporta") avisoConvite("Esse navegador não aceita notificações. Tenta pelo Chrome ou instalando o app.", true);
+      else if (r === "carregando") avisoConvite("Só um segundinho, ainda carregando… toca de novo.", true);
+      else avisoConvite("Não deu certo agora. Tenta de novo daqui a pouco.", true);
+    };
+  }
+  // decide se mostra sozinho: só quando dá pra ligar a notificação neste aparelho e a pessoa ainda não ligou
+  function talvezConvidar() {
+    if (!convite || !OS || OS.User.PushSubscription.optedIn) return;
+    if (ios && !instalado) return;                                   // no Safari do iPhone não dá: primeiro precisa instalar
+    if (!OS.Notifications.isPushSupported()) return;
+    if (window.Notification && Notification.permission === "denied") return;
+    const c = ler("pm-convite");
+    if (c && (c.r === "sim" || Date.now() - c.t < DIAS_DE_NOVO * 864e5)) return;
+    // espera o app aparecer e não atropela outra tela aberta
+    setTimeout(() => { if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), #treinoTela:not([hidden])")) return; abrirConvite(false); }, 1500);
   }
 
   $("#ativarAlerta").onclick = ativar;
@@ -58,6 +101,7 @@
     OS = OneSignal;
     OneSignal.User.PushSubscription.addEventListener("change", mostrar);
     mostrar();
+    talvezConvidar();
   });
 
   // usado pelo Treino cedo: liga a notificação e guarda os treinos como etiquetas no OneSignal (tr_esporte_praia_hora = dias)

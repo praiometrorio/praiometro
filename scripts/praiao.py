@@ -35,7 +35,7 @@ def previsao():
     lat = ",".join(str(p[2]) for p in PRAIAS); lon = ",".join(str(p[3]) for p in PRAIAS)
     base = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&timezone={urllib.parse.quote(FUSO)}&forecast_days=7"
     tempo = baixar(base + "&hourly=precipitation_probability,cloud_cover,wind_speed_10m&daily=sunrise,sunset")
-    try: nuvens = baixar(base + "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m&models=" + ",".join(MODELOS))
+    try: nuvens = baixar(base + "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,precipitation&models=" + ",".join(MODELOS))
     except Exception: nuvens = None
     if isinstance(tempo, dict): tempo = [tempo]
     if isinstance(nuvens, dict): nuvens = [nuvens]
@@ -44,6 +44,7 @@ def previsao():
 def minutos(hhmm):
     return int(hhmm[:2]) * 60 + int(hhmm[3:5])
 
+CHUVA_MM = 0.3   # chance de chuva = % dos 9 modelos com 0,3 mm ou mais na hora (igual ao app)
 PESO_NUVEM = {"baixa": 1, "media": 0.75, "alta": 0.3}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
 
 def nuvem_que_tapa(nh, m, k):
@@ -57,43 +58,76 @@ def analisar_dia(t, n, data):
     - nuvens = média dos 9 modelos (nuvem que tapa o sol: baixa 100%, média 75%, alta 30%); vento = valor do meio (mediana) dos 9 modelos
     - céu de cada hora (6h às 20h): chuva >= 50% = chuva; nuvens >= 70 = nublado; >= 35 = entre nuvens; senão sol;
       antes do nascer / depois do pôr do sol não conta como sol
-    - horas de sol = horas com "sol" entre 6h e 20h; vento = o mais forte entre 9h e 17h; chuva = a maior entre 6h e 20h"""
-    h = t["hourly"]; media = {}; meio = {}
+    - praião: só o horário de praia (9h às 17h); hora de sol = 1 ponto, entre nuvens = meio; véspera 5+ pontos, 3 dias antes 6+; vento = o mais forte entre 9h e 17h; chuva = a maior nas horas boas (9h às 17h, com sol ou entre nuvens)"""
+    h = t["hourly"]; media = {}; meio = {}; chance = {}
     if n:
         nh = n["hourly"]
         for k, ts in enumerate(nh["time"]):
             xs = [nuvem_que_tapa(nh, m, k) for m in MODELOS]
             xs = [x for x in xs if x is not None]
             if len(xs) >= 3: media[ts] = sum(xs) / len(xs)
+            ps = [x for x in (nh.get("precipitation_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if x is not None]
+            if len(ps) >= 3: chance[ts] = round(100 * sum(1 for x in ps if x >= CHUVA_MM) / len(ps))   # igual ao app
             vs = sorted(v for v in (nh.get("wind_speed_10m_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if v is not None)
             if len(vs) >= 3: meio[ts] = vs[(len(vs) - 1) // 2] if len(vs) % 2 else (vs[len(vs) // 2 - 1] + vs[len(vs) // 2]) / 2
     d = t["daily"]["time"].index(data) if data in t["daily"]["time"] else None
     nas = minutos((t["daily"]["sunrise"][d] or "T05:30")[11:16]) if d is not None else 330
     por = minutos((t["daily"]["sunset"][d] or "T18:30")[11:16]) if d is not None else 1110
-    sol, vento, chuva = 0, 0, 0
+    sol, vento, chuva, estados = 0, 0, 0, {}
     for k, ts in enumerate(h["time"]):
         if ts[:10] != data: continue
         hr = int(ts[11:13])
         if hr < 6 or hr > 20: continue
-        c = h["precipitation_probability"][k] or 0
+        c = chance.get(ts, h["precipitation_probability"][k] or 0)
         nv = round(media.get(ts, h["cloud_cover"][k] or 0))
         v = meio.get(ts, h["wind_speed_10m"][k])
-        chuva = max(chuva, c)
+        # chuva: só conta nas horas boas de praia (9h às 17h com sol ou entre nuvens);
+        # chuva só à tarde, depois de uma manhã de sol, vira "praião, mais pela manhã"
+        if 9 <= hr <= 17 and c < 50 and nv < 70: chuva = max(chuva, c)
         if v is not None and 9 <= hr <= 17: vento = max(vento, round(v))
         escuro = hr * 60 + 30 < nas - 10 or hr * 60 + 30 > por + 10
         if not escuro and c < 50 and nv < 35: sol += 1
-    return sol, vento, chuva
+        if 9 <= hr <= 17: estados[hr] = "chuva" if c >= 50 else "nublado" if nv >= 70 else "parcial" if nv >= 35 else "sol"
+    return estados, vento, chuva
+
+def pontos(estados, de=9, ate=17):
+    """horário de praia: hora de sol vale 1, hora entre nuvens vale meio"""
+    return sum(1 if estados.get(h) == "sol" else 0.5 if estados.get(h) == "parcial" else 0 for h in range(de, ate + 1))
+
+def tipo_praiao(estados):
+    """igual ao app (tipoPraiao): dia todo / mais pela manhã / mais à tarde / com visitas de algumas nuvens"""
+    tot, manha, tarde = pontos(estados), pontos(estados, 9, 13), pontos(estados, 14, 17)
+    if tot >= 8: return "todo"
+    if manha >= 4 and tarde <= 1.5: return "manha"
+    if tarde >= 3.5 and manha <= 2: return "tarde"
+    return "nuvens"
 
 def praias_boas(tempo, nuvens, data, rigoroso):
     boas = []
     for i, (pid, nome, _, _) in enumerate(PRAIAS):
-        sol, vento, chuva = analisar_dia(tempo[i], nuvens[i] if nuvens else None, data)
-        ok = (sol >= 8 and vento <= 15 and chuva < 30) if rigoroso else (sol >= 6 and vento <= 15 and chuva < 40)
-        if ok: boas.append((sol, -vento, -FAMA.index(pid), nome))
+        estados, vento, chuva = analisar_dia(tempo[i], nuvens[i] if nuvens else None, data)
+        pts = pontos(estados)
+        ok = (pts >= 6 and vento <= 15 and chuva < 30) if rigoroso else (pts >= 5 and vento <= 15 and chuva < 40)
+        if ok: boas.append((pts, -vento, -FAMA.index(pid), nome, tipo_praiao(estados)))
     boas.sort(reverse=True)
-    return [b[3] for b in boas]
+    return boas
 
-def nomes(lista):
+def tipo_do_dia(boas):
+    """o tipo de praião que mais aparece entre as praias boas (empate: o melhor)"""
+    ordem = ["todo", "manha", "tarde", "nuvens"]
+    conta = {t: sum(1 for b in boas if b[4] == t) for t in ordem}
+    return max(ordem, key=lambda t: (conta[t], -ordem.index(t)))
+
+# como cada tipo de praião aparece na notificação: (pedaço do título, frase do texto)
+JEITO = {
+    "todo":   ("praião o dia todo", "com solzão o dia inteiro e vento fraco"),
+    "manha":  ("praião, mais pela manhã", "com sol firme de manhã; à tarde o tempo fecha"),
+    "tarde":  ("praião, mais à tarde", "com sol firme à tarde; a manhã começa fechada"),
+    "nuvens": ("praião com visitas de algumas nuvens", "com sol entre nuvens e vento fraco"),
+}
+
+def nomes(boas):
+    lista = [b[3] for b in boas]
     return f"{lista[0]}, {lista[1]} e mais {len(lista) - 2} praias" if len(lista) > 2 else " e ".join(lista)
 
 def enviar(titulo, texto, chave_envio):
@@ -133,14 +167,16 @@ def main():
     if not reg.get("vespera"):
         boas = praias_boas(tempo, nuvens, amanha, rigoroso=False)
         dia = DIAS[(hoje + datetime.timedelta(days=1)).weekday()]
+        tit, frase = JEITO[tipo_do_dia(boas)] if boas else JEITO["todo"]
+        ic = "🌤️" if tipo_do_dia(boas) == "nuvens" else "☀️" if boas else ""
         if reg.get("pre"):
             if len(boas) >= 4:
-                ok = enviar("☀️ Confirmado: amanhã é dia de praião!", f"{nomes(boas)} com solzão e vento fraco. Toca pra ver.", f"conf-{amanha}")
+                ok = enviar(f"{ic} Confirmado: amanhã tem {tit}!", f"{nomes(boas)} {frase}. Toca pra ver.", f"conf-{amanha}")
             else:
                 ok = enviar(f"😕 Mudou: {dia} não vai ter praião", "A previsão piorou e vai ter mais nuvem que o esperado. Toca pra ver como ficou.", f"canc-{amanha}")
             if ok: reg["vespera"] = True; mudou = True
         elif len(boas) >= 4:
-            if enviar("☀️ Amanhã é dia de praião!", f"{nomes(boas)} com solzão e vento fraco. Toca pra ver.", f"vesp-{amanha}"):
+            if enviar(f"{ic} Amanhã tem {tit}!", f"{nomes(boas)} {frase}. Toca pra ver.", f"vesp-{amanha}"):
                 reg["vespera"] = True; mudou = True
         else:
             print(f"Amanhã ({amanha}): só {len(boas)} praias boas, sem aviso.")
@@ -153,7 +189,8 @@ def main():
         dia = DIAS[alvo_d.weekday()]
         vespera = DIAS[(alvo_d - datetime.timedelta(days=1)).weekday()]
         if len(boas) >= 5:
-            if enviar(f"👀 A princípio, {dia} tem praião!", f"{nomes(boas)} com cara de solzão. A previsão ainda pode mudar: a gente confirma na {vespera} à noite.", f"pre-{alvo}"):
+            tit, frase = JEITO[tipo_do_dia(boas)]
+            if enviar(f"👀 A princípio, {dia} tem {tit}!", f"{nomes(boas)} {frase}. A previsão ainda pode mudar: a gente confirma na {vespera} à noite.", f"pre-{alvo}"):
                 estado.setdefault(alvo, {})["pre"] = True; mudou = True
         else:
             print(f"Daqui a 3 dias ({alvo}): só {len(boas)} praias muito boas, sem pré-aviso.")

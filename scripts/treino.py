@@ -23,7 +23,7 @@ def previsao():
     lat = ",".join(str(p[2]) for p in PRAIAS); lon = ",".join(str(p[3]) for p in PRAIAS)
     base = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&timezone={urllib.parse.quote(FUSO)}&forecast_days=3"
     tempo = baixar(base + "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,wind_speed_10m,wind_gusts_10m")
-    try: mods = baixar(base + "&hourly=wind_speed_10m&models=" + ",".join(MODELOS))
+    try: mods = baixar(base + "&hourly=wind_speed_10m,precipitation&models=" + ",".join(MODELOS))
     except Exception: mods = None
     if isinstance(tempo, dict): tempo = [tempo]
     if isinstance(mods, dict): mods = [mods]
@@ -40,7 +40,7 @@ def hora_a_hora(t, m, data):
         ts = f"{data}T{hr:02d}:00"
         if ts not in h["time"]: continue
         k = h["time"].index(ts)
-        v = None
+        v = None; chuva = h["precipitation_probability"][k] or 0
         if m:
             mh = m["hourly"]
             if ts in mh["time"]:
@@ -48,6 +48,9 @@ def hora_a_hora(t, m, data):
                 vs = [mh.get("wind_speed_10m_" + md, [None] * len(mh["time"]))[km] for md in MODELOS]
                 vs = [x for x in vs if x is not None]
                 if len(vs) >= 3: v = mediana(vs)
+                # chance de chuva = % dos 9 modelos com 0,3 mm ou mais na hora (igual ao app)
+                ps = [x for x in (mh.get("precipitation_" + md, [None] * len(mh["time"]))[km] for md in MODELOS) if x is not None]
+                if len(ps) >= 3: chuva = round(100 * sum(1 for x in ps if x >= 0.3) / len(ps))
         if v is None: v = h["wind_speed_10m"][k]
         v = None if v is None else round(v)
         g, vb = h["wind_gusts_10m"][k], h["wind_speed_10m"][k]
@@ -55,7 +58,7 @@ def hora_a_hora(t, m, data):
         if v is not None and g is not None:
             f = min(2.2, max(1.1, g / vb)) if vb and vb > 3 else 1.5
             raj = max(v + 1, round(v * f))
-        out[hr] = {"v": v, "raj": raj, "chuva": h["precipitation_probability"][k] or 0,
+        out[hr] = {"v": v, "raj": raj, "chuva": chuva,
                    "t": h["temperature_2m"][k], "ur": h["relative_humidity_2m"][k]}
     return out
 
