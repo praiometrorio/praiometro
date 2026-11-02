@@ -11,7 +11,7 @@ from praiao import PRAIAS, MODELOS, FUSO, SITE, baixar
 ESPORTES = {   # [bom até, atrapalha até] em km/h (vento médio); acima disso é ruim
     "beach":   ("Beach tennis", "🎾", (7, 13)),
     "volei":   ("vôlei", "🏐", (8, 15)),
-    "futev":   ("futevôlei", "⚽", (10, 18)),
+    "futev":   ("futevôlei", "⚽", (12, 20)),
     "altinha": ("altinha", "🦶", (10, 18)),
     "fresco":  ("frescobol", "🏖️", (12, 20)),
     "corrida": ("corrida", "🏃", (25, 35)),

@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v10";
+  const CACHE_CHAVE = "pm-previsao-v11";
   const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -300,9 +300,10 @@
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
+  const PESO_NUVEM = { baixa: 1, media: 0.75, alta: 0.3 };    // quanto cada camada de nuvem esconde o sol
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=cloud_cover,wind_speed_10m,wind_direction_10m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,secondary_swell_wave_height,secondary_swell_wave_direction,secondary_swell_wave_period,wind_wave_height,wind_wave_direction,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
@@ -529,10 +530,17 @@
       const t = T[i], m = M[i], h = t.hourly;
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
       const nuvemMedia = {}, ventoMeio = {}, dirMeio = {};
+      // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
+      // alta (o véu fino lá em cima) deixa o sol passar. Sem as camadas, usa o total do modelo.
+      const nuvemQueTapa = (nh, md, k) => {
+        const b = (nh["cloud_cover_low_" + md] || [])[k], m = (nh["cloud_cover_mid_" + md] || [])[k], a = (nh["cloud_cover_high_" + md] || [])[k];
+        if (b == null || m == null || a == null) return (nh["cloud_cover_" + md] || [])[k];
+        return 100 * (1 - (1 - PESO_NUVEM.baixa * b / 100) * (1 - PESO_NUVEM.media * m / 100) * (1 - PESO_NUVEM.alta * a / 100));
+      };
       if (N[i] && N[i].hourly) {
         const nh = N[i].hourly;
         nh.time.forEach((ts, k) => {
-          const xs = MODELOS_NUVEM.map((md) => (nh["cloud_cover_" + md] || [])[k]).filter((v) => v != null);
+          const xs = MODELOS_NUVEM.map((md) => nuvemQueTapa(nh, md, k)).filter((v) => v != null);
           if (xs.length >= 3) nuvemMedia[ts] = media(xs);
           // vento: o valor do meio entre os modelos (um modelo exagerado sozinho não manda mais)
           const vs = MODELOS_NUVEM.map((md) => (nh["wind_speed_10m_" + md] || [])[k]).filter((v) => v != null).sort((a, b) => a - b);
@@ -679,7 +687,7 @@
   const ESPORTES = {
     beach:  { nome: "Beach tennis", ic: ICONES_ESP.beach, vento: [7, 13] },
     volei:  { nome: "Vôlei", ic: ICONES_ESP.volei, vento: [8, 15] },
-    futev:  { nome: "Futevôlei", ic: ICONES_ESP.futev, vento: [10, 18] },
+    futev:  { nome: "Futevôlei", ic: ICONES_ESP.futev, vento: [12, 20] },   // bom até 12: retorno de quem joga (out/2026)
     altinha:{ nome: "Altinha", ic: ICONES_ESP.altinha, vento: [10, 18] },
     fresco: { nome: "Frescobol", ic: ICONES_ESP.fresco, vento: [12, 20] },
     corrida:{ nome: "Corrida", ic: ICONES_ESP.corrida, vento: [25, 35] }

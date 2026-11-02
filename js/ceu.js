@@ -173,9 +173,10 @@
     if (nascer) marco(R, f, nascer, `Nasce ${hm(nascer.m)}`, u);
     if (por) marco(R, f, por, `🌅 Pôr do sol ${hm(por.m)}`, u);
 
-    // sol agora
+    // sol agora (e procura o sol de verdade na imagem para acertar o desenho sozinho)
     const agora = new Date();
     const s = SOL.posicao(agora, praia.lat, praia.lon);
+    acharSol(R, f, s);
     const p = projetar(R, vetor(s.az, s.alt), f);
     const naTela = !p.atras && p.x > 0 && p.x < W && p.y > 0 && p.y < H;
     if (naTela && s.alt > -1) {
@@ -192,7 +193,7 @@
     // texto de baixo
     const rumo = rumoDaCamera(R);
     const sit = s.alt < -1 ? "O sol já se pôs. A linha mostra o caminho de hoje." :
-      naTela ? "Toque no sol de verdade para acertar o desenho." : "Siga a seta para achar o sol.";
+      naTela ? (autoAcertou ? "Desenho acertado pelo sol de verdade ✓" : "Toque no sol de verdade para acertar o desenho.") : "Siga a seta para achar o sol.";
     const onde = Math.abs(elevacaoCamera(R)) > 60 ? "Olhando para o alto" : `Olhando para o ${DIRS[Math.round(rumo / 45) % 8]}`;
     dica.textContent = `${onde} · ${sit}`;
   }
@@ -212,6 +213,7 @@
   const hm = (m) => `${Math.floor(m / 60)}h${pad(m % 60)}`;
 
   function rotulo(t, x, y, u) {
+    if (window.pmLingua) t = window.pmLingua.traduz(t);          // texto desenhado na imagem também troca de língua
     ctx.font = `700 ${14 * u}px Figtree, system-ui, sans-serif`;
     const w = ctx.measureText(t).width + 14 * u;
     ctx.fillStyle = "rgba(16,40,58,.75)";
@@ -239,17 +241,57 @@
     rotulo("☀️ O sol está pra lá", cx, cy + 44 * u, u);
   }
 
+  // direção (azimute) de um ponto da tela, em pixels do canvas
+  function azDoPonto(R, f, X, Y) {
+    const d = [(X - canvas.width / 2) / f, -(Y - canvas.height / 2) / f, -1];
+    const v = [R[0][0] * d[0] + R[0][1] * d[1] + R[0][2] * d[2], R[1][0] * d[0] + R[1][1] * d[1] + R[1][2] * d[2]];
+    return ang(Math.atan2(v[0], v[1]) / RAD);
+  }
+
+  // Acha o sol de verdade na imagem da câmera (a mancha mais clara perto de onde ele deveria estar)
+  // e corrige o erro da bússola sozinho. A bússola do celular costuma errar 10° a 20° na praia.
+  let amostra = null, actx = null, ultimaAmostra = 0, achados = [], autoAcertou = false;
+  function acharSol(R, f, s) {
+    if (s.alt < 4 || !video.videoWidth || performance.now() - ultimaAmostra < 220) return;
+    ultimaAmostra = performance.now();
+    const vw = video.videoWidth, vh = video.videoHeight, k = Math.max(vw, vh) / 180;
+    const sw = Math.round(vw / k), sh = Math.round(vh / k);
+    if (!amostra) { amostra = document.createElement("canvas"); actx = amostra.getContext("2d", { willReadFrequently: true }); }
+    if (amostra.width !== sw || amostra.height !== sh) { amostra.width = sw; amostra.height = sh; }
+    try { actx.drawImage(video, 0, 0, sw, sh); } catch (e) { return; }
+    const px = actx.getImageData(0, 0, sw, sh).data;
+    const W = canvas.width, H = canvas.height, esc = Math.max(W / vw, H / vh), ox = (W - vw * esc) / 2, oy = (H - vh * esc) / 2;
+    const alvo = projetar(R, vetor(s.az, s.alt), f); if (alvo.atras) return;
+    const raio = f * Math.tan(32 * RAD);
+    let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, claros = 0;
+    for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+      const i = (y * sw + x) * 4, lum = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      if (lum < 248) continue;
+      claros++;
+      const X = ox + (x + 0.5) * k * esc, Y = oy + (y + 0.5) * k * esc;
+      if (Math.hypot(X - alvo.x, Y - alvo.y) > raio) continue;
+      n++; sx += X; sy += Y; sxx += X * X; syy += Y * Y;
+    }
+    // céu todo branco (nublado, contra a luz) ou nada claro: não dá para achar o sol
+    if (n < 2 || claros > sw * sh * 0.03) { achados = []; return; }
+    const cx = sx / n, cy = sy / n, espalhado = Math.sqrt(Math.max(0, sxx / n - cx * cx + syy / n - cy * cy));
+    if (espalhado > f * Math.tan(3.5 * RAD)) { achados = []; return; }      // mancha grande demais: nuvem clara, não o sol
+    const dif = ang(azDoPonto(R, f, cx, cy) - s.az + 180) - 180;
+    if (Math.abs(dif) > 30) { achados = []; return; }
+    // só corrige depois de achar o sol no mesmo lugar algumas vezes seguidas
+    achados.push(dif); if (achados.length > 4) achados.shift();
+    if (achados.length < 3 || Math.max(...achados) - Math.min(...achados) > 4) return;
+    ajusteUsuario -= dif * 0.4;
+    if (Math.abs(dif) < 2) autoAcertou = true;
+  }
+
   // Toque no sol de verdade: corrige o erro da bússola (só o giro para os lados)
   function aoTocar(ev) {
     if (alphaRawnull()) return;
     const t = ev.touches ? ev.touches[0] : ev;
     const dpr = window.devicePixelRatio || 1;
     const R = matriz(alphaAbsoluto()), f = focal();
-    const px = t.clientX * dpr - canvas.width / 2, py = -(t.clientY * dpr - canvas.height / 2);
-    // direção do ponto tocado, nas coordenadas da Terra
-    const d = [px / f, py / f, -1];
-    const v = [R[0][0] * d[0] + R[0][1] * d[1] + R[0][2] * d[2], R[1][0] * d[0] + R[1][1] * d[1] + R[1][2] * d[2]];
-    const azToque = ang(Math.atan2(v[0], v[1]) / RAD);
+    const azToque = azDoPonto(R, f, t.clientX * dpr, t.clientY * dpr);
     const s = SOL.posicao(new Date(), praia.lat, praia.lon);
     if (s.alt < 0) return;
     const dif = ang(azToque - s.az + 180) - 180;
@@ -262,7 +304,7 @@
 
   // ---------- abrir e fechar ----------
   async function abrir(p) {
-    praia = p; ajusteUsuario = 0; correcaoBussola = null; alphaRaw = null; temBussola = false; Rsuave = null; ultimoRelativo = 0; ultimaBussola = null; foraSeguidas = 0;
+    praia = p; ajusteUsuario = 0; achados = []; autoAcertou = false; correcaoBussola = null; alphaRaw = null; temBussola = false; Rsuave = null; ultimoRelativo = 0; ultimaBussola = null; foraSeguidas = 0;
     calcular();
     if (!el) montar();
     el.querySelector(".ceu-nome").textContent = p.nome;
@@ -327,5 +369,5 @@
   const suportado = () => !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.DeviceOrientationEvent) &&
     matchMedia("(pointer: coarse)").matches;
 
-  window.CEU = { abrir, fechar, suportado, _teste: { matriz, projetar, rumoDaCamera, set: (a, b, g) => { alphaRaw = a; beta = b; gamma = g; correcaoBussola = 0; } } };
+  window.CEU = { abrir, fechar, suportado, _teste: { matriz, projetar, rumoDaCamera, set: (a, b, g) => { alphaRaw = a; beta = b; gamma = g; correcaoBussola = 0; }, ajuste: () => ajusteUsuario, focal: () => focal(), solTela: () => { const R = matriz(alphaAbsoluto()); const s = SOL.posicao(new Date(), praia.lat, praia.lon); return projetar(R, vetor(s.az, s.alt), focal()); } } };
 })();

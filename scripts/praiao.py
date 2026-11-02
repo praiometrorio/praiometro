@@ -35,7 +35,7 @@ def previsao():
     lat = ",".join(str(p[2]) for p in PRAIAS); lon = ",".join(str(p[3]) for p in PRAIAS)
     base = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&timezone={urllib.parse.quote(FUSO)}&forecast_days=7"
     tempo = baixar(base + "&hourly=precipitation_probability,cloud_cover,wind_speed_10m&daily=sunrise,sunset")
-    try: nuvens = baixar(base + "&hourly=cloud_cover,wind_speed_10m&models=" + ",".join(MODELOS))
+    try: nuvens = baixar(base + "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m&models=" + ",".join(MODELOS))
     except Exception: nuvens = None
     if isinstance(tempo, dict): tempo = [tempo]
     if isinstance(nuvens, dict): nuvens = [nuvens]
@@ -44,9 +44,17 @@ def previsao():
 def minutos(hhmm):
     return int(hhmm[:2]) * 60 + int(hhmm[3:5])
 
+PESO_NUVEM = {"baixa": 1, "media": 0.75, "alta": 0.3}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
+
+def nuvem_que_tapa(nh, m, k):
+    g = lambda nome: (nh.get(nome + "_" + m) or [None] * len(nh["time"]))[k]
+    b, md, a = g("cloud_cover_low"), g("cloud_cover_mid"), g("cloud_cover_high")
+    if b is None or md is None or a is None: return g("cloud_cover")
+    return 100 * (1 - (1 - PESO_NUVEM["baixa"] * b / 100) * (1 - PESO_NUVEM["media"] * md / 100) * (1 - PESO_NUVEM["alta"] * a / 100))
+
 def analisar_dia(t, n, data):
     """EXATAMENTE o mesmo cálculo do app (js/app.js: montar, estadoHora, analisar, ehPraiao):
-    - nuvens = média dos 9 modelos; vento = valor do meio (mediana) dos 9 modelos
+    - nuvens = média dos 9 modelos (nuvem que tapa o sol: baixa 100%, média 75%, alta 30%); vento = valor do meio (mediana) dos 9 modelos
     - céu de cada hora (6h às 20h): chuva >= 50% = chuva; nuvens >= 70 = nublado; >= 35 = entre nuvens; senão sol;
       antes do nascer / depois do pôr do sol não conta como sol
     - horas de sol = horas com "sol" entre 6h e 20h; vento = o mais forte entre 9h e 17h; chuva = a maior entre 6h e 20h"""
@@ -54,7 +62,7 @@ def analisar_dia(t, n, data):
     if n:
         nh = n["hourly"]
         for k, ts in enumerate(nh["time"]):
-            xs = [nh.get("cloud_cover_" + m, [None] * len(nh["time"]))[k] for m in MODELOS]
+            xs = [nuvem_que_tapa(nh, m, k) for m in MODELOS]
             xs = [x for x in xs if x is not None]
             if len(xs) >= 3: media[ts] = sum(xs) / len(xs)
             vs = sorted(v for v in (nh.get("wind_speed_10m_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if v is not None)
