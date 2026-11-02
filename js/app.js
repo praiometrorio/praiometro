@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v11";
+  const CACHE_CHAVE = "pm-previsao-v12";
   const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -94,7 +94,10 @@
     const n = (e) => nucleo.filter((y) => y.est === e).length;
     const ceu = n("chuva") >= 2 ? "chuva" : n("sol") >= 5 ? "sol" : n("sol") + n("parcial") >= 4 ? "parcial" : "nublado";
     const tam = (j) => j ? j.fim - j.ini : 0;
-    const o = x.ondas;
+    // ondas: hoje, só das horas que ainda vêm (a manhã que já passou não conta)
+    const horaO = +relogio.format(new Date()).slice(0, 2);
+    const marFrente = x.hoje ? (x.marH || []).filter((y) => y.h >= horaO && y.o != null) : [];
+    const o = marFrente.length ? Math.round(Math.max(...marFrente.map((y) => y.o)) * 10) / 10 : x.ondas;
 
     // --- selos ---
     const selos = [];
@@ -178,7 +181,7 @@
       : ((horasSol <= 1 && (ceu === "nublado" || ceu === "chuva")) || (ceu === "chuva" && x.chuvaMax >= 70)) ? "ruim" : "medio";
     // frase curta: o céu, a chuva e só o que for muito importante (o resto está nos selos)
     const fecho = tom === "bom" ? " Dia de praia raiz!" : "";
-    const chuvaTxt = ceu !== "chuva" && pancada ? `, com chance de pancada às ${pancada.h}h` : "";
+    const chuvaTxt = ceu !== "chuva" && pancada ? `, com chance de pancada de chuva às ${pancada.h}h` : "";
     const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 20 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
@@ -301,6 +304,29 @@
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
   const PESO_NUVEM = { baixa: 1, media: 0.75, alta: 0.3 };    // quanto cada camada de nuvem esconde o sol
+  // ---------- onda que chega na praia ----------
+  // O modelo de ondas é de mar aberto (ponto a vários km da costa), igual para praias vizinhas.
+  // Cada parte do mar (ondulação principal, secundária e marola do vento) só chega inteira se vier de frente pra praia;
+  // vindo de lado, a praia fica atrás de pedras/pontas e a onda chega menor. ondaDe = para onde a praia está virada pras ondas.
+  const expoOnda = (p, d) => {
+    const f = p.ondaDe ?? p.mar;
+    if (d == null || f == null) return 1;
+    const dd = Math.abs((((d - f) % 360) + 540) % 360 - 180), x = Math.max(0, dd - 20);
+    return x >= 85 ? 0.15 : Math.max(0.15, Math.cos(x * Math.PI / 180));
+  };
+  // altura do mar na praia: a altura total do modelo, reduzida pela parte que vem de lado
+  const ondaPraia = (p, mh, k) => {
+    const g = (n) => (mh[n] ? mh[n][k] : null), tot = g("wave_height");
+    if (tot == null) return null;
+    let o;
+    const partes = [["swell_wave_height", "swell_wave_direction"], ["secondary_swell_wave_height", "secondary_swell_wave_direction"], ["wind_wave_height", "wind_wave_direction"]]
+      .map(([a, d]) => [g(a), g(d)]).filter(([a]) => a != null && a > 0);
+    if (partes.length) {
+      const e0 = partes.reduce((s, [a]) => s + a * a, 0), e1 = partes.reduce((s, [a, d]) => s + (a * expoOnda(p, d)) ** 2, 0);
+      o = tot * Math.sqrt(e1 / e0);
+    } else o = tot * expoOnda(p, g("wave_direction"));
+    return p.baia ? Math.min(o, 0.5) : o;
+  };
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
@@ -589,7 +615,7 @@
         if (m && m.hourly) {
           const mi = [];
           m.hourly.time.forEach((ts, k) => { const hr = +ts.slice(11, 13); if (ts.slice(0, 10) === data && hr >= HORA_INI && hr <= HORA_FIM) mi.push(k); });
-          const w = mi.map((k) => m.hourly.wave_height[k]).filter((v) => v != null);
+          const w = mi.map((k) => ondaPraia(p, m.hourly, k)).filter((v) => v != null);
           const s = mi.map((k) => m.hourly.sea_surface_temperature[k]).filter((v) => v != null);
           if (w.length) ondas = Math.max(...w);
           if (s.length) aguaT = media(s);
@@ -620,12 +646,13 @@
               const ts = `${data}T${pad(hr)}:00`, k = mh.time.indexOf(ts), kt = h.time.indexOf(ts);
               if (k < 0 || g("wave_height", k) == null) continue;
               // praia de baía: o modelo de ondas não enxerga a baía; limita em 0,5 m, igual ao quadradinho "Mar"
-              const lim = (v) => (v != null && p.baia ? Math.min(v, 0.5) : v);
+              // cada parte também é reduzida quando vem de lado (pedras e pontas abrigam a praia)
+              const lim = (v, d) => (v == null ? v : p.baia ? Math.min(v * expoOnda(p, d), 0.5) : v * expoOnda(p, d));
               res.push({ h: hr,
-                alt: lim(g("wave_height", k)), dir: g("wave_direction", k), per: g("wave_period", k),
-                sw: { a: lim(g("swell_wave_height", k)), d: g("swell_wave_direction", k), p: g("swell_wave_period", k) },
-                sw2: { a: lim(g("secondary_swell_wave_height", k)), d: g("secondary_swell_wave_direction", k), p: g("secondary_swell_wave_period", k) },
-                vg: { a: lim(g("wind_wave_height", k)), d: g("wind_wave_direction", k) },
+                alt: ondaPraia(p, mh, k), dir: g("wave_direction", k), per: g("wave_period", k),
+                sw: { a: lim(g("swell_wave_height", k), g("swell_wave_direction", k)), d: g("swell_wave_direction", k), p: g("swell_wave_period", k) },
+                sw2: { a: lim(g("secondary_swell_wave_height", k), g("secondary_swell_wave_direction", k)), d: g("secondary_swell_wave_direction", k), p: g("secondary_swell_wave_period", k) },
+                vg: { a: lim(g("wind_wave_height", k), g("wind_wave_direction", k)), d: g("wind_wave_direction", k) },
                 v: kt >= 0 ? ventoEm(kt) : null, vd: kt >= 0 ? dirEm(kt) : null, raj: kt >= 0 ? rajEm(kt) : null });
             }
             return res.length ? res : null;
@@ -636,7 +663,7 @@
             for (let hr = HORA_INI; hr <= HORA_FIM; hr++) {
               const k = m.hourly.time.indexOf(`${data}T${pad(hr)}:00`);
               if (k < 0) continue;
-              let o = m.hourly.wave_height[k]; if (p.baia && o != null) o = Math.min(o, 0.5);
+              const o = ondaPraia(p, m.hourly, k);
               r.push({ h: hr, o, s: m.hourly.sea_surface_temperature[k], d: m.hourly.wave_direction ? m.hourly.wave_direction[k] : null, per: m.hourly.wave_period ? m.hourly.wave_period[k] : null });
             }
             return r;

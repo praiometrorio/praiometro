@@ -89,6 +89,8 @@
     ["Chance alta de chuva a partir das #h", "High chance of rain from #h", "Alta probabilidad de lluvia desde las #h", "Forte risque de pluie à partir de #h"],
     ["Chance alta de chuva a partir das", "High chance of rain from", "Alta probabilidad de lluvia desde las", "Forte risque de pluie à partir de"],
     ["Sem chance alta de chuva", "No high chance of rain", "Sin alta probabilidad de lluvia", "Pas de fort risque de pluie"],
+    ["com chance de pancada de chuva às #h", "with a chance of a rain shower at #h", "con probabilidad de chubasco a las #h", "avec risque d'averse à #h"],
+    ["com chance de pancada de chuva às", "with a chance of a rain shower at", "con probabilidad de chubasco a las", "avec risque d'averse à"],
     ["com chance de pancada às #h", "with a chance of a shower at #h", "con probabilidad de chubasco a las #h", "avec risque d'averse à #h"],
     ["com chance de pancada às", "with a chance of a shower at", "con probabilidad de chubasco a las", "avec risque d'averse à"],
     ["chance de chuva", "chance of rain", "probabilidad de lluvia", "risque de pluie"], ["Chuva #%", "Rain #%", "Lluvia #%", "Pluie #%"],

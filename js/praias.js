@@ -4,6 +4,7 @@
 // baia: praia dentro da Baía de Guanabara (mar calmo, previsão de ondas não se aplica)
 // selvagem: praia mais isolada, com mar mais forte
 // porDoSol: lugar clássico para ver o pôr do sol
+// ondaDe (opcional): para onde a praia está virada pras ondas, quando difere de "mar" (ex.: Arpoador, abrigado pela pedra do lado leste)
 // mar: direção para onde a praia está virada (para o surfe: de onde a onda chega de frente e qual vento é terral)
 // predios: estimativa dos prédios da orla que fazem sombra na areia
 //   altura = altura média (m), dist = distância da areia até os prédios (m),
@@ -14,7 +15,7 @@ window.PRAIAS = [
   { id: "vermelha",    nome: "Praia Vermelha",      regiao: "zs",  local: "Zona Sul · Urca",                     lat: -22.9555, lon: -43.1645, mar: 115 },
   { id: "leme",        nome: "Leme",                regiao: "zs",  local: "Zona Sul",                            lat: -22.9631, lon: -43.1680, mar: 150, predios: { altura: 33, dist: 100, terra: 300 } },
   { id: "copacabana",  nome: "Copacabana",          regiao: "zs",  local: "Zona Sul",                            lat: -22.9711, lon: -43.1822, mar: 145, predios: { altura: 36, dist: 100, terra: 315 } },
-  { id: "arpoador",    nome: "Arpoador",            regiao: "zs",  local: "Zona Sul",                            lat: -22.9887, lon: -43.1922, mar: 170, porDoSol: true },
+  { id: "arpoador",    nome: "Arpoador",            regiao: "zs",  local: "Zona Sul",                            lat: -22.9887, lon: -43.1922, mar: 170, ondaDe: 205, porDoSol: true },
   { id: "diabo",       nome: "Praia do Diabo",      regiao: "zs",  local: "Zona Sul · entre o Arpoador e o Forte", lat: -22.9895, lon: -43.1907, mar: 120, selvagem: true },
   { id: "ipanema",     nome: "Ipanema",             regiao: "zs",  local: "Zona Sul",                            lat: -22.9868, lon: -43.2050, mar: 175, predios: { altura: 30, dist: 95, terra: 355 } },
   { id: "leblon",      nome: "Leblon",              regiao: "zs",  local: "Zona Sul",                            lat: -22.9873, lon: -43.2230, mar: 180, predios: { altura: 30, dist: 95, terra: 350 } },
