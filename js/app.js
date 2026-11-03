@@ -2989,10 +2989,23 @@
     let pedidoAndroid = null;
     const conv = $("#convInstalar");
     const fecharConv = (dias) => { conv.hidden = true; document.body.style.overflow = ""; guarda.gravar("pm-inst-convite", Date.now() + dias * 864e5); };
+    // aberto de dentro do Instagram/Facebook/TikTok: ali não dá pra instalar; primeiro precisa abrir no navegador de verdade
+    const dentroDeApp = /Instagram|FBAN|FBAV|FB_IAB|musical_ly|Bytedance|TikTok|Line\//i.test(navigator.userAgent);
+    const prepararNavegador = () => {
+      const url = "praiometrorio.com.br" + location.pathname.replace(/^\/praiometro/, "");
+      $("#instTit").textContent = "Abra no " + (ios ? "Safari" : "Chrome") + " pra instalar";
+      conv.querySelector(".convite-intro").textContent = "Você abriu o Praiômetro por dentro do Instagram (ou outro app). Daqui não dá pra colocar na tela de início. É rapidinho:";
+      $("#instPassos").innerHTML = `<li><span>1</span><div><b>Toque nos ••• ou ⋮</b>No canto de cima, à direita.</div></li>
+        <li><span>2</span><div><b>${ios ? "Abrir no navegador externo" : "Abrir no Chrome"}</b>${ios ? "Ou \"Abrir no Safari\"." : "Ou \"Abrir no navegador\"."}</div></li>
+        <li><span>3</span><div><b>Lá, siga os passos</b>A gente mostra como colocar na tela de início.</div></li>`;
+      $("#instSim").textContent = ios ? "Abrir no Safari" : "Abrir no Chrome";
+      $("#instSim").dataset.ir = ios ? "x-safari-https://" + url : `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
+    };
     const abrirConv = () => {
       if (!conv || instalado || !celular || (guarda.ler("pm-inst-convite") || 0) > Date.now()) return;
-      if (!ios && !pedidoAndroid) return;                                   // Android sem o pedido do Chrome: não dá pra ajudar direito
-      if (pedidoAndroid) { $("#instPassos").hidden = true; $("#instSim").textContent = "Instalar agora"; }
+      if (dentroDeApp) prepararNavegador();
+      else if (!ios && !pedidoAndroid) return;                              // Android sem o pedido do Chrome: não dá pra ajudar direito
+      if (pedidoAndroid && !dentroDeApp) { $("#instPassos").hidden = true; $("#instSim").textContent = "Instalar agora"; }
       if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), .convite:not([hidden])")) return;
       conv.hidden = false; document.body.style.overflow = "hidden";
       (window.pmEventos = window.pmEventos || []).push("viu-instalar");
@@ -3000,11 +3013,13 @@
     if (conv) {
       $("#instNao").onclick = () => fecharConv(5);
       $("#instSim").onclick = async () => {
+        // dentro do Instagram etc.: tenta abrir direto no navegador (se o app bloquear, ficam os passos na tela)
+        if ($("#instSim").dataset.ir) { location.href = $("#instSim").dataset.ir; return; }
         if (pedidoAndroid) { pedidoAndroid.prompt(); try { await pedidoAndroid.userChoice; } catch (e) {} pedidoAndroid = null; }
         fecharConv(2);
       };
       window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); pedidoAndroid = e; setTimeout(abrirConv, 1200); });
-      if (ios) setTimeout(abrirConv, 1200);
+      if (ios || dentroDeApp) setTimeout(abrirConv, 1200);
     }
   }
 
