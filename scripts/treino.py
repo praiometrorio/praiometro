@@ -115,6 +115,7 @@ def hora_a_hora(t, m, data, mar=None, pid=None, propria=None):
         if mar and ts in mar["hourly"]["time"]:
             km = mar["hourly"]["time"].index(ts); o = onda_surfista(pid, mar["hourly"], km)
             s = (mar["hourly"].get("sea_surface_temperature") or [None] * (km + 1))[km]
+            if s is not None: s -= 0.5 if ORIENTACAO.get(pid, (None, False))[1] else 1.5   # igual ao app (aguaPraia)
         out[hr] = {"v": v, "raj": raj, "chuva": chuva,
                    "t": h["temperature_2m"][k], "ur": h["relative_humidity_2m"][k],
                    "o": None if o is None else round(o, 1), "s": s, "propria": propria}

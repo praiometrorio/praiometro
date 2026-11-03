@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v15";
+  const CACHE_CHAVE = "pm-previsao-v16";
   const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -133,9 +133,10 @@
     else selos.push({ cls: "ruim", ic: IC.onda, t: "Mar pesado", s: `Ondas de ${fmt(o)} m, cuidado com a correnteza` + incerta });
 
     if (x.agua == null) selos.push({ cls: "neutro", ic: IC.termo, t: "Água", s: "Sem dado da temperatura" });
-    else if (x.agua < 20) selos.push({ cls: "frio", ic: IC.termo, t: "Água gelada", s: `${fmt(x.agua)}°C, só pra corajoso` });
-    else if (x.agua < 22.5) selos.push({ cls: "frio", ic: IC.termo, t: "Água fresquinha", s: `${fmt(x.agua)}°C, refresca` });
-    else selos.push({ cls: "quente", ic: IC.termo, t: "Água quentinha", s: `${fmt(x.agua)}°C, dá pra ficar de molho` });
+    else if (x.agua < 19) selos.push({ cls: "frio", ic: IC.termo, t: "Água gelada", s: `~${fmt(x.agua)}°C` });
+    else if (x.agua < 22) selos.push({ cls: "frio", ic: IC.termo, t: "Água fresquinha", s: `~${fmt(x.agua)}°C` });
+    else if (x.agua < 24.5) selos.push({ cls: "quente", ic: IC.termo, t: "Água agradável", s: `~${fmt(x.agua)}°C` });
+    else selos.push({ cls: "quente", ic: IC.termo, t: "Água quentinha", s: `~${fmt(x.agua)}°C, dá pra ficar de molho` });
 
     // No teste, os modelos previram vento ~3 km/h mais fraco que o real e quase nunca a ventania da tarde.
     // Por isso os limites aqui são mais baixos do que o vento "de verdade" que eles representam.
@@ -353,6 +354,10 @@
   // 3) e é falada na medida do surfista (bem menor que a face inteira): fator calibrado com quem estava na água
   //    (Arpoador, nov/2026: o modelo dava 1,5 m e na água tinha "no máximo 1 m").
   const MEDIDA_SURFISTA = 0.6;
+  // Água: o modelo mede a superfície do mar numa grade de vários km, longe da areia, e no Rio não enxerga a água fria
+  // que sobe do fundo junto à costa (ressurgência). Na beira costuma estar ~1,5 °C mais fria que o número do modelo
+  // (Ipanema, nov/2026: modelo ~23,5 °C, na água "fresca, aquele gelado"). Na baía a diferença é menor.
+  const aguaPraia = (p, v) => v == null ? null : v - (p.baia ? 0.5 : 1.5);
   const periodoEm = (mh, k) => {
     const g = (n) => (mh[n] ? mh[n][k] : null), sw = g("swell_wave_height"), tot = g("wave_height");
     return sw != null && tot != null && sw >= 0.5 * tot && g("swell_wave_period") != null ? g("swell_wave_period") : g("wave_period");
@@ -680,7 +685,7 @@
           const mi = [];
           m.hourly.time.forEach((ts, k) => { const hr = +ts.slice(11, 13); if (ts.slice(0, 10) === data && hr >= HORA_INI && hr <= HORA_FIM) mi.push(k); });
           const w = mi.map((k) => ondaSurfista(p, m.hourly, k)).filter((v) => v != null);
-          const s = mi.map((k) => m.hourly.sea_surface_temperature[k]).filter((v) => v != null);
+          const s = mi.map((k) => aguaPraia(p, m.hourly.sea_surface_temperature[k])).filter((v) => v != null);
           if (w.length) ondas = Math.max(...w);
           if (s.length) aguaT = media(s);
         }
@@ -728,7 +733,7 @@
               const k = m.hourly.time.indexOf(`${data}T${pad(hr)}:00`);
               if (k < 0) continue;
               const o = ondaSurfista(p, m.hourly, k);
-              r.push({ h: hr, o, s: m.hourly.sea_surface_temperature[k], d: m.hourly.wave_direction ? m.hourly.wave_direction[k] : null, per: m.hourly.wave_period ? m.hourly.wave_period[k] : null });
+              r.push({ h: hr, o, s: aguaPraia(p, m.hourly.sea_surface_temperature[k]), d: m.hourly.wave_direction ? m.hourly.wave_direction[k] : null, per: m.hourly.wave_period ? m.hourly.wave_period[k] : null });
             }
             return r;
           })(),
@@ -738,7 +743,7 @@
             const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
             const ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
             const km = m && m.hourly ? m.hourly.time.indexOf(`${data}T${pad(hr)}:00`) : -1;
-            const o = km >= 0 ? ondaSurfista(p, m.hourly, km) : null, s = km >= 0 ? m.hourly.sea_surface_temperature[km] : null;
+            const o = km >= 0 ? ondaSurfista(p, m.hourly, km) : null, s = km >= 0 ? aguaPraia(p, m.hourly.sea_surface_temperature[km]) : null;
             return { h: hr, t: h.temperature_2m[k], ur, chuva: chuvaEm(k), v: ventoEm(k), raj: rajEm(k),
               uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr),
               o: o == null ? null : Math.round(o * 10) / 10, s, propria: prop && typeof prop === "object" ? prop.propria : prop === true ? true : prop === false ? false : null };
@@ -2625,7 +2630,7 @@
   const faixaIdx = (u) => { const i = FAIXAS_UV.findIndex((f) => Math.round(u) <= f.ate); return i < 0 ? FAIXAS_UV.length - 1 : i; };
   const marCat = (o) => o < 0.6 ? { n: "Piscininha", c: "#8FD3EA" } : o < 1.2 ? { n: "Marolinha", c: "#4FB3D9" } : o < 2 ? { n: "Mar mexido", c: "#1E8FC6" } : { n: "Mar pesado", c: "#0B3F6B" };
   const ventoCat = (v) => v <= 10 ? { n: "Vento fraco", c: "#7CC99A" } : v <= 15 ? { n: "Brisa", c: "#F2C12E" } : v <= 20 ? { n: "Vento moderado", c: "#F08A3C" } : { n: "Ventania", c: "#D9534F" };
-  const aguaCat = (t) => t < 20 ? "Gelada" : t < 22.5 ? "Fresquinha" : "Quentinha";
+  const aguaCat = (t) => t < 19 ? "Gelada" : t < 22 ? "Fresquinha" : t < 24.5 ? "Agradável" : "Quentinha";
   let relAtual = null, relAberto = null;
   // "das 9h às 13h" (a última hora já não conta) ou "a partir das 15h" quando vai até o fim do dia
   const faixaH = (j) => (j.fim > HORA_FIM ? `a partir das ${j.ini}h` : `das ${j.ini}h às ${j.fim}h`);
@@ -2655,7 +2660,7 @@
     if (k === "agua") { const pts = (x.marH || []).filter((q) => q.s != null).map((q) => ({ h: q.h, v: Math.round(q.s * 10) / 10, cor: "#16A3C9" }));
       const lo = Math.min(...pts.map((q) => q.v)), hi = Math.max(...pts.map((q) => q.v));
       return { titulo: "Temperatura da água", unid: "°C", min: Math.floor(lo - 1), max: Math.ceil(hi + 1), tipo: "linha", pts, barraNome: "Água °C",
-        texto: (q) => `<b>${fmt1(q.v)} °C · ${aguaCat(q.v)}</b><span>Temperatura na superfície do mar</span>`,
+        texto: (q) => `<b>${fmt1(q.v)} °C · ${aguaCat(q.v)}</b><span>Estimada perto da areia</span>`,
         resumo: () => pts.length ? [`Entre ${fmt1(lo)} e ${fmt1(hi)} °C no dia`] : ["Sem dado da temperatura"], leg: [] }; }
     if (k === "vento") { const pts = hs.filter((y) => y.v != null).map((y) => ({ h: y.h, v: y.v, cor: ventoCat(y.v).c, d: y.vd, raj: y.raj }));
       return { titulo: "Vento hora a hora", unid: "km/h", max: Math.max(25, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "Vento (km/h)", setas: true, setaVento: true,
@@ -3017,7 +3022,21 @@
       $("#instNao").onclick = () => fecharConv(5);
       $("#instSim").onclick = async () => {
         // dentro do Instagram etc.: tenta abrir direto no navegador (se o app bloquear, ficam os passos na tela)
-        if ($("#instSim").dataset.ir) { location.href = $("#instSim").dataset.ir; return; }
+        if ($("#instSim").dataset.ir) {
+          // o Instagram às vezes bloqueia abrir o Safari direto: se em 1 s a página continuar aqui, copia o link e explica o caminho manual
+          location.href = $("#instSim").dataset.ir;
+          setTimeout(() => {
+            if (document.hidden) return;
+            const link = "https://praiometrorio.com.br/";
+            try { navigator.clipboard.writeText(link); } catch (e) {}
+            conv.querySelector(".convite-intro").innerHTML = "<b>O Instagram não deixou abrir direto.</b> Faça assim:";
+            $("#instPassos").innerHTML = `<li><span>1</span><div><b>Toque nos ••• lá em cima</b>No canto direito da tela do Instagram.</div></li>
+              <li><span>2</span><div><b>Abrir no navegador externo</b>Pronto, abre no ${ios ? "Safari" : "Chrome"}.</div></li>
+              <li><span>✓</span><div><b>Ou cole o link no ${ios ? "Safari" : "Chrome"}</b>Já copiamos pra você: praiometrorio.com.br</div></li>`;
+            $("#instSim").textContent = "Entendi"; delete $("#instSim").dataset.ir;
+          }, 1000);
+          return;
+        }
         if (pedidoAndroid) { pedidoAndroid.prompt(); try { await pedidoAndroid.userChoice; } catch (e) {} pedidoAndroid = null; }
         fecharConv(2);
       };
