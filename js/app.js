@@ -118,7 +118,7 @@
     const agoraUv = x.hoje ? comUv.find((y) => y.h === horaJa) : null;
     const uvTxt = (pico ? `Pico ${picoUvTxt(x.horas)}` : `UV ${uv}`) + (agoraUv ? ` · agora UV ${Math.round(agoraUv.uv)}` : "");
     if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: `${uvTxt} · evite o sol do meio-dia` });
-    else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de pegar cor", s: `${uvTxt} · protetor a cada 2h` });
+    else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de bronze", s: `${uvTxt} · protetor a cada 2h` });
     else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `${uvTxt} · passa protetor` });
     else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: `${uvTxt} · queima mesmo nublado` });
     else selos.push({ cls: "neutro", ic: IC.gota, t: "UV baixo", s: "Pouco risco de queimar" });

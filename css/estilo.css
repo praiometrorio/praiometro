@@ -879,3 +879,32 @@ html,body{overscroll-behavior-y:none}
 .selo .selo-mais{top:9px;right:8px;font-size:15px}
 /* legendas dos gráficos centralizadas */
 .pico-leg,.tr-leg{justify-content:center;text-align:center}
+
+/* quadradinho do sol na areia: sol nascendo à esquerda e se pondo à direita, no fundo (mesmo tamanho) */
+.info.sombra{position:relative;overflow:hidden;color:#4A2A10;
+  background:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2290%22%20height%3D%2260%22%20viewBox%3D%220%200%2090%2060%22%3E%3Cg%20opacity%3D%22.8%22%3E%3Cpath%20d%3D%22M24%2033v-7M11%2038l-5-4.5M37%2038l5-4.5M5%2049H0M43%2049h5%22%20stroke%3D%22%23FFC53D%22%20stroke-width%3D%222.4%22%20stroke-linecap%3D%22round%22/%3E%3Cpath%20d%3D%22M9%2060a15%2015%200%200%201%2030%200z%22%20fill%3D%22%23FFC53D%22/%3E%3C/g%3E%3Cpath%20d%3D%22M0%2059.5h90%22%20stroke%3D%22%23F2C57C%22%20stroke-width%3D%221.2%22%20opacity%3D%22.7%22/%3E%3C/svg%3E") left bottom/90px 60px no-repeat,url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%2290%22%20height%3D%2260%22%20viewBox%3D%220%200%2090%2060%22%3E%3Cg%20opacity%3D%22.8%22%3E%3Cpath%20d%3D%22M41%2060a17%2017%200%200%201%2034%200z%22%20fill%3D%22%23F07A3A%22/%3E%3Cpath%20d%3D%22M43%2053.5h30M47%2057h22%22%20stroke%3D%22%23FFE3D1%22%20stroke-width%3D%221.6%22%20stroke-linecap%3D%22round%22/%3E%3C/g%3E%3Cpath%20d%3D%22M0%2059.5h90%22%20stroke%3D%22%23EBA77E%22%20stroke-width%3D%221.2%22%20opacity%3D%22.7%22/%3E%3C/svg%3E") right bottom/90px 60px no-repeat,linear-gradient(90deg,#FFF5D9 0%,#FFF8EC 50%,#FFE5D3 100%)}
+.info.sombra svg{color:#C27A12}
+
+/* ===== v10: topo mais leve + atalhos numa barra fixa embaixo ("bolinhas saltadas") ===== */
+/* faixa do praião numa linha discreta */
+.praiao{background:rgba(255,182,39,.14);color:#FFD36B;padding:9px 12px;border-radius:12px;font-size:13.5px;font-weight:700}
+.praiao svg{width:18px;height:18px;color:#FFB627}
+.praiao small{display:inline;color:#FFE7B3;font-weight:500;opacity:.85;margin-left:4px}
+/* barra de baixo */
+.atalhos4{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#0A2840;
+  border-radius:26px 26px 0 0;padding:0 8px calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(0,10,25,.35)}
+.atalhos4.so3{grid-template-columns:repeat(3,1fr)}
+.atalhos4>button,.atalhos4.so3 #abrirTreino{grid-column:auto;position:relative;flex-direction:column;height:auto;min-height:0;margin:-18px 0 0;padding:0;
+  background:none;box-shadow:none;gap:5px;align-items:center;justify-content:flex-start;border-radius:0;color:#BFD6E6;text-align:center}
+.atalhos4>button svg{width:22px;height:22px;box-sizing:content-box;padding:10px;border-radius:50%;border:4px solid #0A2840;filter:none}
+.atalhos4 #abrirFav svg{background:linear-gradient(120deg,#FFD36B,#FFB627);color:#fff}
+.atalhos4 #abrirSurfe svg{background:linear-gradient(120deg,#16A3C9,#0B6FA8);color:#fff}
+.atalhos4 #abrirTreino svg{background:linear-gradient(120deg,#2B2F6B 0%,#B0457A 55%,#FF9A5A 100%)}
+.atalhos4 #abrirSol svg{background:linear-gradient(120deg,#FF8A3D 0%,#FFB627 60%,#FFD36B 100%);color:#fff}
+.atalhos4>button span{display:block;flex:none;font-size:11px;font-weight:700;letter-spacing:.01em}
+.atalhos4>button small{display:none}
+.atalhos4 #favQtd{position:absolute;top:0;right:calc(50% - 28px);min-width:18px;height:18px;font-size:10px;padding:0 4px;background:#fff;color:#10283A;border-radius:999px;display:grid;place-items:center}
+.atalhos4 #favQtd:empty{display:none}
+.atalhos4 .btn-sol em{top:-6px;right:calc(50% - 34px);font-size:7.5px;padding:3px 5px}
+.wrap{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+@media (min-width:700px){.atalhos4{left:50%;right:auto;width:440px;transform:translateX(-50%)}}
