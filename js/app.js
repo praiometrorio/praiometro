@@ -161,8 +161,7 @@
     else if (x.aguaTotal) selos.push({ cls: "sol", ic: IC.escudo, t: `Própria em ${x.aguaOk} de ${x.aguaTotal} pontos`, s: bol });
     else selos.push({ cls: "neutro", ic: IC.escudo, t: "Água", s: "Sem boletim do INEA" });
 
-    if (!p.baia && o != null && o >= 1 && o <= 2.4 && x.vento <= 15)
-      selos.push({ cls: "mar", ic: IC.prancha, t: "Onda pra surfar", s: `${fmt(o)} m · vento ${x.vento} km/h` });
+    // (o quadradinho "Onda pra surfar" saiu: o cartão fica com 6, e o surfe tem a tela própria)
 
     // --- frase do dia ---
     let ceuTxt;
@@ -193,9 +192,22 @@
     const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       ventoRef > 20 ? "ventania" : ventoRef > 15 ? "ventando" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
-    const score = horasSol * 2 + horasParcial * 0.5 - horasChuva - (x.vento > 20 ? 3 : x.vento > 15 ? 1 : 0) - (!p.baia && o != null && o > 1.6 ? 1.5 : 0) - (x.propria === false ? 5 : 0) + (p.baia ? 0 : 0.5) + (x.propria === true ? 0.5 : 0) + (x.propria == null && x.aguaTotal ? (x.aguaOk / x.aguaTotal - 0.5) * 2 : 0);
+    // ---- nota de 0 a 10 (ordena a lista "Praias hoje") ----
+    // Céu (até 4): hora a hora com peso pelo horário de praia (9h–15h = 1; 8h e 16h = 0,6; 7h e 17h = 0,3);
+    //   sol = 1, entre nuvens = 0,5, nublado = 0, chuva = -0,5.
+    // Mar (até 2): onda na praia. Vento (até 1,5): o mais forte das 9h às 17h. Água INEA (até 2). Bônus: água do mar ≥ 22° (+0,5).
+    const PESO_H = { 7: 0.3, 8: 0.6, 9: 1, 10: 1, 11: 1, 12: 1, 13: 1, 14: 1, 15: 1, 16: 0.6, 17: 0.3 }, VAL_EST = { sol: 1, parcial: 0.5, nublado: 0, chuva: -0.5, noite: 0 };
+    const somaPeso = Object.values(PESO_H).reduce((a, b) => a + b, 0);
+    const ptCeu = Math.max(0, 4 * x.horas.reduce((s, y) => s + (PESO_H[y.h] || 0) * (VAL_EST[y.est] ?? 0), 0) / somaPeso);
+    const ptMar = p.baia ? 2 : o == null ? 1 : o <= 0.6 ? 2 : o <= 1.2 ? 1.5 : o <= 1.6 ? 1 : o <= 2 ? 0.5 : 0;
+    const vRef = ventoRef ?? x.vento;
+    const ptVento = vRef <= 10 ? 1.5 : vRef <= 15 ? 1 : vRef <= 20 ? 0.5 : 0;
+    const ptAgua = x.propria === true ? 2 : x.propria === false ? 0 : x.aguaTotal ? 2 * x.aguaOk / x.aguaTotal : 1;
+    const ptBonus = x.agua != null && x.agua >= 22 ? 0.5 : 0;
+    const nota = Math.min(10, Math.round((ptCeu + ptMar + ptVento + ptAgua + ptBonus) * 10) / 10);
+    const score = nota;
     selos.forEach((s, i) => { s.k = ["ceu", "uv", "mar", "agua", "vento", "inea", "surfe"][i]; });
-    return { horasSol, janela, ceu, tom, selos, veredito, resumo, score };
+    return { horasSol, janela, ceu, tom, selos, veredito, resumo, score, nota };
   }
 
   // ---------- cena desenhada (muda com o tempo do dia) ----------
@@ -684,8 +696,11 @@
           cedo: Array.from({ length: 8 }, (_, i) => 4 + i).map((hr) => {
             const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
             const ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
+            const km = m && m.hourly ? m.hourly.time.indexOf(`${data}T${pad(hr)}:00`) : -1;
+            const o = km >= 0 ? ondaPraia(p, m.hourly, km) : null, s = km >= 0 ? m.hourly.sea_surface_temperature[km] : null;
             return { h: hr, t: h.temperature_2m[k], ur, chuva: chuvaEm(k), v: ventoEm(k), raj: rajEm(k),
-              uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr) };
+              uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr),
+              o: o == null ? null : Math.round(o * 10) / 10, s, propria: prop && typeof prop === "object" ? prop.propria : prop === true ? true : prop === false ? false : null };
           }).filter(Boolean),
           // as 24 horas do dia (para o "Céu hora a hora" estilo iPhone: madrugada e noite também)
           dia24: Array.from({ length: 24 }, (_, hr) => {
@@ -729,6 +744,7 @@
   futev: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><defs><clipPath id="cf"><circle cx="16" cy="16" r="13"/></clipPath></defs><circle cx="16" cy="16" r="13" fill="#fff"/><g clip-path="url(#cf)"><g fill="#1A1A1A"><polygon points="16.00,11.40 20.37,14.58 18.70,19.72 13.30,19.72 11.63,14.58"/><polygon points="22.17,7.51 20.57,2.59 24.76,-0.45 28.94,2.59 27.34,7.51"/><polygon points="25.99,19.24 30.17,16.20 34.36,19.24 32.76,24.16 27.58,24.16"/><polygon points="16.00,26.50 20.18,29.54 18.59,34.46 13.41,34.46 11.82,29.54"/><polygon points="6.01,19.24 4.42,24.16 -0.76,24.16 -2.36,19.24 1.83,16.20"/><polygon points="9.83,7.51 4.66,7.51 3.06,2.59 7.24,-0.45 11.43,2.59"/></g><path d="M16.00 11.40L16.00 6.70 M16.00 6.70L4.66 7.51 M16.00 6.70L27.34 7.51 M20.37 14.58L24.84 13.13 M24.84 13.13L20.57 2.59 M24.84 13.13L27.58 24.16 M18.70 19.72L21.47 23.52 M21.47 23.52L30.17 16.20 M21.47 23.52L11.82 29.54 M13.30 19.72L10.53 23.52 M10.53 23.52L20.18 29.54 M10.53 23.52L1.83 16.20 M11.63 14.58L7.16 13.13 M7.16 13.13L4.42 24.16 M7.16 13.13L11.43 2.59" stroke="#1A1A1A" stroke-width="0.90" fill="none"/></g><circle cx="16" cy="16" r="13" fill="none" stroke="#1A1A1A" stroke-width="1.2"/></svg>',
   altinha: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><text x="-1" y="29" font-size="23">🦶</text><defs><clipPath id="ca"><circle cx="23.5" cy="8.5" r="6.8"/></clipPath></defs><circle cx="23.5" cy="8.5" r="6.8" fill="#fff"/><g clip-path="url(#ca)"><g fill="#1A1A1A"><polygon points="23.50,6.09 25.79,7.76 24.91,10.45 22.09,10.45 21.21,7.76"/><polygon points="26.73,4.06 25.89,1.48 28.08,-0.11 30.27,1.48 29.43,4.06"/><polygon points="28.72,10.20 30.91,8.61 33.10,10.20 32.27,12.77 29.56,12.77"/><polygon points="23.50,13.99 25.69,15.58 24.85,18.16 22.15,18.16 21.31,15.58"/><polygon points="18.28,10.20 17.44,12.77 14.73,12.77 13.90,10.20 16.09,8.61"/><polygon points="20.27,4.06 17.57,4.06 16.73,1.48 18.92,-0.11 21.11,1.48"/></g><path d="M23.50 6.09L23.50 3.64 M23.50 3.64L17.57 4.06 M23.50 3.64L29.43 4.06 M25.79 7.76L28.13 7.00 M28.13 7.00L25.89 1.48 M28.13 7.00L29.56 12.77 M24.91 10.45L26.36 12.44 M26.36 12.44L30.91 8.61 M26.36 12.44L21.31 15.58 M22.09 10.45L20.64 12.44 M20.64 12.44L25.69 15.58 M20.64 12.44L16.09 8.61 M21.21 7.76L18.87 7.00 M18.87 7.00L17.44 12.77 M18.87 7.00L21.11 1.48" stroke="#1A1A1A" stroke-width="0.47" fill="none"/></g><circle cx="23.5" cy="8.5" r="6.8" fill="none" stroke="#1A1A1A" stroke-width="1"/></svg>',
   fresco: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><g transform="rotate(-35 14 14)"><ellipse cx="14" cy="11" rx="8" ry="9.5" fill="#D99A55" stroke="#9C6127" stroke-width="1.3"/><path d="M10 6c2-1.5 6-1.5 8 0" stroke="#F3C48C" stroke-width="1.4" fill="none" stroke-linecap="round"/><rect x="11.8" y="19.5" width="4.4" height="10" rx="1.6" fill="#2E2E3A"/></g><circle cx="26" cy="7" r="3.8" fill="#FF7A2F" stroke="#D35A15" stroke-width="1"/></svg>',
+  natacao: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><circle cx="21" cy="11" r="4.6" fill="#F4C9A0"/><path d="M16.6 10.2a4.6 4.6 0 0 1 8.8-.6c-2.8-1-6-1-8.8.6z" fill="#FF5A4E"/><path d="M15.6 10.6c1 .4 2.1.4 3-.1M21.8 10.4c1 .5 2.2.5 3.2 0" stroke="#10283A" stroke-width="1.3" fill="none" stroke-linecap="round"/><path d="M4 17.5c3-4.5 7.5-6.5 12-5.5" stroke="#F4C9A0" stroke-width="3" fill="none" stroke-linecap="round"/><path d="M2 20.5c2.3 0 2.3-1.8 4.6-1.8s2.3 1.8 4.6 1.8 2.3-1.8 4.6-1.8 2.3 1.8 4.6 1.8 2.3-1.8 4.6-1.8 2.3 1.8 4.6 1.8" stroke="#1E8FC6" stroke-width="2.4" fill="none" stroke-linecap="round"/><path d="M2 25.5c2.3 0 2.3-1.8 4.6-1.8s2.3 1.8 4.6 1.8 2.3-1.8 4.6-1.8 2.3 1.8 4.6 1.8 2.3-1.8 4.6-1.8 2.3 1.8 4.6 1.8" stroke="#7FD3F0" stroke-width="2.2" fill="none" stroke-linecap="round"/></svg>',
   corrida: '<svg class="ic-esp" aria-hidden="true" viewBox="0 0 32 32"><path d="M3 22.5c0-3 1-6.5 2.5-9.5.5-1 1.8-1.2 2.6-.4 1.6 1.6 3.6 2.2 5.4 1.6l2.6-.9c.9-.3 1.9 0 2.4.8l2 3c.6.9 1.5 1.5 2.6 1.7l4.6.8c1.8.3 3.1 1.9 3.1 3.7v.4H3z" fill="#FF6B3D"/><path d="M3 24.2h26.8v1.6c0 1-.8 1.8-1.8 1.8H4.8c-1 0-1.8-.8-1.8-1.8z" fill="#fff" stroke="#10283A" stroke-width="1"/><path d="M11 15.5l1.6 2.6M14 14.5l1.6 2.6M17 14l1.6 2.6" stroke="#fff" stroke-width="1.4" stroke-linecap="round"/></svg>'
   };
   const ESPORTES = {
@@ -737,7 +753,9 @@
     futev:  { nome: "Futevôlei", ic: ICONES_ESP.futev, vento: [12, 20] },   // bom até 12: retorno de quem joga (out/2026)
     altinha:{ nome: "Altinha", ic: ICONES_ESP.altinha, vento: [10, 18] },
     fresco: { nome: "Frescobol", ic: ICONES_ESP.fresco, vento: [12, 20] },
-    corrida:{ nome: "Corrida", ic: ICONES_ESP.corrida, vento: [25, 35] }
+    corrida:{ nome: "Corrida", ic: ICONES_ESP.corrida, vento: [25, 35] },
+    // natação no mar: o que manda são as ondas na praia (já com o abrigo da praia); vento só faz marola
+    natacao:{ nome: "Natação", ic: ICONES_ESP.natacao, vento: [15, 22], ondas: [0.6, 1.0] }
   };
   const HORAS_TREINO = [5, 6, 7, 8, 9];
   const SEMANA_CURTA = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -771,6 +789,15 @@
   function notaTreino(q, esp) {
     const E = ESPORTES[esp], motivos = [];
     let n = 0;
+    if (esp === "natacao") {
+      // nadar na chuva não estraga o treino; o que pesa é o mar
+      if (q.chuva >= 50) { n = 1; motivos.push("chuva"); }
+      if (q.o != null) { const no = q.o <= E.ondas[0] ? 0 : q.o <= E.ondas[1] ? 1 : 2; if (no) motivos.push(no === 2 ? "ondas grandes" : "mar mexido"); n = Math.max(n, no); }
+      if (q.v != null && q.v > E.vento[0]) { const nv = q.v > E.vento[1] ? 2 : 1; motivos.push(nv === 2 ? "vento forte" : "marola do vento"); n = Math.max(n, nv); }
+      if (q.propria === false) { n = Math.max(n, 1); motivos.push("água imprópria"); }
+      if (q.s != null && q.s < 19) { n = Math.max(n, 1); motivos.push("água gelada"); }
+      return { n, motivos };
+    }
     if (q.chuva >= 50) { n = 2; motivos.push("chuva"); } else if (q.chuva >= 30) { n = 1; motivos.push("chance de chuva"); }
     if (esp === "corrida") {
       const w = bulbo(q.t, q.ur);
@@ -784,7 +811,7 @@
     }
     return { n, motivos };
   }
-  const NOTA_TXT = (esp) => { const v = esp === "corrida" ? "correr" : "jogar"; return [`Ótimo pra ${v}`, "Dá, mas atrapalha", `Ruim pra ${v}`]; };
+  const NOTA_TXT = (esp) => { const v = esp === "corrida" ? "correr" : esp === "natacao" ? "nadar" : "jogar"; return [`Ótimo pra ${v}`, "Dá, mas atrapalha", `Ruim pra ${v}`]; };
   const NOTA_CURTA = ["ótimo", "atrapalha", "ruim"];
   function horaAgora() {
     const p = new Intl.DateTimeFormat("en-GB", { timeZone: FUSO, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date()).split(":");
@@ -826,9 +853,11 @@
 
   // faixa hora a hora (5h às 10h) de um treino num dia
   function faixaTreino(t, x, mini) {
-    const cls = ["bom", "medio", "ruim"], corrida = t.esp === "corrida";
+    const cls = ["bom", "medio", "ruim"], corrida = t.esp === "corrida", nada = t.esp === "natacao";
     return `<div class="tr-faixa${mini ? " mini" : ""}">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => { const nt = notaTreino(y, t.esp);
-      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${corrida ? Math.round(y.t) + "°" : (y.v ?? "–")}</span>${mini ? "" : `<span class="u">${corrida ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : "km/h"}</span>`}</div>`; }).join("")}</div>`;
+      const v = corrida ? Math.round(y.t) + "°" : nada ? (y.o != null ? fmt1(y.o) : "–") : (y.v ?? "–");
+      const u = corrida ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : nada ? "m" : "km/h";
+      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${v}</span>${mini ? "" : `<span class="u">${u}</span>`}</div>`; }).join("")}</div>`;
   }
   const CEU_TREINO = '<span class="tr-disco"></span><span class="tr-mar"></span><span class="tr-reflexo"></span>';
   const NOTA_RODAPE = '<p class="tr-nota">* Os limites de vento são estimativas e estão sujeitos a mudanças. Contamos também com o seu feedback para melhorar cada vez mais a nossa precisão.</p>';
@@ -862,7 +891,7 @@
           <p class="tr-rot">Que horas?</p>
           <div class="tr-dias">${HORAS_TREINO.map((hh) => `<button data-hora="${hh}" class="${hh === r.hora ? "on" : ""}">${hh}h</button>`).join("")}</div>
           <p class="tr-rot">Em que praia?</p>
-          <select class="tr-select" id="trPraia">${PRAIAS.filter((z) => !z.baia).map((z) => `<option value="${z.id}"${z.id === r.praia ? " selected" : ""}>${z.nome}</option>`).join("")}</select>
+          <select class="tr-select" id="trPraia">${PRAIAS.map((z) => `<option value="${z.id}"${z.id === r.praia ? " selected" : ""}>${z.nome}</option>`).join("")}</select>
           ${r.esp === "corrida" ? `<p class="tr-rot">Onde você corre?</p><div class="tr-dias"><button data-piso="orla" class="${r.piso === "orla" ? "on" : ""}">Orla</button><button data-piso="areia" class="${r.piso === "areia" ? "on" : ""}">Areia</button></div>` : ""}
           <button class="tr-ligar" id="trSalvar">${r.tipo === "avulso" ? "Ver a previsão" : "Salvar"}</button>
           <p class="tr-aviso-msg" id="trFormMsg"></p>
@@ -908,7 +937,7 @@
 
     if (m === "detalhe") {
       const av = trTela.avulso, t = av || treinos.find((z) => z.id === trTela.id); if (!t) return irTreino("lista");
-      const E = ESPORTES[t.esp], s = av ? sessaoDia(t, av.d) : proximaSessao(t), corrida = t.esp === "corrida";
+      const E = ESPORTES[t.esp], s = av ? sessaoDia(t, av.d) : proximaSessao(t), corrida = t.esp === "corrida", nada = t.esp === "natacao";
       if (!s) {
         corpo.innerHTML = `<div class="tr-card"><p>Sem previsão para o próximo ${E.nome.toLowerCase()} (${textoDias(t.dias)} · ${t.hora}h) nos próximos dias.</p></div>`;
         return;
@@ -916,8 +945,8 @@
       const { x, q, nota } = s;
       let piora = "";
       const pior = x.cedo.find((y) => y.h > t.hora && notaTreino(y, t.esp).n > nota.n);
-      if (pior) piora = corrida ? ` Piora a partir das ${pior.h}h.` : ` O vento aperta a partir das ${pior.h}h.`;
-      const frase = nota.n === 0 ? (corrida ? "Temperatura boa e sem chuva." : "Vento fraco e sem chuva.") + piora : "Por causa de " + nota.motivos.join(" e ") + "." + piora;
+      if (pior) piora = corrida || nada ? ` Piora a partir das ${pior.h}h.` : ` O vento aperta a partir das ${pior.h}h.`;
+      const frase = nota.n === 0 ? (corrida ? "Temperatura boa e sem chuva." : nada ? "Mar calmo e pouco vento." : "Vento fraco e sem chuva.") + piora : "Por causa de " + nota.motivos.join(" e ") + "." + piora;
       const nivs = (x.mareDia || []).map((z) => z.n), mn = Math.min(...nivs), mx = Math.max(...nivs);
       const mareTxt = (n) => n == null || !nivs.length ? "—" : (n - mn) / ((mx - mn) || 1) < 0.35 ? "baixa · faixa larga" : (n - mn) / ((mx - mn) || 1) > 0.65 ? "alta · faixa estreita" : "média";
       const uvAlto = (x.cedo || []).concat(x.horas || []).find((y) => y.uv != null && y.uv >= 6);
@@ -928,14 +957,16 @@
           <div class="tr-veredito"><span class="tr-selo n${nota.n}">${NOTA_TXT(t.esp)[nota.n]}</span><h3>${nomeDiaTreino(s.d)}, ${t.hora}h</h3><p>${frase}</p></div>
         </div>
         <div class="tr-card tr-dados">
-          <div><b>${q.v ?? "–"}</b><span>vento km/h</span></div><div><b>${q.raj ?? "–"}</b><span>rajada km/h</span></div>
-          <div><b>${q.chuva}%</b><span>chuva</span></div><div><b>${Math.round(q.t)}°</b><span>temperatura</span></div>
+          ${nada ? `<div><b>${q.o != null ? fmt1(q.o) + " m" : "–"}</b><span>ondas</span></div><div><b>${q.s != null ? fmt1(q.s) + "°" : "–"}</b><span>água</span></div>
+          <div><b>${q.v ?? "–"}</b><span>vento km/h</span></div><div><b>${q.propria === true ? "Própria" : q.propria === false ? "Imprópria" : "–"}</b><span>INEA</span></div>`
+          : `<div><b>${q.v ?? "–"}</b><span>vento km/h</span></div><div><b>${q.raj ?? "–"}</b><span>rajada km/h</span></div>
+          <div><b>${q.chuva}%</b><span>chuva</span></div><div><b>${Math.round(q.t)}°</b><span>temperatura</span></div>`}
         </div>
         <div class="tr-card">
-          <p class="tr-rot">Hora a hora · ${corrida ? "calor e chuva" : "vento pra bola"}</p>
+          <p class="tr-rot">Hora a hora · ${corrida ? "calor e chuva" : nada ? "ondas na praia" : "vento pra bola"}</p>
           ${faixaTreino(t, x)}
           <div class="tr-leg"><span><i class="bom"></i>bom</span><span><i class="medio"></i>atrapalha</span><span><i class="ruim"></i>ruim</span></div>
-          ${corrida ? "" : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
+          ${corrida ? "" : nada ? `<p class="tr-lim">Natação: ondas boas até ${fmt1(E.ondas[0])} m · atrapalham até ${fmt1(E.ondas[1])} m · acima disso, ruim. Vento acima de ${E.vento[0]} km/h faz marola.</p>` : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
         </div>
         <div class="tr-card tr-linhas">
           ${av ? "" : `<div><span>Seus dias</span><b>${textoDias(t.dias)}</b></div>`}
@@ -961,7 +992,7 @@
     const pendFb = treinos.filter((t) => t.dias.includes(hojeSem) && agora.h >= t.hora + 1 && t.criado !== hojeData && !guarda.ler(`pm-fb-${hojeData}-${t.id}`));
     corpo.innerHTML = `
       <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>Meus treinos</h3><p>Toque num treino para ver hora a hora.</p></div></div>
-      ${pendFb.map((t) => `<div class="tr-card tr-fb" data-fbid="${t.id}"><p>Como estava ${t.esp === "corrida" ? "a corrida" : "o vento pro " + ESPORTES[t.esp].nome.toLowerCase()} hoje às ${t.hora}h?</p>
+      ${pendFb.map((t) => `<div class="tr-card tr-fb" data-fbid="${t.id}"><p>Como estava ${t.esp === "corrida" ? "a corrida" : t.esp === "natacao" ? "o mar pra nadar" : "o vento pro " + ESPORTES[t.esp].nome.toLowerCase()} hoje às ${t.hora}h?</p>
         <div><button data-fb="bom">👍 Bom</button><button data-fb="atrapalhou">😐 Atrapalhou</button><button data-fb="ruim">👎 Ruim</button></div></div>`).join("")}
       ${treinos.map((t) => { const E = ESPORTES[t.esp], s = proximaSessao(t);
         return `<button class="tr-card tr-item" data-abrir="${t.id}">
@@ -1295,6 +1326,8 @@
     const banner = $("#praiao");
     banner.hidden = !n;
     if (n) banner.innerHTML = `${IC.sol}<div>${nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase())} tem ${JEITO_PRAIAO[pr.tipo]}!<small>${n} praias com sol e vento tranquilo</small></div>`;
+    // foto do topo (abas dos dias + faixa do praião) para a próxima abertura já mostrar tudo na hora, sem "pular"
+    if (estado.dia === 0) guarda.gravar("pm-topo-foto", { data: datas[0], dias: $("#dias").innerHTML, praiao: n ? banner.innerHTML : "" });
 
     carregarHorizonte(atual.p);      // usa o relevo guardado na hora, ou busca e redesenha quando chegar
     desenharCartao(atual);
@@ -1528,7 +1561,7 @@
   const miniTxt = (x) => x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `${y.h}h ${({ sol: "sol", parcial: "entre nuvens", nublado: "nublado", chuva: "chuva", noite: "sem sol" })[y.est]}`).join(", ");
 
   function desenharLista() {
-    if (!linhas.length) return;
+    if (!linhas.length || !$("#lista")) return;   // a lista "Praias hoje" saiu da tela (nov/2026)
     const atual = praiaAtual();
     const ord = linhas.slice().sort((a, b) => b.a.score - a.a.score);
     const filtradas = estado.regiao === "todas" ? ord : ord.filter((l) => l.p.regiao === estado.regiao);
@@ -1537,7 +1570,8 @@
     $("#lista").innerHTML = vis.map((l) => `<li><button data-id="${l.p.id}" aria-current="${l.p.id === atual.p.id}">
       <span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>
       <span class="nm"><b>${ehFavorita(l.p.id) ? '<i class="fav" aria-label="favorita">★</i> ' : ""}${l.p.nome}</b><span>${l.a.resumo}</span></span>
-      <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `<i class="${y.est}"></i>`).join("")}</span></button></li>`).join("");
+      <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `<i class="${y.est}"></i>`).join("")}</span>
+      <span class="nota-lista n${l.a.nota >= 8 ? 3 : l.a.nota >= 6.5 ? 2 : l.a.nota >= 5 ? 1 : 0}" aria-label="nota ${fmt1(l.a.nota)} de 10"><b>${fmt1(l.a.nota)}</b></span></button></li>`).join("");
     document.querySelectorAll("#lista button").forEach((b) => b.onclick = () => selecionar(b.dataset.id, true));
   }
 
@@ -2657,6 +2691,9 @@
         ${gC}${barrasC}${regua("c24R2", C0, C1)}
       </svg>
       <p class="c24-nota">Cada coluna é uma hora. A chance é quantos dos 9 modelos de previsão põem chuva naquela hora. Arraste nos gráficos para ver cada horário.</p>`;
+    let horaMostrada = null, pedido = null, minPedido = null;
+    // arrastar: no máximo um desenho por quadro da tela (fica liso mesmo em celular mais fraco)
+    const moverSuave = (min) => { minPedido = min; if (pedido) return; pedido = requestAnimationFrame(() => { pedido = null; mover(minPedido); }); };
     const mover = (min) => {
       const mn = Math.max(hs[0].h * 60, Math.min(hs[hs.length - 1].h * 60 + 59, min)), y = hs.find((z) => z.h === Math.floor(mn / 60)) || hs[0];
       ceuSt.min = mn;
@@ -2667,18 +2704,22 @@
       $("#c24R1").setAttribute("transform", `translate(${cx.toFixed(1)} 0)`); $("#c24R1 circle").setAttribute("cy", YT(vT).toFixed(1));
       $("#c24R2").setAttribute("transform", `translate(${cx.toFixed(1)} 0)`); $("#c24R2 circle").setAttribute("cy", YC(y.chuva || 0).toFixed(1));
       $("#c24H").textContent = `${pad(Math.floor(mn / 60))}:${pad(mn % 60)}`;
-      $("#c24I").innerHTML = IC[y.est];
-      $("#c24I").className = "ci " + y.est;
-      $("#c24T").textContent = Math.round(vt) + "°";
-      $("#c24D").textContent = `${NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
+      // ícone, temperatura e frase só mudam quando troca a hora (menos trabalho a cada movimento do dedo)
+      if (horaMostrada !== y.h) {
+        horaMostrada = y.h;
+        $("#c24I").innerHTML = IC[y.est];
+        $("#c24I").className = "ci " + y.est;
+        $("#c24T").textContent = Math.round(vt) + "°";
+        $("#c24D").textContent = `${NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
+      }
     };
     const agora = relogio.format(new Date()), minAg = +agora.slice(0, 2) * 60 + +agora.slice(3, 5);
     mover(ceuSt.min ?? (d === 0 ? minAg : 12 * 60));
     ["#c24Temp", "#c24Chuva"].forEach((sel) => {
       const el = $(sel); let arr = false;
       const paraMin = (ev) => { const r = el.getBoundingClientRect(); return Math.round(((ev.clientX - r.left) * W / r.width - esq) / larg * 1440); };
-      el.addEventListener("pointerdown", (ev) => { arr = true; el.setPointerCapture(ev.pointerId); mover(paraMin(ev)); });
-      el.addEventListener("pointermove", (ev) => { if (arr) mover(paraMin(ev)); });
+      el.addEventListener("pointerdown", (ev) => { arr = true; el.setPointerCapture(ev.pointerId); moverSuave(paraMin(ev)); });
+      el.addEventListener("pointermove", (ev) => { if (arr) moverSuave(paraMin(ev)); });
       el.addEventListener("pointerup", () => { arr = false; }); el.addEventListener("pointercancel", () => { arr = false; });
     });
     document.querySelectorAll(".c24-dias button").forEach((b) => b.onclick = () => { ceuSt.d = +b.dataset.d; ceuSt.min = null; desenharCeu(); });

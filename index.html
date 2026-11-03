@@ -20,9 +20,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=7.7">
+  <link rel="stylesheet" href="css/estilo.css?v=8.2">
 </head>
 <body>
+<script>
+  // Telas por cima (Treino, Favoritas, Surfe, relatórios...): trava a página de trás de verdade.
+  // No iPhone, só "overflow: hidden" não basta: ao abrir uma lista de escolha (ex.: "Em que praia?"),
+  // o iOS rolava a página e aparecia o app embaixo da tela. Aqui a página de trás fica presa no lugar.
+  (function () {
+    var y = 0, preso = false;
+    new MutationObserver(function () {
+      var b = document.body.style, quer = b.overflow === "hidden";
+      if (quer && !preso) { preso = true; y = window.scrollY; b.position = "fixed"; b.top = -y + "px"; b.left = "0"; b.right = "0"; }
+      else if (!quer && preso) { preso = false; b.position = ""; b.top = ""; b.left = ""; b.right = ""; window.scrollTo(0, y); }
+    }).observe(document.body, { attributes: true, attributeFilter: ["style"] });
+  })();
+</script>
 <div class="wrap">
   <header>
     <div class="brand">
@@ -115,6 +128,24 @@
   </div>
 
   <div class="praiao" id="praiao" hidden></div>
+  <script>
+    // Mostra o topo na hora, antes do resto carregar (sem os botões "pularem"):
+    // 1) "Trajeto do sol" já aparece (ou some) conforme o aparelho; 2) abas dos dias e faixa do praião da última abertura de hoje.
+    (function () {
+      var sol = document.getElementById("abrirSol"), at = document.getElementById("atalhos");
+      var tem = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia && window.DeviceOrientationEvent) && matchMedia("(pointer: coarse)").matches;
+      if (sol) sol.hidden = !tem; if (at) at.classList.toggle("so3", !tem);
+      try {
+        var f = JSON.parse(localStorage.getItem("pm-topo-foto") || "null");
+        var hoje = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+        if (f && f.data === hoje) {
+          var d = document.getElementById("dias"), p = document.getElementById("praiao");
+          if (f.dias && d && !d.innerHTML.trim()) d.innerHTML = f.dias;
+          if (f.praiao && p) { p.innerHTML = f.praiao; p.hidden = false; }
+        }
+      } catch (e) {}
+    })();
+  </script>
 
   <!-- convite do alerta de praião: aparece sozinho na primeira vez (fundo escurecido), com a explicação antes do pedido do celular -->
   <div class="convite" id="convite" hidden role="dialog" aria-modal="true" aria-labelledby="conviteTit">
@@ -168,10 +199,6 @@
         <div class="mapdica">Toque numa praia para ver o caminho do sol: <b class="t-nascer">nascer</b>, <b class="t-arco">sol na areia</b>, <b class="t-sombra">sombra</b> e <b class="t-por">pôr do sol</b>. Dê zoom para ver a sombra dos prédios, postos, banheiros 🚻 e chuveiros 🚿.</div>
       </section>
 
-      <section class="lista">
-        <div class="listahead"><h2 id="listaTitulo">Praias hoje</h2><small>As melhores primeiro · céu das 6h às 20h</small></div>
-        <ol id="lista"></ol>
-      </section>
     </div>
   </main>
 
@@ -191,12 +218,12 @@
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=5"></script>
-<script src="js/app.js?v=9.8"></script>
+<script src="js/app.js?v=10.4"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script src="js/alerta.js?v=7"></script>
-<script src="js/lingua.js?v=7"></script>
+<script src="js/lingua.js?v=10"></script>
 <!-- Contador de visitas (GoatCounter: sem cookies, não guarda dados pessoais) -->
 <script>
   // separa quem abriu pelo app instalado na tela de início de quem abriu pelo navegador

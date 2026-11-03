@@ -126,6 +126,16 @@
     ["Só chega aviso em dia de praião. Dá pra desligar quando quiser, aqui no app.", "You only get alerts on beach days. Turn them off anytime, right here in the app.", "Solo llegan avisos en días de playa. Puedes desactivarlos cuando quieras, aquí en la app.", "Vous ne recevez d'alertes que les jours de plage. Désactivables à tout moment, ici dans l'app."],
     ["☀️ Quero ser avisado", "☀️ Notify me", "☀️ Quiero que me avisen", "☀️ Prévenez-moi"], ["Agora não", "Not now", "Ahora no", "Pas maintenant"], ["Fechar", "Close", "Cerrar", "Fermer"],
     ["Pronto! Quando vier praião, você fica sabendo. ☀️", "Done! When a beach day is coming, you'll know. ☀️", "¡Listo! Cuando venga día de playa, te enteras. ☀️", "C'est fait ! Quand une journée plage arrive, vous serez prévenu. ☀️"],
+    ["Natação", "Swimming", "Natación", "Natation"], ["Ótimo pra nadar", "Great for swimming", "Ideal para nadar", "Idéal pour nager"], ["Ruim pra nadar", "Bad for swimming", "Malo para nadar", "Mauvais pour nager"],
+    ["Mar calmo e pouco vento.", "Calm sea and little wind.", "Mar calmo y poco viento.", "Mer calme et peu de vent."],
+    ["ondas grandes", "big waves", "olas grandes", "grosses vagues"], ["mar mexido", "choppy sea", "mar movido", "mer agitée"], ["marola do vento", "wind chop", "oleaje del viento", "clapot du vent"],
+    ["água imprópria", "unsafe water", "agua no apta", "eau impropre"], ["água gelada", "cold water", "agua fría", "eau froide"],
+    ["ondas", "waves", "olas", "vagues"], ["água", "water", "agua", "eau"], ["Própria", "Safe", "Apta", "Propre"], ["Imprópria", "Unsafe", "No apta", "Impropre"],
+    ["Hora a hora · ondas na praia", "Hour by hour · waves at the beach", "Hora a hora · olas en la playa", "Heure par heure · vagues sur la plage"],
+    ["Natação: ondas boas até # m · atrapalham até # m · acima disso, ruim. Vento acima de # km/h faz marola.", "Swimming: waves fine up to # m · get in the way up to # m · above that, bad. Wind above # km/h makes chop.", "Natación: olas buenas hasta # m · molestan hasta # m · más que eso, malo. Viento sobre # km/h hace oleaje.", "Natation : vagues bonnes jusqu'à # m · gênantes jusqu'à # m · au-delà, mauvais. Vent au-dessus de # km/h = clapot."],
+    ["Como estava o mar pra nadar hoje às #h?", "How was the sea for swimming today at #h?", "¿Cómo estuvo el mar para nadar hoy a las #h?", "Comment était la mer pour nager aujourd'hui à #h ?"],
+    ["Da maior nota pra menor · barrinhas: céu das 6h às 20h", "Highest score first · bars: sky from 6am to 8pm", "De la mayor nota a la menor · barras: cielo de 6h a 20h", "De la meilleure note à la moins bonne · barres : ciel de 6h à 20h"],
+    ["pesado", "rough", "fuerte", "forte"], ["nota", "score", "nota", "note"],
     ["com chance de pancada de chuva às #h", "with a chance of a rain shower at #h", "con probabilidad de chubasco a las #h", "avec risque d'averse à #h"],
     ["com chance de pancada de chuva às", "with a chance of a rain shower at", "con probabilidad de chubasco a las", "avec risque d'averse à"],
     ["com chance de pancada às #h", "with a chance of a shower at #h", "con probabilidad de chubasco a las #h", "avec risque d'averse à #h"],
@@ -446,8 +456,11 @@
     if (pc) { const r2 = traduzE(pc[1]); if (r2 != null) return { en: "Because of ", es: "Por ", fr: "À cause de " }[lingua] + r2 + fim; }
     if (/ e /.test(base)) { const r3 = traduzE(base); if (r3 != null) return r3 + fim; }
     // "Seg 6h", "Amanhã 7h": traduz a palavra e mantém o horário
-    const ph = base.match(/^(\S+) (\d+h.*)$/);
-    if (ph) { const w = porChave(ph[1]); if (w != null) return w + " " + ph[2] + fim; }
+    const ph = / · /.test(base) ? null : base.match(/^(\S+) (\d+h.*)$/);   // com " · " no meio, cada pedaço é traduzido separado
+    if (ph) { const w = porChave(ph[1]); if (w != null) {
+      // "Qua 7h: ótimo": traduz também o que vem depois dos dois-pontos
+      const rh = ph[2].match(/^(\d+h): (.+)$/), dep = rh ? porChave(rh[2]) : null;
+      return w + " " + (dep != null ? rh[1] + ": " + dep : ph[2]) + fim; } }
     return null;
   }
   function traduzE(t) {
