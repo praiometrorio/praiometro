@@ -1470,8 +1470,7 @@
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     $("#compartilhar").onclick = () => compartilhar(l);
     document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => { guarda.gravar("pm-dica-selo", true); abrirRelatorio(b.dataset.k, l); });
-    // dica só até a pessoa tocar numa casinha pela primeira vez
-    if (!guarda.ler("pm-dica-selo")) { const s0 = $("#cartao .selo[data-k]"); if (s0) { s0.classList.add("dica-on"); s0.insertAdjacentHTML("beforeend", '<span class="balao">👆 Toque pra ver hora a hora</span>'); } }
+
     // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
     const sol = $("#abrirSol"), temCeu = !!(window.CEU && CEU.suportado());
     if (sol) { sol.hidden = !temCeu; $("#atalhos").classList.toggle("so3", !temCeu); sol.onclick = () => CEU.abrir(p); }

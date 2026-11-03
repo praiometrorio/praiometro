@@ -941,3 +941,8 @@ html,body{overscroll-behavior-y:none}
 .selo.dica-on{animation:dicaPulsa 1.4s ease-in-out infinite;overflow:visible}
 .selo .balao{position:absolute;left:8px;top:calc(100% + 10px);z-index:9;background:#10283A;color:#fff;font:700 13px var(--f-body);padding:9px 12px;border-radius:12px;white-space:nowrap;box-shadow:0 8px 20px rgba(0,0,0,.25);pointer-events:none}
 .selo .balao:before{content:"";position:absolute;left:18px;top:-6px;border:6px solid transparent;border-top:0;border-bottom-color:#10283A}
+
+/* folhas de detalhe: nunca sobem por baixo do relógio/bateria; o título e o X ficam sempre visíveis */
+.rel-folha{max-height:calc(100vh - env(safe-area-inset-top,0px) - 24px);max-height:calc(100dvh - env(safe-area-inset-top,0px) - 24px);overscroll-behavior:contain}
+.rel-topo{position:sticky;top:-16px;z-index:4;background:inherit;margin:-16px -18px 8px;padding:16px 18px 8px;border-radius:26px 26px 0 0}
+.rel-x{width:44px;height:44px}
