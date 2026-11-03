@@ -908,3 +908,20 @@ html,body{overscroll-behavior-y:none}
 .atalhos4 .btn-sol em{top:-6px;right:calc(50% - 34px);font-size:7.5px;padding:3px 5px}
 .wrap{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 @media (min-width:700px){.atalhos4{left:50%;right:auto;width:440px;transform:translateX(-50%)}}
+
+/* "Como chegar" (metrô): fechado só o título, tocando abre os detalhes */
+.info.como{display:block;padding:0}
+.como summary{list-style:none;display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;font-size:14.5px}
+.como summary::-webkit-details-marker{display:none}
+.como summary b{flex:1}
+.como-seta{font-style:normal;font-size:20px;line-height:1;opacity:.55;transition:transform .2s}
+.como[open] .como-seta{transform:rotate(90deg)}
+.como-corpo{padding:0 14px 12px 46px;font-size:14px;animation:comoAbre .22s ease-out}
+.como-corpo p{margin:0}
+.como-corpo .como-sub{font-size:12.5px;opacity:.75;margin-bottom:4px}
+.como-corpo ul{margin:0;padding:0;list-style:none;display:grid;gap:4px}
+.como-corpo li span{opacity:.75}
+@keyframes comoAbre{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+
+/* enfeite do "Como chegar": bonequinho com prancha, pontilhado e guarda-sol */
+.info .como-anda{width:104px;height:34px;flex:none;overflow:visible;margin:0}

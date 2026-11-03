@@ -45,6 +45,19 @@ def onda_praia(pid, mh, k):
         o = tot * (e1 / e0) ** 0.5
     else: o = tot * expo_onda(pid, g("wave_direction"))
     return min(o, 0.5) if ORIENTACAO.get(pid, (None, False))[1] else o
+
+MEDIDA_SURFISTA = 0.6   # igual ao app
+
+def onda_surfista(pid, mh, k):
+    """onda na arrebentação, na medida do surfista (igual ao app: ondaSurfista)"""
+    h = onda_praia(pid, mh, k)
+    if h is None: return None
+    if ORIENTACAO.get(pid, (None, False))[1]: return h
+    g = lambda n: (mh.get(n) or [None] * (k + 1))[k]
+    sw, tot = g("swell_wave_height"), g("wave_height")
+    T = g("swell_wave_period") if sw is not None and tot is not None and sw >= 0.5 * tot and g("swell_wave_period") is not None else g("wave_period")
+    T = T or 8
+    return max(0, 0.39 * 9.81 ** 0.2 * (T * h * h) ** 0.4 * MEDIDA_SURFISTA)
 HORAS = [5, 6, 7, 8, 9]
 AVISO = "Lembrando: vento e previsão mudam bastante. Confere de novo amanhã cedo no app."
 
@@ -55,7 +68,7 @@ def previsao():
     try: mods = baixar(base + "&hourly=wind_speed_10m,precipitation&models=" + ",".join(MODELOS))
     except Exception: mods = None
     try: mar = baixar(f"https://marine-api.open-meteo.com/v1/marine?latitude={lat}&longitude={lon}&timezone={urllib.parse.quote(FUSO)}&forecast_days=3"
-        "&hourly=wave_height,wave_direction,swell_wave_height,swell_wave_direction,secondary_swell_wave_height,secondary_swell_wave_direction,wind_wave_height,wind_wave_direction,sea_surface_temperature")
+        "&hourly=wave_height,wave_direction,wave_period,swell_wave_period,swell_wave_height,swell_wave_direction,secondary_swell_wave_height,secondary_swell_wave_direction,wind_wave_height,wind_wave_direction,sea_surface_temperature")
     except Exception: mar = None
     if isinstance(tempo, dict): tempo = [tempo]
     if isinstance(mods, dict): mods = [mods]
@@ -100,7 +113,7 @@ def hora_a_hora(t, m, data, mar=None, pid=None, propria=None):
             raj = max(v + 1, round(v * f))
         o = s = None
         if mar and ts in mar["hourly"]["time"]:
-            km = mar["hourly"]["time"].index(ts); o = onda_praia(pid, mar["hourly"], km)
+            km = mar["hourly"]["time"].index(ts); o = onda_surfista(pid, mar["hourly"], km)
             s = (mar["hourly"].get("sea_surface_temperature") or [None] * (km + 1))[km]
         out[hr] = {"v": v, "raj": raj, "chuva": chuva,
                    "t": h["temperature_2m"][k], "ur": h["relative_humidity_2m"][k],

@@ -8,7 +8,7 @@
   const FUSO = "America/Sao_Paulo";
   const OFFSET = "-03:00";                     // o Brasil não tem mais horário de verão
   const HORA_INI = 6, HORA_FIM = 20;           // janela de praia considerada (6h às 20h)
-  const CACHE_CHAVE = "pm-previsao-v14";
+  const CACHE_CHAVE = "pm-previsao-v15";
   const CACHE_MIN = 10;                        // minutos que a previsão fica guardada (atualiza no máximo de 10 em 10)
   const RAIO_SOL = 1.3;                        // km: raio do arco do sol desenhado no mapa
 
@@ -123,12 +123,14 @@
     else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: `${uvTxt} · queima mesmo nublado` });
     else selos.push({ cls: "neutro", ic: IC.gota, t: "UV baixo", s: "Pouco risco de queimar" });
 
+    // ondas a partir do 4º dia: avisa que a previsão do mar ainda pode mudar bastante
+    const incerta = datas.indexOf(x.data) >= 3 ? " · previsão incerta" : "";
     if (p.baia) selos.push({ cls: "mar", ic: IC.calmo, t: "Mar de baía", s: o != null ? `Calminho, ondas de até ${fmt(o)} m` : "Calminho" });
     else if (o == null) selos.push({ cls: "neutro", ic: IC.onda, t: "Mar", s: "Sem dado do mar agora" });
-    else if (o < 0.6) selos.push({ cls: "mar", ic: IC.calmo, t: "Piscininha", s: `Mar liso, ondas de ${fmt(o)} m` });
-    else if (o < 1.2) selos.push({ cls: "mar", ic: IC.onda, t: "Marolinha", s: `Ondas de ${fmt(o)} m, dá pra nadar` });
-    else if (o < 2) selos.push({ cls: "mexido", ic: IC.onda, t: "Mar mexido", s: `Ondas de ${fmt(o)} m` });
-    else selos.push({ cls: "ruim", ic: IC.onda, t: "Mar pesado", s: `Ondas de ${fmt(o)} m, cuidado com a correnteza` });
+    else if (o < 0.6) selos.push({ cls: "mar", ic: IC.calmo, t: "Piscininha", s: `Mar liso, ondas de ${fmt(o)} m` + incerta });
+    else if (o < 1.2) selos.push({ cls: "mar", ic: IC.onda, t: "Marolinha", s: `Ondas de ${fmt(o)} m, dá pra nadar` + incerta });
+    else if (o < 2) selos.push({ cls: "mexido", ic: IC.onda, t: "Mar mexido", s: `Ondas de ${fmt(o)} m` + incerta });
+    else selos.push({ cls: "ruim", ic: IC.onda, t: "Mar pesado", s: `Ondas de ${fmt(o)} m, cuidado com a correnteza` + incerta });
 
     if (x.agua == null) selos.push({ cls: "neutro", ic: IC.termo, t: "Água", s: "Sem dado da temperatura" });
     else if (x.agua < 20) selos.push({ cls: "frio", ic: IC.termo, t: "Água gelada", s: `${fmt(x.agua)}°C, só pra corajoso` });
@@ -345,6 +347,24 @@
     return p.baia ? Math.min(o, 0.5) : o;
   };
   const CHUVA_MM = 0.3;   // mm numa hora para um modelo "contar" como chuva
+  // ---------- onda que o surfista pega (na arrebentação) ----------
+  // 1) ondaPraia: altura do mar em frente à praia (alto-mar corrigido pela direção e pelo abrigo);
+  // 2) a onda cresce ao chegar no raso, mais quanto maior o período (fórmula de Komar & Gaughan para a altura de quebra);
+  // 3) e é falada na medida do surfista (bem menor que a face inteira): fator calibrado com quem estava na água
+  //    (Arpoador, nov/2026: o modelo dava 1,5 m e na água tinha "no máximo 1 m").
+  const MEDIDA_SURFISTA = 0.6;
+  const periodoEm = (mh, k) => {
+    const g = (n) => (mh[n] ? mh[n][k] : null), sw = g("swell_wave_height"), tot = g("wave_height");
+    return sw != null && tot != null && sw >= 0.5 * tot && g("swell_wave_period") != null ? g("swell_wave_period") : g("wave_period");
+  };
+  const ondaSurfista = (p, mh, k) => {
+    const h = ondaPraia(p, mh, k);
+    if (h == null) return null;
+    if (p.baia) return h;                                     // baía: já limitada a 0,5 m, não quebra como mar aberto
+    const T = periodoEm(mh, k) || 8;
+    const hb = 0.39 * Math.pow(9.81, 0.2) * Math.pow(T * h * h, 0.4);
+    return Math.max(0, hb * MEDIDA_SURFISTA);
+  };
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,precipitation&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
@@ -417,16 +437,37 @@
     if (!perto.length && lista[0] && lista[0].min <= 27) perto = [lista[0]];
     return perto.sort((a, b) => a.ordem - b.ordem || a.min - b.min);
   }
+  // enfeite do "Como chegar": bonequinho de palito correndo com a prancha → pontilhado → areia com guarda-sol
+  const ANDANDO = `<svg class="como-anda" viewBox="0 0 112 36" aria-hidden="true">
+    <svg x="4" y="8" width="31" height="26" viewBox="95 770 560 490" overflow="visible">
+      <g fill="none" stroke="#3B2F63" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M185 917 L310 907 M125 987 L245 970 M107 1058 L178 1047" stroke-width="18" opacity=".55"/>
+        <circle cx="520" cy="857" r="78"/>
+        <path d="M493 936 L478 990"/>
+        <path d="M548 1020 L578 1027 L640 965"/>
+        <path d="M445 1104 L368 1200 L265 1170 L235 1213"/>
+        <path d="M445 1110 L540 1155 L580 1245 L628 1205"/>
+      </g>
+      <ellipse cx="375" cy="1045" rx="176" ry="54" transform="rotate(-9 375 1045)" fill="#FFB627" stroke="#3B2F63" stroke-width="22"/>
+      <path d="M205 1071 L545 1019" stroke="#E8562A" stroke-width="16" stroke-linecap="round"/>
+      <path d="M490 942 L400 985 Q362 1040 362 1108" fill="none" stroke="#3B2F63" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <path d="M40 32 H84" stroke="#6B5BA8" stroke-width="2" stroke-dasharray="1 5" stroke-linecap="round" opacity=".55"/>
+    <path d="M84 33.5 Q97 25 111 33.5 Z" fill="#F2D9A8"/>
+    <path d="M98 28.5 L95 13" stroke="#7A5A3A" stroke-width="1.3" stroke-linecap="round"/>
+    <path d="M95 7 L84.5 14.5 Q87 13.5 89.5 14.5 Z" fill="#FF5A4E"/><path d="M95 7 L89.5 14.5 Q92.2 13.5 95 14.5 Z" fill="#fff"/><path d="M95 7 L95 14.5 Q97.8 13.5 100.5 14.5 Z" fill="#FF5A4E"/><path d="M95 7 L100.5 14.5 Q103 13.5 105.5 14.5 Z" fill="#fff"/>
+    <path d="M84.5 14.5 Q95 3 105.5 14.5" fill="none" stroke="#E04A3E" stroke-width=".7"/>
+  </svg>`;
   function htmlMetro(p) {
     const ms = metroPerto(p);
     if (!ms.length) return "";
     const nomePosto = (n) => n === "QM" ? "Quebra-Mar" : /^\d+$/.test(n) ? "Posto " + n : n;
-    if (ms.length === 1) {
-      const m = ms[0];
-      return `<div class="info metro">${IC.metro}<span><b>Metrô ${m.nome}</b>, uns ${m.min} min a pé${m.posto ? ` até ${/^\d+$|^QM$/.test(m.posto) ? "o " : "a "}${nomePosto(m.posto)}` : ""}.</span></div>`;
-    }
-    return `<div class="info metro">${IC.metro}<div class="metro-c"><b>Metrô</b> <small>Escolha pelo pedaço da praia</small>
-      <ul>${ms.map((m) => `<li><b>${m.nome}</b>${m.posto ? ` → ${nomePosto(m.posto)}` : ""} <span>· ${m.min} min</span></li>`).join("")}</ul></div></div>`;
+    // "Como chegar": fechado mostra só o título; tocando, abre os detalhes (estação, posto e minutos a pé)
+    const corpo = ms.length === 1
+      ? `<p><b>Metrô ${ms[0].nome}</b>, uns ${ms[0].min} min a pé${ms[0].posto ? ` até ${/^\d+$|^QM$/.test(ms[0].posto) ? "o " : "a "}${nomePosto(ms[0].posto)}` : ""}.</p>`
+      : `<p class="como-sub">De metrô · escolha pelo pedaço da praia</p>
+        <ul>${ms.map((m) => `<li><b>${m.nome}</b>${m.posto ? ` → ${nomePosto(m.posto)}` : ""} <span>· ${m.min} min a pé</span></li>`).join("")}</ul>`;
+    return `<details class="info metro como"><summary>${IC.metro}<b>Como chegar</b>${ANDANDO}<i class="como-seta" aria-hidden="true">›</i></summary><div class="como-corpo">${corpo}</div></details>`;
   }
 
   // ---------- maré ----------
@@ -638,7 +679,7 @@
         if (m && m.hourly) {
           const mi = [];
           m.hourly.time.forEach((ts, k) => { const hr = +ts.slice(11, 13); if (ts.slice(0, 10) === data && hr >= HORA_INI && hr <= HORA_FIM) mi.push(k); });
-          const w = mi.map((k) => ondaPraia(p, m.hourly, k)).filter((v) => v != null);
+          const w = mi.map((k) => ondaSurfista(p, m.hourly, k)).filter((v) => v != null);
           const s = mi.map((k) => m.hourly.sea_surface_temperature[k]).filter((v) => v != null);
           if (w.length) ondas = Math.max(...w);
           if (s.length) aguaT = media(s);
@@ -672,7 +713,7 @@
               // cada parte também é reduzida quando vem de lado (pedras e pontas abrigam a praia)
               const lim = (v, d) => (v == null ? v : p.baia ? Math.min(v * expoOnda(p, d), 0.5) : v * expoOnda(p, d));
               res.push({ h: hr,
-                alt: ondaPraia(p, mh, k), dir: g("wave_direction", k), per: g("wave_period", k),
+                alt: ondaSurfista(p, mh, k), dir: g("wave_direction", k), per: g("wave_period", k),
                 sw: { a: lim(g("swell_wave_height", k), g("swell_wave_direction", k)), d: g("swell_wave_direction", k), p: g("swell_wave_period", k) },
                 sw2: { a: lim(g("secondary_swell_wave_height", k), g("secondary_swell_wave_direction", k)), d: g("secondary_swell_wave_direction", k), p: g("secondary_swell_wave_period", k) },
                 vg: { a: lim(g("wind_wave_height", k), g("wind_wave_direction", k)), d: g("wind_wave_direction", k) },
@@ -686,7 +727,7 @@
             for (let hr = HORA_INI; hr <= HORA_FIM; hr++) {
               const k = m.hourly.time.indexOf(`${data}T${pad(hr)}:00`);
               if (k < 0) continue;
-              const o = ondaPraia(p, m.hourly, k);
+              const o = ondaSurfista(p, m.hourly, k);
               r.push({ h: hr, o, s: m.hourly.sea_surface_temperature[k], d: m.hourly.wave_direction ? m.hourly.wave_direction[k] : null, per: m.hourly.wave_period ? m.hourly.wave_period[k] : null });
             }
             return r;
@@ -697,7 +738,7 @@
             const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
             const ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
             const km = m && m.hourly ? m.hourly.time.indexOf(`${data}T${pad(hr)}:00`) : -1;
-            const o = km >= 0 ? ondaPraia(p, m.hourly, km) : null, s = km >= 0 ? m.hourly.sea_surface_temperature[km] : null;
+            const o = km >= 0 ? ondaSurfista(p, m.hourly, km) : null, s = km >= 0 ? m.hourly.sea_surface_temperature[km] : null;
             return { h: hr, t: h.temperature_2m[k], ur, chuva: chuvaEm(k), v: ventoEm(k), raj: rajEm(k),
               uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr),
               o: o == null ? null : Math.round(o * 10) / 10, s, propria: prop && typeof prop === "object" ? prop.propria : prop === true ? true : prop === false ? false : null };
