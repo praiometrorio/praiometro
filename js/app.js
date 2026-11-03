@@ -795,7 +795,7 @@
   };
   const ESPORTES = {
     beach:  { nome: "Beach tennis", ic: ICONES_ESP.beach, vento: [7, 13] },
-    volei:  { nome: "Vôlei", ic: ICONES_ESP.volei, vento: [8, 15] },
+    volei:  { nome: "Vôlei", ic: ICONES_ESP.volei, vento: [8, 13] },   // atrapalha até 13: ajuste da Suzane (nov/2026)
     futev:  { nome: "Futevôlei", ic: ICONES_ESP.futev, vento: [12, 20] },   // bom até 12: retorno de quem joga (out/2026)
     altinha:{ nome: "Altinha", ic: ICONES_ESP.altinha, vento: [10, 18] },
     fresco: { nome: "Frescobol", ic: ICONES_ESP.fresco, vento: [12, 20] },
@@ -831,6 +831,10 @@
     const tw = t * Math.atan(0.151977 * Math.sqrt(ur + 8.313659)) + Math.atan(t + ur) - Math.atan(ur - 1.676331) + 0.00391838 * Math.pow(ur, 1.5) * Math.atan(0.023101 * ur) - 4.686035;
     return 0.7 * tw + 0.3 * t;
   };
+  // "a e b", "a, b e c"
+  const juntar = (a) => a.length < 3 ? a.join(" e ") : a.slice(0, -1).join(", ") + " e " + a[a.length - 1];
+  // rajada "muito alta" para o esporte: 10 km/h acima do limite do "atrapalha"
+  const rajadaForte = (q, esp) => q.raj != null && q.raj >= ESPORTES[esp].vento[1] + 10;
   // 0 bom, 1 atrapalha, 2 ruim, e o porquê
   function notaTreino(q, esp) {
     const E = ESPORTES[esp], motivos = [];
@@ -850,10 +854,11 @@
       if (w != null && w >= 28) { n = 2; motivos.push("calor perigoso"); } else if (w != null && w >= 23) { n = Math.max(n, 1); motivos.push("abafado"); }
       if (q.v != null && q.v > E.vento[1]) { n = Math.max(n, 1); motivos.push("vento forte"); }
     } else if (q.v != null) {
-      let nv = q.v <= E.vento[0] ? 0 : q.v <= E.vento[1] ? 1 : 2;
-      if (q.raj != null && q.raj >= E.vento[1] + 10 && nv < 2) nv++;          // rajada forte piora um nível
-      if (nv) motivos.push(nv === 2 ? "vento forte" : "vento");
-      n = Math.max(n, nv);
+      const nv0 = q.v <= E.vento[0] ? 0 : q.v <= E.vento[1] ? 1 : 2;
+      const rj = rajadaForte(q, esp) && nv0 < 2;                               // rajada forte piora um nível
+      if (nv0) motivos.push(nv0 === 2 ? "vento forte" : "vento");
+      if (rj) motivos.push("rajadas fortes");
+      n = Math.max(n, nv0 + (rj ? 1 : 0));
     }
     return { n, motivos };
   }
@@ -900,10 +905,48 @@
   // faixa hora a hora (5h às 10h) de um treino num dia
   function faixaTreino(t, x, mini) {
     const cls = ["bom", "medio", "ruim"], corrida = t.esp === "corrida", nada = t.esp === "natacao";
-    return `<div class="tr-faixa${mini ? " mini" : ""}">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => { const nt = notaTreino(y, t.esp);
+    return `<div class="tr-faixa${mini ? " mini" : ""}">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => {
+      // nos esportes de bola a faixa é "vento pra bola": a cor segue só o vento médio, igual à legenda
+      // (chuva e rajada continuam pesando no veredito lá em cima)
+      const E = ESPORTES[t.esp], soVento = !corrida && !nada && y.v != null;
+      const nt = soVento ? { n: y.v <= E.vento[0] ? 0 : y.v <= E.vento[1] ? 1 : 2 } : notaTreino(y, t.esp);
       const v = corrida ? Math.round(y.t) + "°" : nada ? (y.o != null ? fmt1(y.o) : "–") : (y.v ?? "–");
       const u = corrida ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : nada ? "m" : "km/h";
-      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${v}</span>${mini ? "" : `<span class="u">${u}</span>`}</div>`; }).join("")}</div>`;
+      // rajada pequena embaixo, no mesmo quadrado (em vermelho quando é forte e piora o treino)
+      const rj = corrida || nada ? "" : `<span class="rj${rajadaForte(y, t.esp) ? " forte" : ""}">${mini ? "" : "rajada "}${y.raj ?? "–"}</span>`;   // sempre aparece, até no resumo da lista
+      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${v}</span>${mini ? "" : `<span class="u">${u}</span>`}${rj}</div>`; }).join("")}</div>`;
+  }
+  // comentário embaixo da faixa quando as rajadas estão muito altas (o vento médio sozinho engana)
+  function avisoRajada(t, x) {
+    if (t.esp === "corrida" || t.esp === "natacao") return "";
+    const E = ESPORTES[t.esp], hs = (x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10 && rajadaForte(y, t.esp));
+    if (!hs.length) return "";
+    const top = hs.reduce((a, b) => (b.raj > a.raj ? b : a)), meu = hs.find((y) => y.h === t.hora);
+    const txt = meu && meu.v <= E.vento[1]
+      ? `Vento médio ok às ${t.hora}h (${meu.v} km/h), mas as rajadas estão muito altas: chegam a ${meu.raj} km/h.`
+      : meu ? `Além do vento forte, as rajadas chegam a ${meu.raj} km/h às ${t.hora}h.`
+      : `Rajadas muito altas ${hs.length === 1 ? "às " + hs[0].h + "h" : "das " + hs[0].h + "h às " + hs[hs.length - 1].h + "h"}: até ${top.raj} km/h às ${top.h}h.`;
+    return `<p class="tr-rajada"><span aria-hidden="true">💨 </span><span>${txt}</span></p>`;
+  }
+  // ---------- feedback depois do treino (todos os esportes) ----------
+  // pergunta como foi o treino de hoje: só depois do horário, e não no dia em que o treino foi criado
+  function pedeFeedback(t) {
+    const hoje = datas[0];
+    return !!t && !!t.id && t.dias.includes(diaSemana(hoje)) && horaAgora().h >= t.hora + 1 && t.criado !== hoje && !guarda.ler(`pm-fb-${hoje}-${t.id}`);
+  }
+  const PERGUNTA_FB = (t) => t.esp === "corrida" ? "a corrida" : t.esp === "natacao" ? "o mar pra nadar" : "o vento pro " + ESPORTES[t.esp].nome.toLowerCase();
+  const cartaoFeedback = (t) => `<div class="tr-card tr-fb" data-fbid="${t.id}"><p>Como estava ${PERGUNTA_FB(t)} hoje às ${t.hora}h?</p>
+        <div><button data-fb="bom">👍 Bom</button><button data-fb="atrapalhou">😐 Atrapalhou</button><button data-fb="ruim">👎 Ruim</button></div></div>`;
+  function ligarFeedback(raiz) {
+    raiz.querySelectorAll("[data-fbid]").forEach((card) => card.querySelectorAll("[data-fb]").forEach((b) => b.onclick = () => {
+      const hoje = datas[0], t = treinos.find((z) => z.id === card.dataset.fbid); if (!t) return;
+      const x = previsao[t.praia] && previsao[t.praia][0], q = x && x.cedo ? x.cedo.find((y) => y.h === t.hora) : null;
+      guarda.gravar(`pm-fb-${hoje}-${t.id}`, b.dataset.fb);
+      // vai pro contador (sem dado pessoal): esporte, praia, hora, resposta e o que a previsão dava (vento, rajada, chuva, temperatura)
+      const val = (k) => (q && q[k] != null ? Math.round(q[k]) : "x");
+      (window.pmEventos = window.pmEventos || []).push(`fb-${t.esp}-${t.praia}-${t.hora}h-${b.dataset.fb}-v${val("v")}-r${val("raj")}-c${val("chuva")}-t${val("t")}`);
+      card.innerHTML = "<p>Valeu! Isso ajuda a deixar o Treino cedo mais preciso. 🙌</p>";
+    }));
   }
   const CEU_TREINO = '<span class="tr-disco"></span><span class="tr-mar"></span><span class="tr-reflexo"></span>';
   const NOTA_RODAPE = '<p class="tr-nota">* Os limites de vento são estimativas e estão sujeitos a mudanças. Contamos também com o seu feedback para melhorar cada vez mais a nossa precisão.</p>';
@@ -992,12 +1035,12 @@
       let piora = "";
       const pior = x.cedo.find((y) => y.h > t.hora && notaTreino(y, t.esp).n > nota.n);
       if (pior) piora = corrida || nada ? ` Piora a partir das ${pior.h}h.` : ` O vento aperta a partir das ${pior.h}h.`;
-      const frase = nota.n === 0 ? (corrida ? "Temperatura boa e sem chuva." : nada ? "Mar calmo e pouco vento." : "Vento fraco e sem chuva.") + piora : "Por causa de " + nota.motivos.join(" e ") + "." + piora;
+      const frase = nota.n === 0 ? (corrida ? "Temperatura boa e sem chuva." : nada ? "Mar calmo e pouco vento." : "Vento fraco e sem chuva.") + piora : "Por causa de " + juntar(nota.motivos) + "." + piora;
       const nivs = (x.mareDia || []).map((z) => z.n), mn = Math.min(...nivs), mx = Math.max(...nivs);
       const mareTxt = (n) => n == null || !nivs.length ? "—" : (n - mn) / ((mx - mn) || 1) < 0.35 ? "baixa · faixa larga" : (n - mn) / ((mx - mn) || 1) > 0.65 ? "alta · faixa estreita" : "média";
       const uvAlto = (x.cedo || []).concat(x.horas || []).find((y) => y.uv != null && y.uv >= 6);
       const sens = bulbo(q.t, q.ur);
-      corpo.innerHTML = `
+      corpo.innerHTML = `${!av && pedeFeedback(t) ? cartaoFeedback(t) : ""}
         <div class="tr-ceu">${CEU_TREINO}
           <div class="tr-esc"><span class="tr-chip">${E.ic} ${E.nome}</span><span class="tr-chip">📍 ${nomePraia(t.praia)}</span><span class="tr-chip">⏰ ${t.hora}h</span></div>
           <div class="tr-veredito"><span class="tr-selo n${nota.n}">${NOTA_TXT(t.esp)[nota.n]}</span><h3>${nomeDiaTreino(s.d)}, ${t.hora}h</h3><p>${frase}</p></div>
@@ -1011,8 +1054,9 @@
         <div class="tr-card">
           <p class="tr-rot">Hora a hora · ${corrida ? "calor e chuva" : nada ? "ondas na praia" : "vento pra bola"}</p>
           ${faixaTreino(t, x)}
+          ${avisoRajada(t, x)}
           <div class="tr-leg"><span><i class="bom"></i>bom</span><span><i class="medio"></i>atrapalha</span><span><i class="ruim"></i>ruim</span></div>
-          ${corrida ? "" : nada ? `<p class="tr-lim">Natação: ondas boas até ${fmt1(E.ondas[0])} m · atrapalham até ${fmt1(E.ondas[1])} m · acima disso, ruim. Vento acima de ${E.vento[0]} km/h faz marola.</p>` : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p>`}
+          ${corrida ? "" : nada ? `<p class="tr-lim">Natação: ondas boas até ${fmt1(E.ondas[0])} m · atrapalham até ${fmt1(E.ondas[1])} m · acima disso, ruim. Vento acima de ${E.vento[0]} km/h faz marola.</p>` : `<p class="tr-lim">${E.nome}: bom até ${E.vento[0]} km/h · atrapalha até ${E.vento[1]} · acima disso, ruim.</p><p class="tr-lim">Rajada embaixo de cada hora: em vermelho a partir de ${E.vento[1] + 10} km/h, quando piora o treino.</p>`}
         </div>
         <div class="tr-card tr-linhas">
           ${av ? "" : `<div><span>Seus dias</span><b>${textoDias(t.dias)}</b></div>`}
@@ -1026,6 +1070,7 @@
                ${treinos.length < MAX_TREINOS ? `<button class="tr-editar claro" id="trVirarFixo">Faço toda ${SEMANA_CURTA[diaSemana(datas[av.d]) - 1].toLowerCase()}: salvar como treino da semana</button>` : ""}`
              : '<button class="tr-editar" id="trEditar">Editar dias, horário e praia</button>'}
         ${NOTA_RODAPE}`;
+      ligarFeedback(corpo);
       $("#trEditar").onclick = () => irTreino("form", { rascunho: av ? { ...av } : { ...t, dias: t.dias.slice() } });
       const vf = $("#trVirarFixo");
       if (vf) vf.onclick = () => irTreino("form", { rascunho: { ...av, tipo: "fixo", dias: [diaSemana(datas[av.d])] } });
@@ -1033,18 +1078,15 @@
     }
 
     // lista: meus treinos
-    const agora = horaAgora(), hojeData = datas[0], hojeSem = diaSemana(hojeData);
-    // pergunta como foi o treino de hoje (só depois do horário, e não no dia em que o treino foi criado)
-    const pendFb = treinos.filter((t) => t.dias.includes(hojeSem) && agora.h >= t.hora + 1 && t.criado !== hojeData && !guarda.ler(`pm-fb-${hojeData}-${t.id}`));
+    const pendFb = treinos.filter(pedeFeedback);
     corpo.innerHTML = `
       <div class="tr-ceu curto">${CEU_TREINO}<div class="tr-veredito"><h3>Meus treinos</h3><p>Toque num treino para ver hora a hora.</p></div></div>
-      ${pendFb.map((t) => `<div class="tr-card tr-fb" data-fbid="${t.id}"><p>Como estava ${t.esp === "corrida" ? "a corrida" : t.esp === "natacao" ? "o mar pra nadar" : "o vento pro " + ESPORTES[t.esp].nome.toLowerCase()} hoje às ${t.hora}h?</p>
-        <div><button data-fb="bom">👍 Bom</button><button data-fb="atrapalhou">😐 Atrapalhou</button><button data-fb="ruim">👎 Ruim</button></div></div>`).join("")}
+      ${pendFb.map(cartaoFeedback).join("")}
       ${treinos.map((t) => { const E = ESPORTES[t.esp], s = proximaSessao(t);
         return `<button class="tr-card tr-item" data-abrir="${t.id}">
           <div class="tr-item-topo"><span class="tr-item-ic">${E.ic}</span><div><b>${E.nome}</b><small>${textoDias(t.dias)} · ${t.hora}h · ${nomePraia(t.praia)}${t.esp === "corrida" ? " · " + (t.piso === "areia" ? "areia" : "orla") : ""}</small></div>
             ${s ? `<span class="tr-selo n${s.nota.n}">${NOTA_CURTA[s.nota.n]}</span>` : ""}</div>
-          ${s ? `<p class="tr-item-quando">${nomeDiaTreino(s.d)}, ${t.hora}h${s.nota.n ? " · " + s.nota.motivos.join(" e ") : ""}</p>${faixaTreino(t, s.x, true)}` : '<p class="tr-item-quando">Sem previsão nos próximos dias</p>'}
+          ${s ? `<p class="tr-item-quando">${nomeDiaTreino(s.d)}, ${t.hora}h${s.nota.n ? " · " + juntar(s.nota.motivos) : ""}</p>${faixaTreino(t, s.x, true)}` : '<p class="tr-item-quando">Sem previsão nos próximos dias</p>'}
         </button>`; }).join("")}
       <div class="tr-add-linha">
         ${treinos.length < MAX_TREINOS ? '<button class="tr-add" id="trAdd">+ Adicionar treino da semana</button>' : ""}
@@ -1064,13 +1106,7 @@
       if (avisoTreino) { avisoTreino = false; gravaTreinos(); if (window.pmPush) window.pmPush.etiquetas({}); return desenharTreino(); }
       ligarAvisoTreino(() => desenharTreino());
     };
-    corpo.querySelectorAll("[data-fbid]").forEach((card) => card.querySelectorAll("[data-fb]").forEach((b) => b.onclick = () => {
-      const t = treinos.find((z) => z.id === card.dataset.fbid), x = previsao[t.praia][0], q = x && x.cedo ? x.cedo.find((y) => y.h === t.hora) : null;
-      guarda.gravar(`pm-fb-${hojeData}-${t.id}`, b.dataset.fb);
-      // vai pro contador (sem dado pessoal): esporte, resposta e o vento/temperatura que a previsão dava
-      (window.pmEventos = window.pmEventos || []).push(`fb-${t.esp}-${b.dataset.fb}-v${q ? q.v ?? "x" : "x"}-r${q ? q.raj ?? "x" : "x"}-t${q ? Math.round(q.t) : "x"}`);
-      card.innerHTML = "<p>Valeu! Isso ajuda a deixar o Treino cedo mais preciso. 🙌</p>";
-    }));
+    ligarFeedback(corpo);
     desenharBotaoTreino();
   }
 

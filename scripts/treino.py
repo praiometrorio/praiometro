@@ -14,7 +14,7 @@ PRAIAS = PRAIAS_MAR + [
 
 ESPORTES = {   # [bom até, atrapalha até] em km/h (vento médio); acima disso é ruim
     "beach":   ("Beach tennis", "🎾", (7, 13)),
-    "volei":   ("vôlei", "🏐", (8, 15)),
+    "volei":   ("vôlei", "🏐", (8, 13)),
     "futev":   ("futevôlei", "⚽", (12, 20)),
     "altinha": ("altinha", "🦶", (10, 18)),
     "fresco":  ("frescobol", "🏖️", (12, 20)),
@@ -151,10 +151,11 @@ def nota(q, esp):
         elif w is not None and w >= 23: n = max(n, 1); motivos.append("abafado")
         if q["v"] is not None and q["v"] > lim[1]: n = max(n, 1); motivos.append("vento forte")
     elif q["v"] is not None:
-        nv = 0 if q["v"] <= lim[0] else 1 if q["v"] <= lim[1] else 2
-        if q["raj"] is not None and q["raj"] >= lim[1] + 10 and nv < 2: nv += 1
-        if nv: motivos.append("vento forte" if nv == 2 else "vento")
-        n = max(n, nv)
+        nv0 = 0 if q["v"] <= lim[0] else 1 if q["v"] <= lim[1] else 2
+        rj = q["raj"] is not None and q["raj"] >= lim[1] + 10 and nv0 < 2   # rajada forte piora um nível (igual ao app)
+        if nv0: motivos.append("vento forte" if nv0 == 2 else "vento")
+        if rj: motivos.append("rajadas fortes")
+        n = max(n, nv0 + (1 if rj else 0))
     return n, motivos
 
 def mensagem(esp, nome_praia, hr, q):
@@ -162,10 +163,10 @@ def mensagem(esp, nome_praia, hr, q):
     oque = "a corrida" if esp == "corrida" else "a natação" if esp == "natacao" else ("o " + nome) if esp in ("volei", "futev", "fresco") else ("a " + nome) if esp == "altinha" else "o beach tennis"
     if n == 0: titulo = f"{ic} Amanhã {hr}h tá bom pr{oque[0]} {oque[2:]}!"
     elif n == 1:
-        frase = {"vento": "o vento", "vento forte": "o vento forte", "chance de chuva": "a chance de chuva", "abafado": "o abafado",
+        frase = {"vento": "o vento", "vento forte": "o vento forte", "rajadas fortes": "as rajadas fortes", "chance de chuva": "a chance de chuva", "abafado": "o abafado",
                  "chuva": "a chuva", "mar mexido": "o mar mexido", "marola do vento": "a marola do vento", "água imprópria": "a água imprópria", "água gelada": "a água gelada"}
         titulo = f"{ic} Amanhã {hr}h dá, mas {' e '.join(frase.get(x, x) for x in motivos)} {'podem' if len(motivos) > 1 else 'pode'} atrapalhar"
-    else: titulo = f"{'🌊' if 'ondas grandes' in motivos else '🌧️' if 'chuva' in motivos else '💨' if 'vento' in ' '.join(motivos) else '🥵'} Amanhã {hr}h: condição ruim pr{oque[0]} {oque[2:]}"
+    else: titulo = f"{'🌊' if 'ondas grandes' in motivos else '🌧️' if 'chuva' in motivos else '💨' if 'vento' in ' '.join(motivos) or 'rajadas fortes' in motivos else '🥵'} Amanhã {hr}h: condição ruim pr{oque[0]} {oque[2:]}"
     if esp == "corrida":
         dados = f"{round(q['t'])}°, chuva {q['chuva']}%"
     elif esp == "natacao":
