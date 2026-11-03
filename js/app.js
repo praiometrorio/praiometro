@@ -2988,9 +2988,12 @@
     const celular = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 820;
     let pedidoAndroid = null;
     const conv = $("#convInstalar");
-    const fecharConv = (dias) => { conv.hidden = true; document.body.style.overflow = ""; guarda.gravar("pm-inst-convite", Date.now() + dias * 864e5); };
     // aberto de dentro do Instagram/Facebook/TikTok: ali não dá pra instalar; primeiro precisa abrir no navegador de verdade
     const dentroDeApp = /Instagram|FBAN|FBAV|FB_IAB|musical_ly|Bytedance|TikTok|Line\//i.test(navigator.userAgent);
+
+    // dentro do Instagram etc. a "lembrança" é separada e mais curta (1 dia): ali o convite é o único jeito de sair pro navegador
+    const CHAVE_CONV = () => (dentroDeApp ? "pm-inst-convite-app" : "pm-inst-convite");
+    const fecharConv = (dias) => { conv.hidden = true; document.body.style.overflow = ""; guarda.gravar(CHAVE_CONV(), Date.now() + (dentroDeApp ? 1 : dias) * 864e5); };
     const prepararNavegador = () => {
       const url = "praiometrorio.com.br" + location.pathname.replace(/^\/praiometro/, "");
       $("#instTit").textContent = "Abra no " + (ios ? "Safari" : "Chrome") + " pra instalar";
@@ -3002,7 +3005,7 @@
       $("#instSim").dataset.ir = ios ? "x-safari-https://" + url : `intent://${url}#Intent;scheme=https;package=com.android.chrome;end`;
     };
     const abrirConv = () => {
-      if (!conv || instalado || !celular || (guarda.ler("pm-inst-convite") || 0) > Date.now()) return;
+      if (!conv || instalado || !celular || (guarda.ler(CHAVE_CONV()) || 0) > Date.now()) return;
       if (dentroDeApp) prepararNavegador();
       else if (!ios && !pedidoAndroid) return;                              // Android sem o pedido do Chrome: não dá pra ajudar direito
       if (pedidoAndroid && !dentroDeApp) { $("#instPassos").hidden = true; $("#instSim").textContent = "Instalar agora"; }
