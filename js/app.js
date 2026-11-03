@@ -2981,8 +2981,31 @@
     document.querySelectorAll("#regioes button").forEach((b) => b.onclick = () => irParaRegiao(b.dataset.r));
     const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
     const instalado = window.navigator.standalone || matchMedia("(display-mode: standalone)").matches;
-    if (ios && !instalado && !guarda.ler("pm-instalar-fechado")) $("#instalar").hidden = false;
     $("#fecharInstalar").onclick = () => { $("#instalar").hidden = true; guarda.gravar("pm-instalar-fechado", true); };
+    // Convite para instalar (tela cheia, fundo escurecido): para quem abriu pelo navegador do celular.
+    // iPhone: passo a passo do Safari. Android (Chrome): botão que instala direto.
+    // "Agora não" → volta em 5 dias; "Entendi" → volta em 2 dias se ainda não instalou.
+    const celular = matchMedia("(pointer: coarse)").matches && Math.min(screen.width, screen.height) < 820;
+    let pedidoAndroid = null;
+    const conv = $("#convInstalar");
+    const fecharConv = (dias) => { conv.hidden = true; document.body.style.overflow = ""; guarda.gravar("pm-inst-convite", Date.now() + dias * 864e5); };
+    const abrirConv = () => {
+      if (!conv || instalado || !celular || (guarda.ler("pm-inst-convite") || 0) > Date.now()) return;
+      if (!ios && !pedidoAndroid) return;                                   // Android sem o pedido do Chrome: não dá pra ajudar direito
+      if (pedidoAndroid) { $("#instPassos").hidden = true; $("#instSim").textContent = "Instalar agora"; }
+      if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), .convite:not([hidden])")) return;
+      conv.hidden = false; document.body.style.overflow = "hidden";
+      (window.pmEventos = window.pmEventos || []).push("viu-instalar");
+    };
+    if (conv) {
+      $("#instNao").onclick = () => fecharConv(5);
+      $("#instSim").onclick = async () => {
+        if (pedidoAndroid) { pedidoAndroid.prompt(); try { await pedidoAndroid.userChoice; } catch (e) {} pedidoAndroid = null; }
+        fecharConv(2);
+      };
+      window.addEventListener("beforeinstallprompt", (e) => { e.preventDefault(); pedidoAndroid = e; setTimeout(abrirConv, 1200); });
+      if (ios) setTimeout(abrirConv, 1200);
+    }
   }
 
   async function iniciar() {
