@@ -169,6 +169,7 @@
     ["~#°C, gela na entrada", "~#°C, chilly at first", "~#°C, fría al entrar", "~#°C, fraîche en entrant"], ["~#°C, entra fácil", "~#°C, easy to get in", "~#°C, se entra fácil", "~#°C, on y entre facilement"],
     ["~#°C, só pra corajoso", "~#°C, only for the brave", "~#°C, solo para valientes", "~#°C, pour les courageux"], ["~#°C, dá pra ficar de molho", "~#°C, great for a long dip", "~#°C, para quedarse en remojo", "~#°C, on peut y rester longtemps"],
     ["Estimada perto da areia", "Estimated near the shore", "Estimada cerca de la orilla", "Estimée près du rivage"],
+    ["👆 Toque pra ver hora a hora", "👆 Tap to see hour by hour", "👆 Toca para ver hora a hora", "👆 Touchez pour voir heure par heure"],
     ["com chance de pancada de chuva às #h", "with a chance of a rain shower at #h", "con probabilidad de chubasco a las #h", "avec risque d'averse à #h"],
     ["com chance de pancada de chuva às", "with a chance of a rain shower at", "con probabilidad de chubasco a las", "avec risque d'averse à"],
     ["com chance de pancada às #h", "with a chance of a shower at #h", "con probabilidad de chubasco a las #h", "avec risque d'averse à #h"],
