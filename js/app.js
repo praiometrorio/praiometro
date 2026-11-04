@@ -769,10 +769,14 @@
           // as 24 horas do dia (para o "Céu hora a hora" estilo iPhone: madrugada e noite também)
           dia24: Array.from({ length: 24 }, (_, hr) => {
             const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0 || h.temperature_2m[k] == null) return null;
-            const chuva = chuvaEm(k), nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            let chuva = chuvaEm(k), nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            let tot = Math.round(nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            // igual às horas do cartão: hoje, o que já passou vem do aeroporto
+            const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
+            if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20); }
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
-            return { h: hr, t: h.temperature_2m[k], ur: h.relative_humidity_2m ? h.relative_humidity_2m[k] : null, chuva, nuvens,
+            return { h: hr, t: h.temperature_2m[k], ur: h.relative_humidity_2m ? h.relative_humidity_2m[k] : null, chuva, nuvens, tot,
               est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
@@ -2791,7 +2795,7 @@
         $("#c24I").innerHTML = icHora(y);
         $("#c24I").className = "ci " + y.est;
         $("#c24T").textContent = Math.round(vt) + "°";
-        $("#c24D").textContent = `${NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
+        $("#c24D").textContent = `${icHora(y) === IC.poucas ? "Poucas nuvens" : NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
       }
     };
     const agora = relogio.format(new Date()), minAg = +agora.slice(0, 2) * 60 + +agora.slice(3, 5);
