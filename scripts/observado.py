@@ -12,7 +12,8 @@ BR = datetime.timezone(datetime.timedelta(hours=-3))
 def total(nuvens):
     """céu inteiro coberto (0 a 100), sem desconto pela altura"""
     livre = 1.0
-    for c in nuvens or []: livre *= 1 - COBRE.get(c.get("cover"), 0)
+    # "FEW" (poucas nuvens) conta 25% aqui: já não é céu limpo (o aeroporto quase nunca anota os cirros, então somos rigorosos)
+    for c in nuvens or []: livre *= 1 - (0.25 if c.get("cover") == "FEW" else COBRE.get(c.get("cover"), 0))
     return round(100 * (1 - livre))
 
 def tapa(nuvens):

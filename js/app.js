@@ -33,6 +33,8 @@
   const svg = (corpo) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${corpo}</svg>`;
   const IC = {
     sol: svg('<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
+    // sol com poucas nuvens: o sol inteiro e uma nuvenzinha pequena no canto
+    poucas: svg('<circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M1.5 10h2M3.9 3.9l1.4 1.4M16.1 3.9l-1.4 1.4M3.9 16.1l1.4-1.4M18.5 10h-1"/><path d="M13.5 21.5h6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7.1 1.1 2.1 2.1 0 0 0 .8 4.1z"/>'),
     parcial: svg('<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 10.5A3.5 3.5 0 0 1 11.3 6.6"/><path d="M8 20h10a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.4A2.8 2.8 0 0 0 8 20z"/>'),
     noite: svg('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
     nublado: svg('<path d="M7 19h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 11.6 3.8 3.8 0 0 0 7 19z"/>'),
@@ -70,6 +72,8 @@
     return ini === fim ? `às ${ini}h` : `das ${ini}h às ${fim}h`;
   }
   const SOL_ATE = 25;   // nuvem que tapa o sol abaixo disso = sol firme (antes era 35: prometia sol demais)
+  // ícone da hora: sol limpo, sol com poucas nuvens (nuvenzinha) ou sol entre nuvens (nuvem grande)
+  const icHora = (y) => y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
   const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
@@ -109,7 +113,7 @@
     const selos = [];
     if (chuvaTarde) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol de manhã", s: `Chuva a partir das ${chuvaNuc.h}h` });
     else if (ceu === "chuva") selos.push({ cls: "neutro", ic: IC.chuva, t: "Dia de chuva", s: pancada ? `Chuva a partir das ${pancada.h}h` : "Chuva em boa parte do dia" });
-    else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: IC.sol, t: tam(janela) >= 5 && limpo ? "Solzão" : "Sol", s: limpo ? `Céu limpo das ${janela.ini}h às ${janela.fim}h` : `Poucas nuvens das ${janela.ini}h às ${janela.fim}h` });
+    else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: limpo ? IC.sol : IC.poucas, t: tam(janela) >= 5 && limpo ? "Solzão" : "Sol", s: limpo ? `Céu limpo das ${janela.ini}h às ${janela.fim}h` : `Poucas nuvens das ${janela.ini}h às ${janela.fim}h` });
     else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol entre nuvens", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
     else selos.push({ cls: "neutro", ic: IC.nublado, t: "Céu fechado", s: "Sem sol firme hoje" });
 
@@ -332,8 +336,8 @@
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
   const PESO_NUVEM = { baixa: 1, media: 0.85, alta: 0.45 };
-  const DUVIDA_NUVEM = 60;
-  const LIMPO_ATE = 20;      // céu (todas as nuvens, até a alta) abaixo disso = "céu limpo" de verdade   // nuvem que um modelo precisa prever pra contar como "esse modelo acha que fecha"    // quanto cada camada de nuvem esconde o sol
+  const DUVIDA_NUVEM = 60;   // nuvem que um modelo precisa prever pra contar como "esse modelo acha que fecha"
+  const LIMPO_ATE = 20;      // céu (todas as nuvens, até a alta) abaixo disso = "céu limpo" de verdade
   // ---------- onda que chega na praia ----------
   // O modelo de ondas é de mar aberto (ponto a vários km da costa), igual para praias vizinhas.
   // Cada parte do mar (ondulação principal, secundária e marola do vento) só chega inteira se vier de frente pra praia;
@@ -1434,7 +1438,7 @@
       if (!y) continue;
       const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
       horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${NOME_EST[y.est]}">
-        <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${IC[y.est]}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
+        <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${icHora(y)}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
     // passar para o lado entre as favoritas (só quando a praia aberta é uma favorita e há 2 ou mais)
@@ -2735,7 +2739,7 @@
     for (let v = lo; v <= hi; v += 5) gT += `<line x1="${esq}" x2="${W - dir}" y1="${YT(v).toFixed(1)}" y2="${YT(v).toFixed(1)}" class="cg"/><text x="${W - dir + 6}" y="${(YT(v) + 4).toFixed(1)}" class="ct">${v}°</text>`;
     for (const h of [6, 12, 18]) gT += `<line x1="${X(h * 60)}" x2="${X(h * 60)}" y1="${T0 - 8}" y2="${T1 + 22}" class="cv"/>`;
     for (const h of [0, 6, 12, 18]) gT += `<text x="${X(h * 60) + 4}" y="${T1 + 20}" class="cx">${pad(h)}</text>`;
-    const icones = hs.filter((y) => y.h % 2 === 0).map((y) => `<g transform="translate(${(X(y.h * 60 + 60) - 9).toFixed(1)} 6)" class="ci ${y.est}">${IC[y.est].replace("<svg", '<svg width="18" height="18"')}</g>`).join("");
+    const icones = hs.filter((y) => y.h % 2 === 0).map((y) => `<g transform="translate(${(X(y.h * 60 + 60) - 9).toFixed(1)} 6)" class="ci ${y.est}">${icHora(y).replace("<svg", '<svg width="18" height="18"')}</g>`).join("");
     const kMin = ts.indexOf(Math.min(...ts)), kMax = ts.indexOf(Math.max(...ts));
     const marca = (k, nome, cima) => `<circle cx="${PT[k][0].toFixed(1)}" cy="${PT[k][1].toFixed(1)}" r="5" class="cm"/><text x="${PT[k][0].toFixed(1)}" y="${(PT[k][1] + (cima ? -12 : 20)).toFixed(1)}" class="cmt">${nome}</text>`;
     const linhaT = curva(PT), fundoT = `${linhaT} L${PT[PT.length - 1][0].toFixed(1)},${T1} L${PT[0][0].toFixed(1)},${T1} Z`;
@@ -2784,7 +2788,7 @@
       // ícone, temperatura e frase só mudam quando troca a hora (menos trabalho a cada movimento do dedo)
       if (horaMostrada !== y.h) {
         horaMostrada = y.h;
-        $("#c24I").innerHTML = IC[y.est];
+        $("#c24I").innerHTML = icHora(y);
         $("#c24I").className = "ci " + y.est;
         $("#c24T").textContent = Math.round(vt) + "°";
         $("#c24D").textContent = `${NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
