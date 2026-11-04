@@ -584,6 +584,7 @@
     document.addEventListener("click", (e) => { if (!caixa.contains(e.target)) abre(false); });
     menu.querySelectorAll("button").forEach((b) => b.onclick = () => {
       lingua = b.dataset.l; try { localStorage.setItem("pm-lingua", lingua); } catch (e) {}
+      try { window.pmContar && window.pmContar("idioma-" + lingua); } catch (e) {}
       abre(false); aplicar();
       (window.pmEventos = window.pmEventos || []).push("lingua-" + lingua);
     });

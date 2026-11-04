@@ -314,7 +314,7 @@
   // ---------- estado ----------
   const estado = {
     dia: 0,
-    sel: "ipanema",            // praia aberta (começa sempre em Ipanema)
+    sel: "arpoador",           // praia aberta (começa sempre no Arpoador)
     modoFav: false,            // true = aberta pela tela de favoritas (arrastar passa só entre as favoritas)
     regiao: matchMedia("(max-width:640px)").matches ? "zs" : "todas",
     minuto: null               // horário escolhido no controle do sol (minutos desde 0h)
@@ -919,6 +919,7 @@
       : treinos.length ? "Seus treinos" : "Dá jogo amanhã?";
   }
   function abrirTreino() {
+    contar("abriu-treino");
     trTela = { modo: treinos.length ? "lista" : "escolher", id: null, rascunho: null };
     desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden";
   }
@@ -1394,6 +1395,7 @@
   }
 
   // ---------- desenho ----------
+  let praiaDaAbertura = null, mexeuNaPraia = false, esperaPraia = null;
   function desenhar() {
     document.querySelectorAll(".dia").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.d === estado.dia));
     linhas = PRAIAS.map((p) => { const x = previsao[p.id][estado.dia]; return { p, x, a: analisar(x, p) }; });
@@ -1415,6 +1417,12 @@
     // foto do topo (abas dos dias + faixa do praião) para a próxima abertura já mostrar tudo na hora, sem "pular"
     if (estado.dia === 0) guarda.gravar("pm-topo-foto", { data: datas[0], dias: $("#dias").innerHTML, praiao: n ? banner.innerHTML : "" });
 
+    // só conta a praia que a pessoa ESCOLHEU: a que aparece sozinha ao abrir o app não entra (senão Ipanema ganharia sempre)
+    if (praiaDaAbertura === null) praiaDaAbertura = atual.p.id;
+    else if (atual.p.id !== praiaDaAbertura) mexeuNaPraia = true;
+    // e só se a pessoa PARAR nela por 3,5 s (quem passa pelas praias até chegar na sua não conta as do caminho)
+    clearTimeout(esperaPraia);
+    if (mexeuNaPraia) { const id = atual.p.id; esperaPraia = setTimeout(() => { if (praiaAtual().p.id === id && !document.hidden) contar("praia-" + id); }, 3500); }
     carregarHorizonte(atual.p);      // usa o relevo guardado na hora, ou busca e redesenha quando chegar
     desenharCartao(atual);
     desenharLista();
@@ -1513,7 +1521,7 @@
 
     // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
     const sol = $("#abrirSol"), temCeu = !!(window.CEU && CEU.suportado());
-    if (sol) { sol.hidden = !temCeu; $("#atalhos").classList.toggle("so3", !temCeu); sol.onclick = () => CEU.abrir(p); }
+    if (sol) { sol.hidden = !temCeu; $("#atalhos").classList.toggle("so3", !temCeu); sol.onclick = () => { contar("abriu-trajeto-sol"); CEU.abrir(p); }; }
     $("#minuto").addEventListener("input", (e) => {
       estado.minuto = +e.target.value;
       $("#minutoTxt").textContent = textoMin(estado.minuto);
@@ -1665,7 +1673,11 @@
   // ---------- favoritas ----------
   let favoritas = guarda.ler("pm-favoritas") || [];
   const ehFavorita = (id) => favoritas.includes(id);
+  // conta no GoatCounter (1 vez por dia por celular; ver index.html)
+  const contar = (n) => { try { if (window.pmContar) window.pmContar(n); else (window.pmPendentes = window.pmPendentes || []).push(n); } catch (e) {} };
+  document.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches("details.como") && e.target.open) contar("abriu-como-chegar"); }, true);
   function alternarFavorita(id) {
+    if (!ehFavorita(id)) contar("favoritou-" + id);
     favoritas = ehFavorita(id) ? favoritas.filter((f) => f !== id) : favoritas.concat(id);
     guarda.gravar("pm-favoritas", favoritas);
     contarFavoritas();
@@ -1794,7 +1806,7 @@
       </button>`).join("");
     document.querySelectorAll(".fav-card").forEach((b) => b.onclick = () => { fecharFavoritas(); abrirPraia(b.dataset.id, true); });
   }
-  function abrirFavoritas() { desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function abrirFavoritas() { contar("abriu-favoritas"); desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
   function fecharFavoritas() { $("#favTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- surfe: só dados técnicos (swell, período, direção, vento, maré) ----------
@@ -2121,7 +2133,7 @@
     const ag = document.querySelector(".tab-surf td.ag");
     if (ag) $(".tab-surf").scrollLeft = Math.max(0, ag.offsetLeft - 120);
   }
-  function abrirSurfe() { surfeDia = estado.dia; surfeAberta = null; surfeHora = null; surfeVerFav = false; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function abrirSurfe() { contar("abriu-surfe"); surfeDia = estado.dia; surfeAberta = null; surfeHora = null; surfeVerFav = false; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
   function fecharSurfe() { pararOnd(); $("#surfeTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- mapa de ondulação (estilo Windguru) ----------
@@ -2725,6 +2737,7 @@
   }).join(" ");
   let ceuSt = null;
   function abrirCeu(p, d) {
+    contar("abriu-ceu");
     ceuSt = { p, d, min: null };
     $("#relTela").classList.add("ceu24");
     $("#relTitulo").textContent = "Céu hora a hora";
@@ -2812,6 +2825,7 @@
     document.querySelectorAll(".c24-dias button").forEach((b) => b.onclick = () => { ceuSt.d = +b.dataset.d; ceuSt.min = null; desenharCeu(); });
   }
   function abrirRelatorio(k, l) {
+    if (k !== "ceu") contar("abriu-" + k);
     $("#relTela").classList.remove("ceu24");
     if (k === "ceu") { abrirCeu(l.p, estado.dia); return; }
     relAberto = { k, id: l.p.id, min: null };
@@ -2951,6 +2965,7 @@
       const texto = `${l.p.nome} ${nomeDia(estado.dia)}: ${l.a.veredito} https://praiometrorio.com.br`;
       if (navigator.canShare && navigator.canShare({ files: [arq] })) {
         await navigator.share({ files: [arq], text: texto, title: "Praiômetro" });
+        contar("compartilhou");
       } else {
         const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = nome; a.click();
         setTimeout(() => URL.revokeObjectURL(a.href), 5000);
