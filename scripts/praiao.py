@@ -45,7 +45,7 @@ def minutos(hhmm):
     return int(hhmm[:2]) * 60 + int(hhmm[3:5])
 
 CHUVA_MM = 0.3   # chance de chuva = % dos 9 modelos com 0,3 mm ou mais na hora (igual ao app)
-PESO_NUVEM = {"baixa": 1, "media": 0.75, "alta": 0.3}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
+PESO_NUVEM = {"baixa": 1, "media": 0.85, "alta": 0.45}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
 
 def nuvem_que_tapa(nh, m, k):
     g = lambda nome: (nh.get(nome + "_" + m) or [None] * len(nh["time"]))[k]
@@ -56,7 +56,7 @@ def nuvem_que_tapa(nh, m, k):
 def analisar_dia(t, n, data):
     """EXATAMENTE o mesmo cálculo do app (js/app.js: montar, estadoHora, analisar, ehPraiao):
     - nuvens = média dos 9 modelos (nuvem que tapa o sol: baixa 100%, média 75%, alta 30%); vento = valor do meio (mediana) dos 9 modelos
-    - céu de cada hora (6h às 20h): chuva >= 50% = chuva; nuvens >= 70 = nublado; >= 35 = entre nuvens; senão sol;
+    - céu de cada hora (6h às 20h): chuva >= 50% = chuva; nuvens >= 70 = nublado; >= 25 = entre nuvens; senão sol;
       antes do nascer / depois do pôr do sol não conta como sol
     - praião: só o horário de praia (9h às 17h); hora de sol = 1 ponto, entre nuvens = meio; véspera 5+ pontos, 3 dias antes 6+; vento = o mais forte entre 9h e 17h; chuva = a maior nas horas boas (9h às 17h, com sol ou entre nuvens)"""
     h = t["hourly"]; media = {}; meio = {}; chance = {}
@@ -65,7 +65,10 @@ def analisar_dia(t, n, data):
         for k, ts in enumerate(nh["time"]):
             xs = [nuvem_que_tapa(nh, m, k) for m in MODELOS]
             xs = [x for x in xs if x is not None]
-            if len(xs) >= 3: media[ts] = sum(xs) / len(xs)
+            if len(xs) >= 3:
+                media[ts] = sum(xs) / len(xs)
+                # igual ao app: se 1/3 dos modelos acha que fecha (nuvem >= 60%), vira "entre nuvens", não solzão
+                if sum(1 for x in xs if x >= 60) >= len(xs) / 3: media[ts] = max(media[ts], 40)
             ps = [x for x in (nh.get("precipitation_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if x is not None]
             if len(ps) >= 3: chance[ts] = round(100 * sum(1 for x in ps if x >= CHUVA_MM) / len(ps))   # igual ao app
             vs = sorted(v for v in (nh.get("wind_speed_10m_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if v is not None)
@@ -86,8 +89,8 @@ def analisar_dia(t, n, data):
         if 9 <= hr <= 17 and c < 50 and nv < 70: chuva = max(chuva, c)
         if v is not None and 9 <= hr <= 17: vento = max(vento, round(v))
         escuro = hr * 60 + 30 < nas - 10 or hr * 60 + 30 > por + 10
-        if not escuro and c < 50 and nv < 35: sol += 1
-        if 9 <= hr <= 17: estados[hr] = "chuva" if c >= 50 else "nublado" if nv >= 70 else "parcial" if nv >= 35 else "sol"
+        if not escuro and c < 50 and nv < 25: sol += 1
+        if 9 <= hr <= 17: estados[hr] = "chuva" if c >= 50 else "nublado" if nv >= 70 else "parcial" if nv >= 25 else "sol"
     return estados, vento, chuva
 
 def pontos(estados, de=9, ate=17):

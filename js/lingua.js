@@ -73,6 +73,8 @@
     ["Solzão das #h às #h", "Full sun from #h to #h", "Solazo de #h a #h", "Grand soleil de #h à #h"], ["Solzão das", "Full sun from", "Solazo de", "Grand soleil de"],
     ["Sol firme das #h às #h", "Steady sun from #h to #h", "Sol firme de #h a #h", "Vrai soleil de #h à #h"],
     ["Sol só das", "Sun only from", "Sol solo de", "Soleil seulement de"], ["depois fecha", "then clouds over", "luego se nubla", "puis ça se couvre"],
+    ["Poucas nuvens das #h às #h", "A few clouds from #h to #h", "Algunas nubes de #h a #h", "Quelques nuages de #h à #h"],
+    ["Sol com poucas nuvens das #h às #h", "Sun with a few clouds from #h to #h", "Sol con algunas nubes de #h a #h", "Soleil avec quelques nuages de #h à #h"],
     ["Céu limpo das #h às #h", "Clear sky from #h to #h", "Cielo despejado de #h a #h", "Ciel dégagé de #h à #h"], ["Céu limpo das", "Clear sky from", "Cielo despejado de", "Ciel dégagé de"],
     ["céu limpo", "clear sky", "cielo despejado", "ciel dégagé"], ["Céu fechado", "Overcast", "Cielo cubierto", "Ciel couvert"],
     ["Céu fechado o dia todo", "Overcast all day", "Cielo cubierto todo el día", "Ciel couvert toute la journée"],

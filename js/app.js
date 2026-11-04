@@ -69,7 +69,8 @@
     while (igual(fim + 1)) fim++;
     return ini === fim ? `às ${ini}h` : `das ${ini}h às ${fim}h`;
   }
-  const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= 35 ? "parcial" : "sol";
+  const SOL_ATE = 25;   // nuvem que tapa o sol abaixo disso = sol firme (antes era 35: prometia sol demais)
+  const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
   function maiorSequencia(horas, cond) {
@@ -88,6 +89,8 @@
     const conta = (e) => dia.filter((y) => y.est === e).length;
     const horasSol = conta("sol"), horasParcial = conta("parcial"), horasChuva = conta("chuva");
     const janela = maiorSequencia(x.horas, (y) => y.est === "sol");
+    // "céu limpo" só se o céu inteiro (até a nuvem alta, fininha) estiver quase sem nuvem; senão é "sol com poucas nuvens"
+    const limpo = !!janela && x.horas.filter((y) => y.h >= janela.ini && y.h <= janela.fim).every((y) => (y.tot ?? y.nuvens) < LIMPO_ATE);
     const janelaParcial = maiorSequencia(x.horas, (y) => y.est === "sol" || y.est === "parcial");
     const pancada = dia.find((y) => y.chuva >= 50);
     const nucleo = x.horas.filter((y) => y.h >= 9 && y.h <= 16);
@@ -106,7 +109,7 @@
     const selos = [];
     if (chuvaTarde) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol de manhã", s: `Chuva a partir das ${chuvaNuc.h}h` });
     else if (ceu === "chuva") selos.push({ cls: "neutro", ic: IC.chuva, t: "Dia de chuva", s: pancada ? `Chuva a partir das ${pancada.h}h` : "Chuva em boa parte do dia" });
-    else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: IC.sol, t: tam(janela) >= 5 ? "Solzão" : "Sol", s: `Céu limpo das ${janela.ini}h às ${janela.fim}h` });
+    else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: IC.sol, t: tam(janela) >= 5 && limpo ? "Solzão" : "Sol", s: limpo ? `Céu limpo das ${janela.ini}h às ${janela.fim}h` : `Poucas nuvens das ${janela.ini}h às ${janela.fim}h` });
     else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol entre nuvens", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
     else selos.push({ cls: "neutro", ic: IC.nublado, t: "Céu fechado", s: "Sem sol firme hoje" });
 
@@ -170,7 +173,8 @@
     let ceuTxt;
     if (chuvaTarde) ceuTxt = `Sol de manhã, chuva a partir das ${chuvaNuc.h}h`;
     else if (ceu === "chuva") ceuTxt = pancada ? `Dia de chuva, a partir das ${pancada.h}h` : "Dia de chuva";
-    else if (tam(janela) >= 5) ceuTxt = `Solzão das ${janela.ini}h às ${janela.fim}h`;
+    else if (tam(janela) >= 5 && limpo) ceuTxt = `Solzão das ${janela.ini}h às ${janela.fim}h`;
+    else if (tam(janela) >= 2 && !limpo) ceuTxt = `Sol com poucas nuvens das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janela) >= 2) ceuTxt = `Sol das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janelaParcial) >= 2) ceuTxt = tam(janelaParcial) <= 3 && ceu === "nublado"
       ? `Sol só das ${janelaParcial.ini}h às ${janelaParcial.fim}h, depois fecha` : "Sol entre nuvens";
@@ -314,6 +318,10 @@
   let datas = [];
   let linhas = [];         // praias do dia selecionado, já analisadas
   let balneab = { praias: {} };
+  // céu observado de verdade (aeroportos, robô observado.yml): corrige as horas de hoje que já passaram
+  let observado = { estacoes: {} };
+  const ESTACAO = (p) => p.regiao === "zo" ? ["SBJR", "SBRJ", "SBGL"] : ["SBRJ", "SBGL", "SBJR"];
+  const obsEm = (p, data, hr) => { for (const e of ESTACAO(p)) { const o = (observado.estacoes[e] || {})[`${data}T${pad(hr)}`]; if (o) return o; } return null; };
   const horizontes = {};   // ângulo do relevo por praia (36 direções) ou "carregando" / "erro"
 
   // ---------- busca da previsão ----------
@@ -323,7 +331,9 @@
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
-  const PESO_NUVEM = { baixa: 1, media: 0.75, alta: 0.3 };    // quanto cada camada de nuvem esconde o sol
+  const PESO_NUVEM = { baixa: 1, media: 0.85, alta: 0.45 };
+  const DUVIDA_NUVEM = 60;
+  const LIMPO_ATE = 20;      // céu (todas as nuvens, até a alta) abaixo disso = "céu limpo" de verdade   // nuvem que um modelo precisa prever pra contar como "esse modelo acha que fecha"    // quanto cada camada de nuvem esconde o sol
   // ---------- onda que chega na praia ----------
   // O modelo de ondas é de mar aberto (ponto a vários km da costa), igual para praias vizinhas.
   // Cada parte do mar (ondulação principal, secundária e marola do vento) só chega inteira se vier de frente pra praia;
@@ -619,6 +629,7 @@
     PRAIAS.forEach((p, i) => {
       const t = T[i], m = M[i], h = t.hourly;
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
+      const nuvemTotal = {};   // céu inteiro (todas as camadas, sem desconto): pra saber se é "céu limpo" ou "sol com poucas nuvens"
       const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {};
       // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
       // alta (o véu fino lá em cima) deixa o sol passar. Sem as camadas, usa o total do modelo.
@@ -631,7 +642,10 @@
         const nh = N[i].hourly;
         nh.time.forEach((ts, k) => {
           const xs = MODELOS_NUVEM.map((md) => nuvemQueTapa(nh, md, k)).filter((v) => v != null);
-          if (xs.length >= 3) nuvemMedia[ts] = media(xs);
+          // se pelo menos 1/3 dos modelos acha que fecha (nuvem ≥ 60%), não dá pra prometer solzão: vira "sol com nuvens"
+          const ts2 = MODELOS_NUVEM.map((md) => (nh["cloud_cover_" + md] || [])[k]).filter((v) => v != null);
+          if (ts2.length >= 3) nuvemTotal[ts] = media(ts2);
+          if (xs.length >= 3) nuvemMedia[ts] = xs.filter((v) => v >= DUVIDA_NUVEM).length >= xs.length / 3 ? Math.max(media(xs), 40) : media(xs);
           // chance de chuva: quantos dos 9 modelos põem chuva de verdade (0,3 mm ou mais) naquela hora
           const ps = MODELOS_NUVEM.map((md) => (nh["precipitation_" + md] || [])[k]).filter((v) => v != null);
           if (ps.length >= 3) chuvaModelos[ts] = Math.round(100 * ps.filter((v) => v >= CHUVA_MM).length / ps.length);
@@ -760,14 +774,18 @@
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
-            const chuva = chuvaEm(k);
-            const nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            let chuva = chuvaEm(k);
+            let nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
             const hr = +h.time[k].slice(11, 13);
+            // hoje, horas que já passaram (e a de agora): usa o que foi observado de verdade no aeroporto
+            const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
+            let tot = Math.round(nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); if (ob.chuva) chuva = Math.max(chuva, 80); else chuva = Math.min(chuva, 20); }
             // hora sem sol (antes do nascer ou depois do pôr): mostra noite, a não ser que chova
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
-            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, est, uv: uvEm(k, nuvens), v: ventoEm(k),
+            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, tot, est, uv: uvEm(k, nuvens), v: ventoEm(k),
               vd: dirEm(k), raj: rajEm(k) };
           })
         };
@@ -3062,7 +3080,8 @@
     controles();
     iniciarMapa().catch((e) => console.error("Mapa indisponível", e));
     try {
-      balneab = await buscarJSON("data/balneabilidade.json").catch(() => ({ praias: {} }));
+      [balneab, observado] = await Promise.all([buscarJSON("data/balneabilidade.json").catch(() => ({ praias: {} })),
+        buscarJSON("data/observado.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => ({ estacoes: {} }))]);
       const dados = await carregar();
       montar(dados);
       desenharDias();
@@ -3084,8 +3103,10 @@
     if (buscando || document.hidden || !linhas.length) return;
     buscando = true;
     try {
-      const [dados, bal] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null)]);
+      const [dados, bal, obs] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null),
+        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null)]);
       if (bal && bal.praias) balneab = bal;
+      if (obs && obs.estacoes) observado = obs;
       {
         montar(dados);
         desenharDias();
