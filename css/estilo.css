@@ -946,3 +946,6 @@ html,body{overscroll-behavior-y:none}
 .rel-folha{max-height:calc(100vh - env(safe-area-inset-top,0px) - 24px);max-height:calc(100dvh - env(safe-area-inset-top,0px) - 24px);overscroll-behavior:contain}
 .rel-topo{position:sticky;top:-16px;z-index:4;background:inherit;margin:-16px -18px 8px;padding:16px 18px 8px;border-radius:26px 26px 0 0}
 .rel-x{width:44px;height:44px}
+
+/* legenda: sol com poucas nuvens (metade sol, metade nuvem clarinha) */
+.lg.poucas{background:linear-gradient(135deg,var(--c-sol) 55%,var(--c-parcial) 55%)}

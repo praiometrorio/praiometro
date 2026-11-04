@@ -74,6 +74,8 @@
   const SOL_ATE = 25;   // nuvem que tapa o sol abaixo disso = sol firme (antes era 35: prometia sol demais)
   // ícone da hora: sol limpo, sol com poucas nuvens (nuvenzinha) ou sol entre nuvens (nuvem grande)
   const icHora = (y) => y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
+  // ícone do dia/praia (mapa, abas, listas): sol com nuvenzinha quando o sol é firme mas o céu não está limpo
+  const icDia = (a) => a.ceu === "sol" && a.poucas ? IC.poucas : IC[a.ceu];
   const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
@@ -218,7 +220,7 @@
     const nota = Math.min(10, Math.round((ptCeu + ptMar + ptVento + ptAgua + ptBonus) * 10) / 10);
     const score = nota;
     selos.forEach((s, i) => { s.k = ["ceu", "uv", "mar", "agua", "vento", "inea", "surfe"][i]; });
-    return { horasSol, janela, ceu, tom, selos, veredito, resumo, score, nota };
+    return { horasSol, janela, ceu, poucas: ceu === "sol" && !limpo, tom, selos, veredito, resumo, score, nota };
   }
 
   // ---------- cena desenhada (muda com o tempo do dia) ----------
@@ -1185,7 +1187,7 @@
       const x = previsao.ipanema[d], a = analisar(x, PRAIAS.find((p) => p.id === "ipanema"));
       const ceu = CENA_DIA[a.ceu] ? a.ceu : "sol";
       const hsDia = (x.horas || []).filter((y) => y.h >= 9 && y.h <= 17), pct = hsDia.length ? hsDia.reduce((s, y) => s + y.nuvens, 0) / hsDia.length : 30;
-      return `<button class="dia c-${ceu}" data-d="${d}" aria-pressed="${d === estado.dia}">${cenaDia(ceu, d, pct)}${IC[a.ceu]}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
+      return `<button class="dia c-${ceu}" data-d="${d}" aria-pressed="${d === estado.dia}">${cenaDia(ceu, d, pct)}${icDia(a)}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
     }).join("");
     document.querySelectorAll(".dia").forEach((b) => b.onclick = () => { estado.dia = +b.dataset.d; estado.minuto = null; desenhar(); });
   }
@@ -1402,7 +1404,7 @@
       if (!pin) return;
       const ic = pin.el.querySelector(".ic");
       ic.className = "ic " + a.ceu;
-      ic.innerHTML = IC[a.ceu];
+      ic.innerHTML = icDia(a);
       pin.el.classList.toggle("on", p.id === atual.p.id);
     });
 
@@ -1441,7 +1443,7 @@
       const y = x.horas.find((q) => q.h === h);
       if (!y) continue;
       const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
-      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${NOME_EST[y.est]}">
+      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${icHora(y) === IC.poucas ? "Poucas nuvens" : NOME_EST[y.est]}">
         <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${icHora(y)}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
@@ -1653,7 +1655,7 @@
     const vis = filtradas.filter((l) => ehFavorita(l.p.id)).concat(filtradas.filter((l) => !ehFavorita(l.p.id)));
     $("#listaTitulo").textContent = "Praias " + nomeDia(estado.dia) + (estado.regiao === "todas" ? "" : " · " + REGIOES[estado.regiao].nome);
     $("#lista").innerHTML = vis.map((l) => `<li><button data-id="${l.p.id}" aria-current="${l.p.id === atual.p.id}">
-      <span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>
+      <span class="ic ${l.a.ceu}">${icDia(l.a)}</span>
       <span class="nm"><b>${ehFavorita(l.p.id) ? '<i class="fav" aria-label="favorita">★</i> ' : ""}${l.p.nome}</b><span>${l.a.resumo}</span></span>
       <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `<i class="${y.est}"></i>`).join("")}</span>
       <span class="nota-lista n${l.a.nota >= 8 ? 3 : l.a.nota >= 6.5 ? 2 : l.a.nota >= 5 ? 1 : 0}" aria-label="nota ${fmt1(l.a.nota)} de 10"><b>${fmt1(l.a.nota)}</b></span></button></li>`).join("");
@@ -1786,7 +1788,7 @@
       return;
     }
     $("#favLista").innerHTML = minhas.map(({ p, a }) => `<button class="fav-card simples" data-id="${p.id}">
-        <span class="ic ${a.ceu}">${IC[a.ceu]}</span>
+        <span class="ic ${a.ceu}">${icDia(a)}</span>
         <span class="fav-nome"><b>${p.nome}</b></span>
         <span class="fav-abrir">Previsão completa ›</span>
       </button>`).join("");
@@ -2990,7 +2992,7 @@
       if (!inp.value.trim()) { res.hidden = true; return; }
       res.innerHTML = achadas.length ? achadas.map((p) => {
         const l = linhas.find((q) => q.p.id === p.id);
-        const ic = l ? `<span class="ic ${l.a.ceu}">${IC[l.a.ceu]}</span>` : "";
+        const ic = l ? `<span class="ic ${l.a.ceu}">${icDia(l.a)}</span>` : "";
         return `<li role="option"><button data-id="${p.id}">${ic}<span><b>${p.nome}</b><small>${l ? l.a.resumo : p.local}</small></span></button></li>`;
       }).join("") : `<li class="vazio">Não achei essa praia. Tente outro nome.</li>`;
       res.hidden = false;
