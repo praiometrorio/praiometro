@@ -3089,9 +3089,23 @@
   async function iniciar() {
     controles();
     iniciarMapa().catch((e) => console.error("Mapa indisponível", e));
+    // abre NA HORA com a última previsão guardada no celular (se for de hoje); a internet atualiza logo depois, sem a tela ficar vazia
+    let jaMostrou = false;
     try {
-      [balneab, observado] = await Promise.all([buscarJSON("data/balneabilidade.json").catch(() => ({ praias: {} })),
-        buscarJSON("data/observado.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => ({ estacoes: {} }))]);
+      const guardada = guarda.ler(CACHE_CHAVE);
+      const diaDe = (t) => new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(t));
+      if (guardada && guardada.tempo && diaDe(guardada.t) === diaHoje()) {
+        balneab = guarda.ler("pm-balneab-foto") || { praias: {} };
+        observado = guarda.ler("pm-observado-foto") || { estacoes: {} };
+        montar(guardada); desenharDias(); desenhar(); desenharBotaoTreino(); avisoPrevisao(guardada);
+        jaMostrou = true;
+      }
+    } catch (e) { console.warn("Abertura rápida falhou; carregando normal", e); }
+    try {
+      [balneab, observado] = await Promise.all([buscarJSON("data/balneabilidade.json").catch(() => guarda.ler("pm-balneab-foto") || { praias: {} }),
+        buscarJSON("data/observado.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => guarda.ler("pm-observado-foto") || { estacoes: {} })]);
+      if (balneab && balneab.praias) guarda.gravar("pm-balneab-foto", balneab);
+      if (observado && observado.estacoes) guarda.gravar("pm-observado-foto", observado);
       const dados = await carregar();
       montar(dados);
       desenharDias();
@@ -3102,6 +3116,7 @@
       if (dados.offline) ultimaBusca = Date.now() - (CACHE_MIN - 1) * 60000;    // sem internet: tenta de novo em 1 minuto
     } catch (e) {
       console.error(e);
+      if (jaMostrou) return;   // já tem a previsão guardada na tela: não troca por mensagem de erro
       $("#cartao").innerHTML = '<div class="aviso">Não consegui carregar a previsão agora. Verifique a internet e tente de novo.<br><button id="tentar">Tentar de novo</button></div>';
       $("#tentar").onclick = () => location.reload();
     }
@@ -3115,8 +3130,8 @@
     try {
       const [dados, bal, obs] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null),
         buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null)]);
-      if (bal && bal.praias) balneab = bal;
-      if (obs && obs.estacoes) observado = obs;
+      if (bal && bal.praias) { balneab = bal; guarda.gravar("pm-balneab-foto", bal); }
+      if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
       {
         montar(dados);
         desenharDias();
