@@ -1,0 +1,31 @@
+# Robô do céu observado: a cada meia hora, das 5h às 19h (Brasília), salva as observações reais dos aeroportos.
+name: Céu observado (aeroportos)
+
+on:
+  schedule:
+    - cron: "7,37 8-22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: observado
+  cancel-in-progress: false
+
+jobs:
+  observado:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/observado.py
+      - name: Salvar no site
+        run: |
+          git config user.name "robo-praiometro"
+          git config user.email "robo-praiometro@users.noreply.github.com"
+          git add data/observado.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Céu observado"
+          # se outro robô salvou ao mesmo tempo, junta e tenta de novo (até 4 vezes)
+          for i in 1 2 3 4; do git pull --rebase -X theirs && git push && exit 0; sleep 15; done
+          exit 1
