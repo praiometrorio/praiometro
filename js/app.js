@@ -1289,6 +1289,7 @@
   }
 
   // ---------- relevo e sombra ----------
+  let relevoSite = null;
   async function carregarHorizonte(p) {
     if (horizontes[p.id]) return;
     const chave = "pm-horizonte-v1-" + p.id;
@@ -1296,7 +1297,14 @@
     if (salvo && salvo.length === 36) { horizontes[p.id] = salvo; return; }
     horizontes[p.id] = "carregando";
     await null;
+    // 1º: o arquivo do site com o relevo de todas as praias (calculado uma vez pelo robô relevo.yml)
     try {
+      relevoSite = relevoSite || buscarJSON("data/horizontes.json?v=1");
+      const todos = await relevoSite, ang = todos && todos[p.id];
+      if (Array.isArray(ang) && ang.length === 36) { horizontes[p.id] = ang; guarda.gravar(chave, ang); if (praiaAtual().p.id === p.id) { desenharSombra(); desenharSolNoMapa(); } return; }
+    } catch (e) { relevoSite = null; }
+    // 2º: pergunta ao serviço de relevo (até 3 tentativas)
+    for (let tent = 0; tent < 3 && horizontes[p.id] !== "ok"; tent++) try {
       const pts = SOL.pontosHorizonte(p);
       const partes = [];
       for (let i = 0; i < pts.length; i += 100) partes.push(pts.slice(i, i + 100));
@@ -1306,10 +1314,14 @@
       const ang = SOL.anguloHorizonte(elev);
       horizontes[p.id] = ang;
       guarda.gravar(chave, ang);
+      break;
     } catch (e) {
       console.warn("Relevo indisponível", e);
       horizontes[p.id] = "erro";
+      await new Promise((ok) => setTimeout(ok, 1500 * (tent + 1)));
     }
+    // se falhou, tenta de novo na próxima vez que a praia for aberta
+    if (horizontes[p.id] === "erro") setTimeout(() => { if (horizontes[p.id] === "erro") delete horizontes[p.id]; }, 30000);
     if (praiaAtual().p.id === p.id) { desenharSombra(); desenharSolNoMapa(); }
   }
   const horizonteDe = (p) => Array.isArray(horizontes[p.id]) ? horizontes[p.id] : null;
@@ -1391,7 +1403,7 @@
     const hzOk = Array.isArray(horizontes[p.id]) || horizontes[p.id] === "erro";
     const somb = hzOk ? sombraDoDia(p, x) : null;
     const temSombra = somb && Object.values(somb.sombraHora).some(Boolean);
-    const sombraTxt = somb ? somb.texto + (temSombra ? "" : "") + (horizontes[p.id] === "erro" ? " <small>(Sem dados do relevo agora; considerei só os prédios)</small>" : "") : "Calculando a sombra na areia…";
+    const sombraTxt = somb ? somb.texto + (temSombra ? "" : "") + (horizontes[p.id] === "erro" ? "" : "") : "Calculando a sombra na areia…";
     const ultimaHora = x.horas.filter((y) => y.h >= 16 && y.h <= 18);
     const nuvensTarde = ultimaHora.length ? media(ultimaHora.map((y) => y.nuvens)) : 50;
     const porTxt = nuvensTarde >= 20 && nuvensTarde <= 60 ? "boa chance de céu colorido" : nuvensTarde < 20 ? "céu limpo, cores suaves" : "as nuvens devem esconder";
@@ -1500,7 +1512,7 @@
     if (st === "carregando" || st === undefined) { el.querySelector("span").textContent = "Calculando a sombra na areia…"; return; }
     const r = sombraDoDia(l.p, l.x);
     const temSombra = Object.values(r.sombraHora).some(Boolean);
-    el.querySelector("span").innerHTML = r.texto + (temSombra ? "" : "") + (st === "erro" ? " <small>(Sem dados do relevo agora; considerei só os prédios)</small>" : "");
+    el.querySelector("span").innerHTML = r.texto + (temSombra ? "" : "") + (st === "erro" ? "" : "");
     document.querySelectorAll("#horas [data-h]").forEach((i) => i.classList.toggle("sombra", r.sombraHora[+i.dataset.h]));
     atualizarSituacao();
   }
