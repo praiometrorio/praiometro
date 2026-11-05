@@ -21,7 +21,7 @@ def tapa(nuvens):
     livre = 1.0
     for c in nuvens or []:
         f = COBRE.get(c.get("cover"), 0); base = c.get("base") or 0
-        peso = 1 if base < 6500 else 0.85 if base < 20000 else 0.45
+        peso = 1 if base < 6500 else 0.9 if base < 20000 else 0.55
         livre *= 1 - f * peso
     return round(100 * (1 - livre))
 

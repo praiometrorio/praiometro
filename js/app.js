@@ -34,8 +34,8 @@
   const IC = {
     sol: svg('<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
     // sol com poucas nuvens: o sol inteiro e uma nuvenzinha pequena no canto
-    poucas: svg('<circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M1.5 10h2M3.9 3.9l1.4 1.4M16.1 3.9l-1.4 1.4M3.9 16.1l1.4-1.4M18.5 10h-1"/><path d="M13.5 21.5h6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7.1 1.1 2.1 2.1 0 0 0 .8 4.1z"/>'),
-    parcial: svg('<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 10.5A3.5 3.5 0 0 1 11.3 6.6"/><path d="M8 20h10a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.4A2.8 2.8 0 0 0 8 20z"/>'),
+    poucas: svg('<circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M1.5 10h2M3.9 3.9l1.4 1.4M16.1 3.9l-1.4 1.4M3.9 16.1l1.4-1.4M18.5 10h-1"/><path class="nv-branca" fill="#FFFFFF" stroke="#AEB9C4" d="M13.5 21.5h6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7.1 1.1 2.1 2.1 0 0 0 .8 4.1z"/>'),
+    parcial: svg('<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 10.5A3.5 3.5 0 0 1 11.3 6.6"/><path class="nv-cinza" fill="#D3DAE1" stroke="#7E8B98" d="M8 20h10a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.4A2.8 2.8 0 0 0 8 20z"/>'),
     noite: svg('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
     nublado: svg('<path d="M7 19h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 11.6 3.8 3.8 0 0 0 7 19z"/>'),
     chuva: svg('<path d="M7 15h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 7.6 3.8 3.8 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>'),
@@ -337,7 +337,7 @@
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
-  const PESO_NUVEM = { baixa: 1, media: 0.85, alta: 0.45 };
+  const PESO_NUVEM = { baixa: 1, media: 0.9, alta: 0.55 };
   const DUVIDA_NUVEM = 60;   // nuvem que um modelo precisa prever pra contar como "esse modelo acha que fecha"
   const LIMPO_ATE = 20;      // céu (todas as nuvens, até a alta) abaixo disso = "céu limpo" de verdade
   // ---------- onda que chega na praia ----------

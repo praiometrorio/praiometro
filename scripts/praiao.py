@@ -45,7 +45,7 @@ def minutos(hhmm):
     return int(hhmm[:2]) * 60 + int(hhmm[3:5])
 
 CHUVA_MM = 0.3   # chance de chuva = % dos 9 modelos com 0,3 mm ou mais na hora (igual ao app)
-PESO_NUVEM = {"baixa": 1, "media": 0.85, "alta": 0.45}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
+PESO_NUVEM = {"baixa": 1, "media": 0.9, "alta": 0.55}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
 
 def nuvem_que_tapa(nh, m, k):
     g = lambda nome: (nh.get(nome + "_" + m) or [None] * len(nh["time"]))[k]
