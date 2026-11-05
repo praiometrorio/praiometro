@@ -51,7 +51,7 @@ for m in dados if isinstance(dados, list) else []:
       saida["estacoes"].setdefault(est, {})
       # guarda a observação mais próxima da hora cheia
       if chave not in saida["estacoes"][est] or t.minute <= 15:
-          saida["estacoes"][est][chave] = {"nuvens": n, "total": 0 if cobertura else total(m.get("clouds")), "chuva": any(x in wx for x in ("RA", "DZ", "SH", "TS"))}
+          saida["estacoes"][est][chave] = {"nuvens": n, "total": 0 if cobertura else total(m.get("clouds")), "chuva": any(x in wx for x in ("RA", "DZ", "SH", "TS")), "temp": m.get("temp")}
   except Exception as e:
     print("pulei uma observação:", e)
 if not saida["estacoes"]:

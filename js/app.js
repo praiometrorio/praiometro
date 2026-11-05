@@ -326,6 +326,15 @@
   let balneab = { praias: {} };
   // céu observado de verdade (aeroportos, robô observado.yml): corrige as horas de hoje que já passaram
   let observado = { estacoes: {} };
+  // medições das estações do INMET perto das praias (robô inmet.py): temperatura, umidade e vento de verdade
+  let inmet = { praias: {}, estacoes: {} };
+  // regras: temperatura e umidade valem até 7 km (baía e mar aberto variam pouco, 0 a 2°);
+  // o VENTO só até 3 km e nunca em praia de baía (vento muda muito de uma praia pra outra)
+  const inmetEm = (p, data, hr, oque) => {
+    const c = inmet.praias && inmet.praias[p.id]; if (!c) return null;
+    const cod = c.e || c, km = c.km ?? 99; if (oque === "vento" && (km > 3 || p.baia)) return null;
+    const e = inmet.estacoes[cod]; return (e && e.horas[`${data}T${pad(hr)}`]) || null;
+  };
   const ESTACAO = (p) => p.regiao === "zo" ? ["SBJR", "SBRJ", "SBGL"] : ["SBRJ", "SBGL", "SBJR"];
   const obsEm = (p, data, hr) => { for (const e of ESTACAO(p)) { const o = (observado.estacoes[e] || {})[`${data}T${pad(hr)}`]; if (o) return o; } return null; };
   const horizontes = {};   // ângulo do relevo por praia (36 direções) ou "carregando" / "erro"
@@ -639,6 +648,50 @@
       const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {};
       // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
       // alta (o véu fino lá em cima) deixa o sol passar. Sem as camadas, usa o total do modelo.
+      // "continua o que o aeroporto está vendo": se a última observação de hoje está mais nublada (ou quente/fria)
+      // que a previsão, as próximas 4 horas puxam pra perto do que foi observado (cada hora um pouco menos)
+      const viesHoje = (data) => {
+        const agora = +relogio.format(new Date()).slice(0, 2);
+        for (let hr = agora; hr >= agora - 3; hr--) {
+          const ob = obsEm(p, data, hr); if (!ob) continue;
+          const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
+          const fN = nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0), fT = nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0);
+          return { agora, n: ob.nuvens - fN, tot: (ob.total ?? ob.nuvens) - fT, t: 0 };
+        }
+        return null;
+      };
+      // temperatura e vento: a última medição do INMET perto da praia "puxa" as próximas 4 horas
+      const viesInmet = (data, vEm) => {
+        const agora = +relogio.format(new Date()).slice(0, 2);
+        for (let hr = agora; hr >= agora - 3; hr--) {
+          const io = inmetEm(p, data, hr, vEm ? "vento" : "temp"); if (!io) continue;
+          const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
+          return { agora: hr, t: io.t != null && h.temperature_2m[k] != null ? io.t - h.temperature_2m[k] : 0, v: vEm && io.v != null && vEm(k) != null ? io.v - vEm(k) : 0 };
+        }
+        return null;
+      };
+      const tempHoje = (d, data, hr, tc) => {
+        if (d !== 0) return tc;
+        const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr) : null;
+        if (io && io.t != null) return io.t;
+        const v = viesInmet(data, null); if (!v || hr <= v.agora || hr > v.agora + 4) return tc;
+        return tc + v.t * (1 - (hr - v.agora) / 5);
+      };
+      const ventoHoje = (d, data, hr, k, vEm, dEm, rEm) => {
+        const base = { v: vEm(k), vd: dEm(k), raj: rEm(k) };
+        if (d !== 0) return base;
+        const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr, "vento") : null;
+        if (io && io.v != null) return { v: Math.round(io.v), vd: io.vd ?? base.vd, raj: io.raj != null ? Math.round(io.raj) : base.raj };
+        const vi = viesInmet(data, vEm); if (!vi || hr <= vi.agora || hr > vi.agora + 4 || base.v == null) return base;
+        return { ...base, v: Math.max(0, Math.round(base.v + vi.v * (1 - (hr - vi.agora) / 5))) };
+      };
+      const urHoje = (d, data, hr, ur) => { if (d !== 0) return ur; const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr) : null; return io && io.ur != null ? io.ur : ur; };
+      const ajustaHoje = (d, data, hr, nuv, tot, tc) => {
+        if (d !== 0) return [nuv, tot, tc];
+        const v = viesHoje(data); if (!v || hr <= v.agora || hr > v.agora + 4) return [nuv, tot, tc];
+        const w = 1 - (hr - v.agora) / 5, c = (x) => Math.round(Math.max(0, Math.min(100, x)));
+        return [c(nuv + v.n * w), c(tot + v.tot * w), tc + v.t * w];
+      };
       const nuvemQueTapa = (nh, md, k) => {
         const b = (nh["cloud_cover_low_" + md] || [])[k], m = (nh["cloud_cover_mid_" + md] || [])[k], a = (nh["cloud_cover_high_" + md] || [])[k];
         if (b == null || m == null || a == null) return (nh["cloud_cover_" + md] || [])[k];
@@ -782,9 +835,12 @@
             // igual às horas do cartão: hoje, o que já passou vem do aeroporto
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
             if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20); }
+            let tC = h.temperature_2m[k];
+            if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
+            tC = tempHoje(d, data, hr, tC);
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
-            return { h: hr, t: h.temperature_2m[k], ur: h.relative_humidity_2m ? h.relative_humidity_2m[k] : null, chuva, nuvens, tot,
+            return { h: hr, t: tC, ur: urHoje(d, data, hr, h.relative_humidity_2m ? h.relative_humidity_2m[k] : null), chuva, nuvens, tot,
               est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
@@ -797,12 +853,16 @@
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
             let tot = Math.round(nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0));
             if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); if (ob.chuva) chuva = Math.max(chuva, 80); else chuva = Math.min(chuva, 20); }
+            let tC = h.temperature_2m[k];
+            if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
+            tC = tempHoje(d, data, hr, tC);
             // hora sem sol (antes do nascer ou depois do pôr): mostra noite, a não ser que chova
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
-            return { h: hr, t: Math.round(h.temperature_2m[k]), chuva, nuvens, tot, est, uv: uvEm(k, nuvens), v: ventoEm(k),
-              vd: dirEm(k), raj: rajEm(k) };
+            const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
+            return { h: hr, t: Math.round(tC), chuva, nuvens, tot, est, uv: uvEm(k, nuvens), v: vt.v,
+              vd: vt.vd, raj: vt.raj };
           })
         };
       });
@@ -3118,6 +3178,7 @@
       if (guardada && guardada.tempo && diaDe(guardada.t) === diaHoje()) {
         balneab = guarda.ler("pm-balneab-foto") || { praias: {} };
         observado = guarda.ler("pm-observado-foto") || { estacoes: {} };
+        inmet = guarda.ler("pm-inmet-foto") || { praias: {}, estacoes: {} };
         montar(guardada); desenharDias(); desenhar(); desenharBotaoTreino(); avisoPrevisao(guardada);
         jaMostrou = true;
       }
@@ -3127,6 +3188,8 @@
         buscarJSON("data/observado.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => guarda.ler("pm-observado-foto") || { estacoes: {} })]);
       if (balneab && balneab.praias) guarda.gravar("pm-balneab-foto", balneab);
       if (observado && observado.estacoes) guarda.gravar("pm-observado-foto", observado);
+      const im = await buscarJSON("data/inmet.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => null);
+      if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
       const dados = await carregar();
       montar(dados);
       desenharDias();
@@ -3153,6 +3216,8 @@
         buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null)]);
       if (bal && bal.praias) { balneab = bal; guarda.gravar("pm-balneab-foto", bal); }
       if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
+      const im = await buscarJSON("data/inmet.json?t=" + Date.now()).catch(() => null);
+      if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
       {
         montar(dados);
         desenharDias();
