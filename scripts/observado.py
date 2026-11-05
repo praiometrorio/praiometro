@@ -47,7 +47,7 @@ for m in dados if isinstance(dados, list) else []:
       chave = t.strftime("%Y-%m-%dT%H")
       wx = (m.get("wxString") or "")
       cobertura = "CAVOK" if (m.get("rawOb") or "").find("CAVOK") >= 0 else None
-      n = 0 if cobertura else tapa(m.get("clouds"))
+      n = 0 if cobertura else total(m.get("clouds"))   # nov/2026: céu coberto total, como a previsão
       saida["estacoes"].setdefault(est, {})
       # guarda a observação mais próxima da hora cheia
       if chave not in saida["estacoes"][est] or t.minute <= 15:

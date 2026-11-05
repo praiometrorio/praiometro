@@ -48,7 +48,9 @@ CHUVA_MM = 0.3   # chance de chuva = % dos 9 modelos com 0,3 mm ou mais na hora 
 PESO_NUVEM = {"baixa": 1, "media": 0.9, "alta": 0.55}   # igual ao app: nuvem alta (véu fino) quase não esconde o sol
 
 def nuvem_que_tapa(nh, m, k):
+    """igual ao app (nov/2026): cobertura total do céu do modelo; sem ela, a conta por camadas"""
     g = lambda nome: (nh.get(nome + "_" + m) or [None] * len(nh["time"]))[k]
+    if g("cloud_cover") is not None: return g("cloud_cover")
     b, md, a = g("cloud_cover_low"), g("cloud_cover_mid"), g("cloud_cover_high")
     if b is None or md is None or a is None: return g("cloud_cover")
     return 100 * (1 - (1 - PESO_NUVEM["baixa"] * b / 100) * (1 - PESO_NUVEM["media"] * md / 100) * (1 - PESO_NUVEM["alta"] * a / 100))

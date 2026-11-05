@@ -692,9 +692,12 @@
         const w = 1 - (hr - v.agora) / 5, c = (x) => Math.round(Math.max(0, Math.min(100, x)));
         return [c(nuv + v.n * w), c(tot + v.tot * w), tc + v.t * w];
       };
+      // nov/2026: passamos a usar a COBERTURA TOTAL do céu de cada modelo (como o iPhone). O desconto por altura
+      // (nuvem alta "deixa o sol passar") errava em dia de mormaço. Sem o total, cai na conta por camadas.
       const nuvemQueTapa = (nh, md, k) => {
+        const tt = (nh["cloud_cover_" + md] || [])[k]; if (tt != null) return tt;
         const b = (nh["cloud_cover_low_" + md] || [])[k], m = (nh["cloud_cover_mid_" + md] || [])[k], a = (nh["cloud_cover_high_" + md] || [])[k];
-        if (b == null || m == null || a == null) return (nh["cloud_cover_" + md] || [])[k];
+        if (b == null || m == null || a == null) return null;
         return 100 * (1 - (1 - PESO_NUVEM.baixa * b / 100) * (1 - PESO_NUVEM.media * m / 100) * (1 - PESO_NUVEM.alta * a / 100));
       };
       if (N[i] && N[i].hourly) {
