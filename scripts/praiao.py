@@ -174,6 +174,9 @@ def main():
         dia = DIAS[(hoje + datetime.timedelta(days=1)).weekday()]
         tit, frase = JEITO[tipo_do_dia(boas)] if boas else JEITO["todo"]
         ic = "🌤️" if tipo_do_dia(boas) == "nuvens" else "☀️" if boas else ""
+        # guarda a DECISÃO da véspera (o app mostra a faixa "Hoje tem praião" só se a previsão da véspera cravou)
+        dec = {"praiao": len(boas) >= 4, "tipo": tipo_do_dia(boas) if boas else None, "praias": [b[3] for b in boas][:8], "ids": [FAMA[-b[2]] for b in boas][:8]}
+        if any(reg.get(k) != v for k, v in dec.items()): reg.update(dec); mudou = True
         if reg.get("pre"):
             if len(boas) >= 4:
                 ok = enviar(f"{ic} Confirmado: amanhã tem {tit}!", f"{nomes(boas)} {frase}. Toca pra ver.", f"conf-{amanha}")

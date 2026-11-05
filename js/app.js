@@ -328,6 +328,8 @@
   let observado = { estacoes: {} };
   // medições das estações do INMET perto das praias (robô inmet.py): temperatura, umidade e vento de verdade
   let inmet = { praias: {}, estacoes: {} };
+  // decisões do robô do praião (data/alertas.json): "hoje tem praião" só se a previsão da VÉSPERA cravou
+  let alertas = {};
   // regras: temperatura e umidade valem até 7 km (baía e mar aberto variam pouco, 0 a 2°);
   // o VENTO só até 3 km e nunca em praia de baía (vento muda muito de uma praia pra outra)
   const inmetEm = (p, data, hr, oque) => {
@@ -1206,7 +1208,11 @@
     if (boas.length < 4) return { n: 0 };
     const conta = {}; boas.forEach((p) => { const t = tipoPraiao(previsao[p.id][d]); conta[t] = (conta[t] || 0) + 1; });
     const tipo = ["todo", "manha", "tarde", "nuvens"].reduce((m, t) => ((conta[t] || 0) > (conta[m] || 0) ? t : m), "todo");
-    return { n: boas.length, tipo };
+    const REG = { zs: "Zona Sul", zo: "Zona Oeste", nit: "Niterói" };
+    const regs = [...new Set(boas.map((p) => p.regiao))];
+    const onde = regs.length === 1 ? ` na ${REG[regs[0]] || ""}`.replace("na Niterói", "em Niterói") : "";
+    const nomes = boas.slice(0, 3).map((p) => p.nome).join(", ") + (boas.length > 3 ? ` e mais ${boas.length - 3}` : "");
+    return { n: boas.length, tipo, onde, nomes };
   }
   const nomeDia = (d) => d === 0 ? "hoje" : d === 1 ? "amanhã" : SEMANA_LONGA[new Date(datas[d] + "T12:00:00").getDay()];
 
@@ -1479,10 +1485,22 @@
       pin.el.classList.toggle("on", p.id === atual.p.id);
     });
 
-    const pr = praiaoDia(estado.dia), n = pr.n;
+    let pr = praiaoDia(estado.dia);
+    // HOJE: vale o que a previsão da véspera decidiu (o aeroporto mede o que já passou, não decide praião)
+    if (estado.dia === 0) {
+      const rec = alertas[datas[0]];
+      if (rec && rec.praiao) {
+        const ps = (rec.ids || []).map((id) => PRAIAS.find((p) => p.id === id)).filter(Boolean);
+        const REG = { zs: "Zona Sul", zo: "Zona Oeste", nit: "Niterói" }, regs = [...new Set(ps.map((p) => p.regiao))];
+        const onde = regs.length === 1 ? (regs[0] === "nit" ? " em Niterói" : ` na ${REG[regs[0]]}`) : "";
+        const nm = rec.praias || [];
+        pr = { n: nm.length, tipo: rec.tipo || "todo", onde, nomes: nm.slice(0, 3).join(", ") + (nm.length > 3 ? ` e mais ${nm.length - 3}` : "") };
+      } else pr = { n: 0 };
+    }
+    const n = pr.n;
     const banner = $("#praiao");
     banner.hidden = !n;
-    if (n) banner.innerHTML = `${IC.sol}<div>${nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase())} tem ${JEITO_PRAIAO[pr.tipo]}!<small>${n} praias com sol e vento tranquilo</small></div>`;
+    if (n) banner.innerHTML = `${IC.sol}<div>${nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase())} tem ${JEITO_PRAIAO[pr.tipo]}!<small>${pr.nomes}${pr.onde} · com sol e vento tranquilo</small></div>`;
     // foto do topo (abas dos dias + faixa do praião) para a próxima abertura já mostrar tudo na hora, sem "pular"
     if (estado.dia === 0) guarda.gravar("pm-topo-foto", { data: datas[0], dias: $("#dias").innerHTML, praiao: n ? banner.innerHTML : "" });
 
@@ -3191,6 +3209,7 @@
         buscarJSON("data/observado.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => guarda.ler("pm-observado-foto") || { estacoes: {} })]);
       if (balneab && balneab.praias) guarda.gravar("pm-balneab-foto", balneab);
       if (observado && observado.estacoes) guarda.gravar("pm-observado-foto", observado);
+      alertas = await buscarJSON("data/alertas.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => alertas) || {};
       const im = await buscarJSON("data/inmet.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => null);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
       const dados = await carregar();

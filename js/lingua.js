@@ -99,6 +99,7 @@
     ["Amanhã tem praião, mais pela manhã!", "Beach day tomorrow, best in the morning!", "¡Mañana es día de playa, mejor por la mañana!", "Journée plage demain, surtout le matin !"],
     ["Amanhã tem praião, mais à tarde!", "Beach day tomorrow, best in the afternoon!", "¡Mañana es día de playa, mejor por la tarde!", "Journée plage demain, surtout l'après-midi !"],
     ["Amanhã tem praião com visitas de algumas nuvens!", "Beach day tomorrow, with a few passing clouds!", "¡Mañana es día de playa, con algunas nubes de paso!", "Journée plage demain, avec quelques nuages de passage !"],
+    ["com sol e vento tranquilo", "with sun and light wind", "con sol y viento suave", "avec soleil et vent léger"],
     ["# praias com sol e vento tranquilo", "# beaches with sun and light wind", "# playas con sol y viento suave", "# plages avec soleil et vent léger"],
     ["{D} tem praião o dia todo!", "{D}: beach day all day!", "{D}: ¡día de playa todo el día!", "{D} : journée plage toute la journée !"],
     ["{D} tem praião, mais pela manhã!", "{D}: beach day, best in the morning!", "{D}: ¡día de playa, mejor por la mañana!", "{D} : journée plage, surtout le matin !"],
