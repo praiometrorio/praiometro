@@ -388,7 +388,7 @@
   };
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,precipitation&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,precipitation,temperature_2m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,secondary_swell_wave_height,secondary_swell_wave_direction,secondary_swell_wave_period,wind_wave_height,wind_wave_direction,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
@@ -646,6 +646,12 @@
       };
       if (N[i] && N[i].hourly) {
         const nh = N[i].hourly;
+        // temperatura = mediana dos modelos (um modelo sozinho às vezes erra a hora da frente fria e "despenca" 6° de uma vez)
+        const kh = {}; h.time.forEach((ts, j) => (kh[ts] = j));
+        nh.time.forEach((ts, k) => {
+          const tt = MODELOS_NUVEM.map((md) => (nh["temperature_2m_" + md] || [])[k]).filter((v) => v != null).sort((a, b) => a - b);
+          if (tt.length >= 3 && kh[ts] != null) h.temperature_2m[kh[ts]] = tt.length % 2 ? tt[(tt.length - 1) / 2] : (tt[tt.length / 2 - 1] + tt[tt.length / 2]) / 2;
+        });
         nh.time.forEach((ts, k) => {
           const xs = MODELOS_NUVEM.map((md) => nuvemQueTapa(nh, md, k)).filter((v) => v != null);
           // se pelo menos 1/3 dos modelos acha que fecha (nuvem ≥ 60%), não dá pra prometer solzão: vira "sol com nuvens"
