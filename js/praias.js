@@ -20,7 +20,7 @@ window.PRAIAS = [
   { id: "ipanema",     nome: "Ipanema",             regiao: "zs",  local: "Zona Sul",                            lat: -22.9868, lon: -43.2050, mar: 175, predios: { altura: 30, dist: 95, terra: 355 } },
   { id: "leblon",      nome: "Leblon",              regiao: "zs",  local: "Zona Sul",                            lat: -22.9873, lon: -43.2230, mar: 180, predios: { altura: 30, dist: 95, terra: 350 } },
   { id: "vidigal",     nome: "Vidigal",             regiao: "zs",  local: "Zona Sul · ao pé do Dois Irmãos",     lat: -22.9922, lon: -43.2319, mar: 195 },
-  { id: "saoconrado",  nome: "São Conrado",         regiao: "zo",  local: "Zona Sul · ao pé da Pedra da Gávea",  lat: -22.9995, lon: -43.2680, mar: 175 },
+  { id: "saoconrado",  pedra: true, nome: "São Conrado",         regiao: "zo",  local: "Zona Sul · ao pé da Pedra da Gávea",  lat: -22.9995, lon: -43.2680, mar: 175 },
   { id: "joatinga",    nome: "Joatinga",            regiao: "zo",  local: "Zona Oeste · Joá, acesso por escadaria", lat: -23.0149, lon: -43.2902, mar: 190, selvagem: true, porDoSol: true },
   { id: "barra",       nome: "Barra da Tijuca",     regiao: "zo",  local: "Zona Oeste · Postos 1 a 6",           lat: -23.0112, lon: -43.3320, mar: 170, predios: { altura: 35, dist: 130, terra: 345 } },
   { id: "reserva",     nome: "Reserva",             regiao: "zo",  local: "Zona Oeste · Postos 7 a 9",           lat: -23.0130, lon: -43.3950, mar: 170 },

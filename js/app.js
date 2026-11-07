@@ -339,13 +339,16 @@
     const e = inmet.estacoes[cod]; return (e && e.horas[`${data}T${pad(hr)}`]) || null;
   };
   const ESTACAO = (p) => p.regiao === "zo" ? ["SBJR", "SBRJ", "SBGL"] : ["SBRJ", "SBGL", "SBJR"];
-  const obsEm = (p, data, hr) => { for (const e of ESTACAO(p)) { const o = (observado.estacoes[e] || {})[`${data}T${pad(hr)}`]; if (o) return o; } return null; };
+  // o aeroporto só corrige quando é DECISIVO: céu fechado (≥ 75%, BKN/OVC), céu limpo (≤ 20%) ou chuva.
+  // "Poucas" ou "algumas nuvens" (FEW/SCT) no aeroporto costumam ser nuvem presa nos morros, que não chega na praia:
+  // nesses casos fica a previsão (ex.: 07/11, Leme com sol e Santos Dumont marcando nuvens espalhadas)
+  const obsEm = (p, data, hr) => { if (p.pedra) return null; for (const e of ESTACAO(p)) { const o = (observado.estacoes[e] || {})[`${data}T${pad(hr)}`]; if (o) return o.chuva || o.nuvens >= 75 || o.nuvens <= 20 ? o : null; } return null; };
   const horizontes = {};   // ângulo do relevo por praia (36 direções) ou "carregando" / "erro"
 
   // ---------- busca da previsão ----------
   const listaLat = () => PRAIAS.map((p) => p.lat).join(","), listaLon = () => PRAIAS.map((p) => p.lon).join(",");
   const urlPrevisao = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,uv_index,uv_index_clear_sky" +
+    "&hourly=temperature_2m,relative_humidity_2m,precipitation_probability,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,wind_speed_80m,uv_index,uv_index_clear_sky" +
     "&daily=sunrise,sunset,uv_index_max&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   // Nuvens: média de 9 modelos. No teste de set-out/2026 (Santos Dumont e Jacarepaguá)
   // a média acertou mais se ia ter sol do que qualquer modelo sozinho.
@@ -755,8 +758,29 @@
           const c = Math.min(100, Math.max(0, nuv)) / 100;
           return Math.round(limpo * (1 - 0.5 * Math.pow(c, 2)) * 10) / 10;
         };
-        const ventoEm = (k) => { const v = ventoMeio[h.time[k]] ?? h.wind_speed_10m[k]; return v == null ? null : Math.round(v); };
+        const ventoBase = (k) => { const v = ventoMeio[h.time[k]] ?? h.wind_speed_10m[k]; return v == null ? null : Math.round(v); };
         const dirEm = (k) => dirMeio[h.time[k]] ?? (h.wind_direction_10m ? h.wind_direction_10m[k] : null);
+        // ESTIMATIVA DA PEDRA (praias com "pedra" em praias.js, ex.: São Conrado), só com vento do mar (de E a SW, 70°–250°):
+        // vento: o funil entre a Pedra da Gávea e o Dois Irmãos traz pra areia o vento de 80 m de altura;
+        // nuvem: o ar sobe a encosta; se a base da nuvem (125 m × (temperatura − ponto de orvalho)) fica abaixo do topo
+        // da Pedra da Gávea (844 m) e o vento é ≥ 10 km/h, forma nuvem presa no morro: +25% (base 600–844 m) ou +45% (abaixo de 600 m)
+        const PEDRA_TOPO = 844;
+        const pedraEm = (k) => {
+          if (!p.pedra) return null;
+          const dir = dirEm(k); if (dir == null || dir < 70 || dir > 250) return null;
+          const v10 = ventoBase(k), v80 = h.wind_speed_80m ? h.wind_speed_80m[k] : null;
+          const vento = v80 != null ? Math.max(v10 ?? 0, Math.round(v80)) : v10;
+          const T = h.temperature_2m[k], ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
+          let extra = 0;
+          if (T != null && ur) {
+            const g = Math.log(ur / 100) + 17.62 * T / (243.12 + T), td = 243.12 * g / (17.62 - g);   // ponto de orvalho (Magnus)
+            const base = 125 * (T - td);
+            if (base < PEDRA_TOPO && (vento ?? 0) >= 10) extra = base < 600 ? 45 : 25;
+          }
+          return { vento, extra };
+        };
+        const ventoEm = (k) => { const pd = pedraEm(k); return pd && pd.vento != null ? pd.vento : ventoBase(k); };
+        const nuvemPedra = (k, nuv) => { const pd = pedraEm(k); return pd ? Math.min(100, nuv + pd.extra) : nuv; };
         // rajada: a proporção rajada/vento do modelo padrão aplicada ao vento do meio (nunca menor que o vento)
         const rajEm = (k) => {
           const v = ventoEm(k), g = h.wind_gusts_10m ? h.wind_gusts_10m[k] : null, vb = h.wind_speed_10m[k];
@@ -846,6 +870,7 @@
             let tC = h.temperature_2m[k];
             if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
             tC = tempHoje(d, data, hr, tC);
+            nuvens = nuvemPedra(k, nuvens); tot = nuvemPedra(k, tot);
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             return { h: hr, t: tC, ur: urHoje(d, data, hr, h.relative_humidity_2m ? h.relative_humidity_2m[k] : null), chuva, nuvens, tot,
@@ -864,6 +889,7 @@
             let tC = h.temperature_2m[k];
             if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
             tC = tempHoje(d, data, hr, tC);
+            nuvens = nuvemPedra(k, nuvens); tot = nuvemPedra(k, tot);
             // hora sem sol (antes do nascer ou depois do pôr): mostra noite, a não ser que chova
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
