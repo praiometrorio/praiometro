@@ -39,6 +39,8 @@
     noite: svg('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
     nublado: svg('<path d="M7 19h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 11.6 3.8 3.8 0 0 0 7 19z"/>'),
     chuva: svg('<path d="M7 15h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 7.6 3.8 3.8 0 0 0 7 15z"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>'),
+    // tempestade (radar vê chuva forte em cima da praia agora): nuvem escura + raio amarelo
+    raio: svg('<path class="nv-cinza" fill="#5F6B76" stroke="#3E4952" d="M7 14h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 6.6 3.8 3.8 0 0 0 7 14z"/><path fill="#FFC21A" stroke="#C98A00" stroke-linejoin="round" d="M12.5 12.5l-3 5h3l-2 5.5 5.5-7h-3.2l2-3.5z"/>'),
     gota: svg('<path d="M12 3s5 5.5 5 9.5a5 5 0 0 1-10 0C7 8.5 12 3 12 3z"/><path d="M10 14a2 2 0 0 0 2 2"/>'),
     calmo: svg('<path d="M2 12h20M2 17h20"/>'),
     onda: svg('<path d="M2 12c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3M2 18c2.5 0 2.5-3 5-3s2.5 3 5 3 2.5-3 5-3 2.5 3 5 3"/>'),
@@ -74,7 +76,7 @@
   const SOL_ATE = 40;   // nov/2026: padrão da meteorologia ("predominantemente ensolarado" até ~40% de céu coberto). 20–40% = ícone de poucas nuvens
   const NUBLADO_DE = 70; // 70% ou mais de céu coberto = nublado
   // ícone da hora: sol limpo, sol com poucas nuvens (nuvenzinha) ou sol entre nuvens (nuvem grande)
-  const icHora = (y) => y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
+  const icHora = (y) => y.raio ? IC.raio : y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
   // ícone do dia/praia (mapa, abas, listas): sol com nuvenzinha quando o sol é firme mas o céu não está limpo
   const icDia = (a) => a.ceu === "sol" && a.poucas ? IC.poucas : IC[a.ceu];
   // vento "de praia" (vento médio, km/h): calmo · ventinho · brisa · ventando · ventando muito · ventania
@@ -339,6 +341,38 @@
   let observado = { estacoes: {} };
   // medições das estações do INMET perto das praias (robô inmet.py): temperatura, umidade e vento de verdade
   let inmet = { praias: {}, estacoes: {} };
+  // RADAR de chuva (RainViewer, atualiza a cada 10 min): o "agora" passa a ver a chuva na hora, igual ao iPhone.
+  // Para cada praia: aqui = chuva no pixel da praia (~1,5 km), perto = chuva num raio de ~9 km. 0 nada, 1 fraquinha, 2 chuva, 3 forte.
+  let radar = { t: 0, praias: {} };
+  async function carregarRadar() {
+    try {
+      const m = await buscarJSON("https://api.rainviewer.com/public/weather-maps.json");
+      const q = m.radar && m.radar.past && m.radar.past[m.radar.past.length - 1]; if (!q) return;
+      if (Date.now() - q.time * 1000 > 40 * 60000) return;          // imagem velha demais: não usa
+      if (radar.t === q.time * 1000) return;                          // já é essa
+      const Z = 7, n = 2 ** Z, tiles = {}, novo = {};
+      const pos = (p) => { const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
+        return { x: Math.floor(xf), y: Math.floor(yf), px: Math.floor((xf - Math.floor(xf)) * 256), py: Math.floor((yf - Math.floor(yf)) * 256) }; };
+      const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
+        const img = new Image(); img.crossOrigin = "anonymous";
+        img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
+        img.onerror = erro; img.src = `${m.host}${q.path}/256/${Z}/${x}/${y}/2/0_0.png`;
+      }));
+      // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul = chuva; amarelo/laranja/vermelho = forte
+      const forca = (d, i) => { const a = d[i + 3]; if (a < 40) return 0; if (a < 200) return 1; return d[i] >= 200 ? 3 : 2; };
+      await Promise.all(PRAIAS.map(async (p) => {
+        const o = pos(p); const d = await tile(o.x, o.y);
+        let aqui = 0, perto = 0;
+        for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
+          const X = o.px + dx, Y = o.py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255 || dx * dx + dy * dy > 64) continue;
+          const f = forca(d, (Y * 256 + X) * 4);
+          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) aqui = Math.max(aqui, f); else perto = Math.max(perto, f);
+        }
+        novo[p.id] = { aqui, perto };
+      }));
+      radar = { t: q.time * 1000, praias: novo };
+    } catch (e) { console.warn("Radar indisponível agora", e); }
+  }
   // decisões do robô do praião (data/alertas.json): "hoje tem praião" só se a previsão da VÉSPERA cravou
   let alertas = {};
   // regras: temperatura e umidade valem até 7 km (baía e mar aberto variam pouco, 0 a 2°);
@@ -702,6 +736,16 @@
         const vi = viesInmet(data, vEm); if (!vi || hr <= vi.agora || hr > vi.agora + 4 || base.v == null) return base;
         return { ...base, v: Math.max(0, Math.round(base.v + vi.v * (1 - (hr - vi.agora) / 5))) };
       };
+      // radar: só a hora de AGORA (chuva vista agora) e a próxima (chuva chegando de perto)
+      const chuvaRadar = (d, hr, c) => {
+        const r = radar.praias[p.id]; if (d !== 0 || !r || Date.now() - radar.t > 40 * 60000) return c;
+        const agora = +relogio.format(new Date()).slice(0, 2);
+        if (hr === agora) return r.aqui >= 2 ? Math.max(c, r.aqui === 3 ? 95 : 85) : r.aqui === 1 ? Math.max(c, 55) : r.perto >= 2 ? Math.max(Math.min(c, 45), 35) : Math.min(c, 20);
+        if (hr === agora + 1) return r.aqui >= 2 ? Math.max(c, 70) : r.perto >= 2 ? Math.max(c, 50) : c;
+        return c;
+      };
+      // tempestade agora: radar com chuva FORTE (amarelo/laranja/vermelho) em cima da praia
+      const raioRadar = (d, hr) => { const r = radar.praias[p.id]; return d === 0 && !!r && r.aqui === 3 && Date.now() - radar.t <= 40 * 60000 && hr === +relogio.format(new Date()).slice(0, 2); };
       const urHoje = (d, data, hr, ur) => { if (d !== 0) return ur; const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr) : null; return io && io.ur != null ? io.ur : ur; };
       const ajustaHoje = (d, data, hr, nuv, tot, tc) => {
         if (d !== 0) return [nuv, tot, tc];
@@ -868,7 +912,7 @@
             const ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
             const km = m && m.hourly ? m.hourly.time.indexOf(`${data}T${pad(hr)}:00`) : -1;
             const o = km >= 0 ? ondaSurfista(p, m.hourly, km) : null, s = km >= 0 ? aguaPraia(p, m.hourly.sea_surface_temperature[km]) : null;
-            return { h: hr, t: h.temperature_2m[k], ur, chuva: chuvaEm(k), v: ventoEm(k), raj: rajEm(k),
+            return { h: hr, t: h.temperature_2m[k], ur, chuva: chuvaRadar(d, hr, chuvaEm(k)), v: ventoEm(k), raj: rajEm(k),
               uv: uvEm(k, Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0))), mare: nivelEm(data, hr),
               o: o == null ? null : Math.round(o * 10) / 10, s, propria: prop && typeof prop === "object" ? prop.propria : prop === true ? true : prop === false ? false : null };
           }).filter(Boolean),
@@ -880,6 +924,7 @@
             // igual às horas do cartão: hoje, o que já passou vem do aeroporto
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
             if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20); }
+            chuva = chuvaRadar(d, hr, chuva);
             let tC = h.temperature_2m[k];
             if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
             tC = tempHoje(d, data, hr, tC);
@@ -887,7 +932,7 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             return { h: hr, t: tC, ur: urHoje(d, data, hr, h.relative_humidity_2m ? h.relative_humidity_2m[k] : null), chuva, nuvens, tot,
-              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens) };
+              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens), raio: raioRadar(d, hr) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
@@ -899,6 +944,7 @@
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
             let tot = Math.round(nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0));
             if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); if (ob.chuva) chuva = Math.max(chuva, 80); else chuva = Math.min(chuva, 20); }
+            chuva = chuvaRadar(d, hr, chuva);
             let tC = h.temperature_2m[k];
             if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
             tC = tempHoje(d, data, hr, tC);
@@ -909,7 +955,7 @@
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
             const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
             return { h: hr, t: Math.round(tC), chuva, nuvens, tot, est, uv: uvEm(k, nuvens), v: vt.v,
-              vd: vt.vd, raj: vt.raj };
+              vd: vt.vd, raj: vt.raj, raio: raioRadar(d, hr) };
           })
         };
       });
@@ -1580,7 +1626,7 @@
       const y = x.horas.find((q) => q.h === h);
       if (!y) continue;
       const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
-      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${icHora(y) === IC.poucas ? "Poucas nuvens" : NOME_EST[y.est]}">
+      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${y.raio ? "Tempestade" : icHora(y) === IC.poucas ? "Poucas nuvens" : NOME_EST[y.est]}">
         <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${icHora(y)}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
@@ -3254,7 +3300,7 @@
       alertas = await buscarJSON("data/alertas.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => alertas) || {};
       const im = await buscarJSON("data/inmet.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => null);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
-      const dados = await carregar();
+      const [dados] = await Promise.all([carregar(), Promise.race([carregarRadar(), new Promise((ok) => setTimeout(ok, 4000))])]);
       montar(dados);
       desenharDias();
       desenhar();
@@ -3277,7 +3323,7 @@
     buscando = true;
     try {
       const [dados, bal, obs] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null),
-        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null)]);
+        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null), carregarRadar()]);
       if (bal && bal.praias) { balneab = bal; guarda.gravar("pm-balneab-foto", bal); }
       if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
       const im = await buscarJSON("data/inmet.json?t=" + Date.now()).catch(() => null);

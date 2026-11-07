@@ -62,6 +62,7 @@
     // ---- céu, sol, chuva
     ["Sol", "Sun", "Sol", "Soleil"], ["sol", "sun", "sol", "soleil"], ["Solzão", "Full sun", "Solazo", "Grand soleil"],
     ["Poucas nuvens", "A few clouds", "Algunas nubes", "Quelques nuages"],
+    ["Tempestade", "Thunderstorm", "Tormenta", "Orage"],
     ["Sol entre nuvens", "Sun and clouds", "Sol entre nubes", "Soleil voilé"], ["Entre nuvens", "Partly cloudy", "Parcialmente nublado", "Éclaircies"],
     ["Nublado", "Cloudy", "Nublado", "Nuageux"], ["Chuva", "Rain", "Lluvia", "Pluie"], ["chuva", "rain", "lluvia", "pluie"],
     ["Sem sol", "No sun", "Sin sol", "Sans soleil"], ["Sem sol firme", "No steady sun", "Sin sol firme", "Pas de vrai soleil"],
