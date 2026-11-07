@@ -77,6 +77,15 @@
   const icHora = (y) => y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
   // ícone do dia/praia (mapa, abas, listas): sol com nuvenzinha quando o sol é firme mas o céu não está limpo
   const icDia = (a) => a.ceu === "sol" && a.poucas ? IC.poucas : IC[a.ceu];
+  // vento "de praia" (vento médio, km/h): calmo · ventinho · brisa · ventando · ventando muito · ventania
+  const FAIXAS_VENTO = [
+    { ate: 5, n: "Calmo", c: "#A8DDBE", frase: "sem vento, abafado no sol" },
+    { ate: 10, n: "Ventinho", c: "#7CC99A", frase: "refresca sem atrapalhar" },
+    { ate: 15, n: "Brisa", c: "#F2C12E", frase: "dá pra sentir, refresca bem" },
+    { ate: 22, n: "Ventando", c: "#F08A3C", frase: "canga levanta, areia fina voando" },
+    { ate: 30, n: "Ventando muito", c: "#D9534F", frase: "areia batendo na perna" },
+    { ate: 999, n: "Ventania", c: "#8E3B8E", frase: "melhor não abrir guarda-sol" }];
+  const faixaVento = (v) => FAIXAS_VENTO.find((f) => (v ?? 0) <= f.ate);
   const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= NUBLADO_DE ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
@@ -161,10 +170,11 @@
     const quandoV = depois ? ` às ${picoV.h}h` : "";
     const subV = agoraV ? `Agora ${agoraV.v} km/h` + (depois ? ` · chega a ${picoV.v} às ${picoV.h}h` : "")
       : picoV ? `Até ${picoV.v} km/h${picoV.h ? ` (${picoV.h}h)` : ""}` : `${x.vento} km/h`;
-    if (ventoRef <= 10) selos.push({ cls: "neutro", ic: IC.vento, t: "Vento fraco", s: `${subV} · dia de altinha` });
-    else if (ventoRef <= 15) selos.push({ cls: "neutro", ic: IC.vento, t: depois ? `Brisa${quandoV}` : "Brisa", s: `${subV} · guarda-sol firme` });
-    else if (ventoRef <= 20) selos.push({ cls: "mexido", ic: IC.vento, t: depois ? `Vento aumenta${quandoV}` : "Vento moderado", s: `${subV} · finca bem o guarda-sol` });
-    else selos.push({ cls: "ruim", ic: IC.vento, t: depois ? `Ventania${quandoV}` : "Ventania", s: `${subV} · areia voando` });
+    // faixas de vento "de praia" (nov/2026): na areia, 16 km/h já é "ventando"; a rajada vira aviso à parte
+    const fv = faixaVento(ventoRef);
+    const rajRef = Math.max(0, ...(frente.length ? frente : comV).map((y) => y.raj || 0));
+    const avisoRaj = rajRef >= 35 ? `⚠️ rajadas fortes de até ${rajRef} km/h` : rajRef >= 25 ? `💨 rajadas de até ${rajRef} km/h` : fv.frase;
+    selos.push({ cls: ventoRef <= 15 ? "neutro" : ventoRef <= 22 ? "mexido" : "ruim", ic: IC.vento, t: depois && ventoRef > 15 ? `${fv.n}${quandoV}` : fv.n, s: `${subV} · ${avisoRaj}` });
 
     // água: o último boletim do INEA como ele é (própria ou imprópria), com a data
     const dataBol = x.aguaData ? x.aguaData.slice(8, 10) + "/" + x.aguaData.slice(5, 7) : null;
@@ -200,7 +210,7 @@
     // frase curta: o céu, a chuva e só o que for muito importante (o resto está nos selos)
     const fecho = tom === "bom" ? " Dia de praia raiz!" : "";
     const chuvaTxt = ceu !== "chuva" && !chuvaTarde && pancada ? `, com chance de pancada de chuva às ${pancada.h}h` : "";
-    const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 20 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : "";
+    const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 30 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : ventoRef > 22 ? (depois ? ` Ventando muito a partir das ${picoV.h}h.` : " Ventando muito.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
     const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
@@ -769,7 +779,10 @@
           if (!p.pedra) return null;
           const dir = dirEm(k); if (dir == null || dir < 70 || dir > 250) return null;
           const v10 = ventoBase(k), v80 = h.wind_speed_80m ? h.wind_speed_80m[k] : null;
-          const vento = v80 != null ? Math.max(v10 ?? 0, Math.round(v80)) : v10;
+          // de dia (sol misturando o ar) o vento de cima desce até a areia, a uns 75% da força; de noite o ar perto do chão
+          // "descola" do de cima, então o vento de 80 m NÃO é usado (fica o de 10 m)
+          const hr = +h.time[k].slice(11, 13), diaClaro = hr >= 8 && hr <= 17;
+          const vento = v80 != null && diaClaro ? Math.max(v10 ?? 0, Math.round(0.75 * v80)) : v10;
           const T = h.temperature_2m[k], ur = h.relative_humidity_2m ? h.relative_humidity_2m[k] : null;
           let extra = 0;
           if (T != null && ur) {
@@ -2798,7 +2811,7 @@
   // UV é sempre mostrado em número inteiro, então a faixa (Leve, Moderado...) também sai do número inteiro: 5 = Moderado, 6 = Alto
   const faixaIdx = (u) => { const i = FAIXAS_UV.findIndex((f) => Math.round(u) <= f.ate); return i < 0 ? FAIXAS_UV.length - 1 : i; };
   const marCat = (o) => o < 0.6 ? { n: "Piscininha", c: "#8FD3EA" } : o < 1.2 ? { n: "Marolinha", c: "#4FB3D9" } : o < 2 ? { n: "Mar mexido", c: "#1E8FC6" } : { n: "Mar pesado", c: "#0B3F6B" };
-  const ventoCat = (v) => v <= 10 ? { n: "Vento fraco", c: "#7CC99A" } : v <= 15 ? { n: "Brisa", c: "#F2C12E" } : v <= 20 ? { n: "Vento moderado", c: "#F08A3C" } : { n: "Ventania", c: "#D9534F" };
+  const ventoCat = (v) => { const f = faixaVento(v); return { n: f.n, c: f.c }; };
   const aguaCat = (t) => t < 19 ? "Gelada" : t < 22 ? "Fresquinha" : t < 24.5 ? "Agradável" : "Quentinha";
   let relAtual = null, relAberto = null;
   // "das 9h às 13h" (a última hora já não conta) ou "a partir das 15h" quando vai até o fim do dia
@@ -2837,7 +2850,7 @@
         resumo: () => { if (!pts.length) return ["Sem dado do vento"]; const mx = pts.reduce((a, b) => (b.v > a.v ? b : a)), calmo = pts.filter((q) => q.v <= 10);
           const j = maiorSequencia(hs, (y) => y.v != null && y.v <= 10);
           return [`Mais forte às ${mx.h}h: ${mx.v} km/h`, calmo.length && j ? `Vento fraco ${faixaH(j)}` : "Sem horário de vento fraco"]; },
-        leg: [["#7CC99A", "Fraco"], ["#F2C12E", "Brisa"], ["#F08A3C", "Moderado"], ["#D9534F", "Ventania"]] }; }
+        leg: FAIXAS_VENTO.map((f) => [f.c, f.n]) }; }
     return null;
   }
   // ---------- "Céu hora a hora" no estilo do app Tempo do iPhone: dias em cima, curva de temperatura e chance de chuva, régua arrastável ----------
