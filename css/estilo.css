@@ -949,3 +949,12 @@ html,body{overscroll-behavior-y:none}
 
 /* legenda: sol com poucas nuvens (metade sol, metade nuvem clarinha) */
 .lg.poucas{background:linear-gradient(135deg,var(--c-sol) 55%,var(--c-parcial) 55%)}
+
+/* tempestade no cartão: raios piscando e clarão no céu */
+.tp-raio1 { animation: tpRaio1 5.2s infinite; }
+.tp-raio2 { animation: tpRaio2 7.3s infinite 1.6s; opacity: 0; }
+.tp-clarao { animation: tpClarao 5.2s infinite; }
+@keyframes tpRaio1 { 0%, 8% { opacity: 0; } 9% { opacity: 1; } 11% { opacity: .25; } 13% { opacity: 1; } 22% { opacity: 1; } 27%, 100% { opacity: 0; } }
+@keyframes tpRaio2 { 0%, 4% { opacity: 0; } 5% { opacity: 1; } 7% { opacity: .3; } 9% { opacity: 1; } 16% { opacity: 1; } 21%, 100% { opacity: 0; } }
+@keyframes tpClarao { 0%, 8% { opacity: 0; } 9% { opacity: .22; } 11% { opacity: .05; } 13% { opacity: .16; } 20%, 100% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .tp-raio1, .tp-raio2 { animation: none; opacity: 1; } .tp-clarao { animation: none; } }

@@ -290,8 +290,12 @@
     }
     // tempestade agora: raio saindo da nuvem, desenhado DEPOIS dos morros (sempre no céu, nunca atrás da montanha)
     if (a.raio) {
-      // tempestade agora: nuvens carregadas no topo + dois raios (arte pronta em icons/tempestade.webp, 783x247)
-      s += `<image href="icons/tempestade.webp" x="0" y="0" width="400" height="126.2" preserveAspectRatio="none"/>`;
+      // tempestade agora: nuvens carregadas no topo + dois raios (arte pronta em icons/tempestade-*.webp, 783x247)
+      // animado: os raios piscam (cada um no seu ritmo) e o céu dá um clarão junto (css .tp-*)
+      s += `<image class="tp-raio1" href="icons/tempestade-raio1.webp" x="0" y="0" width="400" height="126.2" preserveAspectRatio="none"/>` +
+        `<image class="tp-raio2" href="icons/tempestade-raio2.webp" x="0" y="0" width="400" height="126.2" preserveAspectRatio="none"/>` +
+        `<image href="icons/tempestade-nuvens.webp" x="0" y="0" width="400" height="126.2" preserveAspectRatio="none"/>` +
+        `<rect class="tp-clarao" width="400" height="230" fill="#DCEBFF" opacity="0"/>`;
     }
     if (x.vento > 15) s += `<g stroke="${escura ? "#C9D3DA" : cinza ? "#9AAAB5" : "#FFFFFF"}" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"><path d="M236 100h70a10 10 0 1 0-10-10M256 116h90a10 10 0 1 1-10 10M226 132h50"/></g>`;
     s += `<rect x="0" y="140" width="400" height="56" fill="${mar}"/>`;
