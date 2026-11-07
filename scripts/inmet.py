@@ -13,13 +13,14 @@ RAIO_KM = 7.0
 def baixa(caminho):
     urls = [BASE + caminho] + ([BASE + "/token" + caminho + "/" + TOKEN] if TOKEN else [])
     for u in urls:
-        for tent in range(3):
+        for tent in range(2):
             try:
-                with urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Praiometro"}), timeout=60) as r:
+                with urllib.request.urlopen(urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 Praiometro"}), timeout=60) as r:
                     txt = r.read().decode("utf-8", "replace").strip()
-                    return json.loads(txt) if txt else []
+                    print("resposta", (u.replace(TOKEN, "***") if TOKEN else u)[:90], "→ status", r.status, "| tamanho", len(txt), "| começo:", txt[:120].replace("\n", " "))
+                    return json.loads(txt) if txt[:1] in "[{" else []
             except Exception as e:
-                print("falhou", u.replace(TOKEN, "***") if TOKEN else u, "→", e); time.sleep(10)
+                print("falhou", (u.replace(TOKEN, "***") if TOKEN else u)[:90], "→", e); time.sleep(5)
     return None
 
 def praias():
@@ -52,9 +53,15 @@ ini = (agora - datetime.timedelta(days=1)).strftime("%Y-%m-%d"); fim = agora.str
 saida = {"_comoFunciona": "Medições reais das estações automáticas do INMET (hora de Brasília). t=°C, ur=%, v e raj=km/h, vd=graus.",
          "atualizadoEm": datetime.datetime.now(BR).strftime("%Y-%m-%dT%H:%M"), "praias": mapa, "estacoes": {},
          "estacaoInfo": {e["CD_ESTACAO"]: {"lat": num(e["VL_LATITUDE"]), "lon": num(e["VL_LONGITUDE"])} for e in estacoes if e["CD_ESTACAO"] in usadas}}
+dia_todo = None
 for cod in usadas:
     dados = baixa(f"/estacao/{ini}/{fim}/{cod}")
-    if not isinstance(dados, list): continue
+    if not dados:   # plano B: o endpoint do dia inteiro (todas as estações), filtrando a nossa
+        if dia_todo is None:
+            dia_todo = (baixa(f"/estacao/dados/{ini}") or []) + (baixa(f"/estacao/dados/{fim}") or [])
+        dados = [d for d in dia_todo if isinstance(d, dict) and d.get("CD_ESTACAO") == cod]
+        for d in dados: d.setdefault("DT_MEDICAO", d.get("DT_MEDICAO") or fim)
+    if not isinstance(dados, list) or not dados: print("sem medições de", cod); continue
     nome = next((e.get("DC_NOME") for e in estacoes if e["CD_ESTACAO"] == cod), cod)
     horas = {}
     for d in dados:
