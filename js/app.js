@@ -71,12 +71,13 @@
     while (igual(fim + 1)) fim++;
     return ini === fim ? `às ${ini}h` : `das ${ini}h às ${fim}h`;
   }
-  const SOL_ATE = 25;   // nuvem que tapa o sol abaixo disso = sol firme (antes era 35: prometia sol demais)
+  const SOL_ATE = 40;   // nov/2026: padrão da meteorologia ("predominantemente ensolarado" até ~40% de céu coberto). 20–40% = ícone de poucas nuvens
+  const NUBLADO_DE = 70; // 70% ou mais de céu coberto = nublado
   // ícone da hora: sol limpo, sol com poucas nuvens (nuvenzinha) ou sol entre nuvens (nuvem grande)
   const icHora = (y) => y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
   // ícone do dia/praia (mapa, abas, listas): sol com nuvenzinha quando o sol é firme mas o céu não está limpo
   const icDia = (a) => a.ceu === "sol" && a.poucas ? IC.poucas : IC[a.ceu];
-  const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
+  const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= NUBLADO_DE ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
   function maiorSequencia(horas, cond) {
@@ -646,6 +647,7 @@
     PRAIAS.forEach((p, i) => {
       const t = T[i], m = M[i], h = t.hourly;
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
+      const ATE_AMANHA = new Date(Date.parse(diaHoje() + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
       const nuvemTotal = {};   // céu inteiro (todas as camadas, sem desconto): pra saber se é "céu limpo" ou "sol com poucas nuvens"
       const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {};
       // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
@@ -715,13 +717,14 @@
           // se pelo menos 1/3 dos modelos acha que fecha (nuvem ≥ 60%), não dá pra prometer solzão: vira "sol com nuvens"
           const ts2 = MODELOS_NUVEM.map((md) => (nh["cloud_cover_" + md] || [])[k]).filter((v) => v != null);
           if (ts2.length >= 3) nuvemTotal[ts] = media(ts2);
-          if (xs.length >= 3) nuvemMedia[ts] = xs.filter((v) => v >= DUVIDA_NUVEM).length >= xs.length / 3 ? Math.max(media(xs), 40) : media(xs);
+          // regra de 1/3 só para hoje e amanhã (dias mais longe, os modelos sempre discordam; a média já mostra)
+          if (xs.length >= 3) nuvemMedia[ts] = ts.slice(0, 10) <= ATE_AMANHA && xs.filter((v) => v >= DUVIDA_NUVEM).length >= xs.length / 3 ? Math.max(media(xs), SOL_ATE) : media(xs);
           // chance de chuva: quantos dos 9 modelos põem chuva de verdade (0,3 mm ou mais) naquela hora
           const ps = MODELOS_NUVEM.map((md) => (nh["precipitation_" + md] || [])[k]).filter((v) => v != null);
           if (ps.length >= 3) chuvaModelos[ts] = Math.round(100 * ps.filter((v) => v >= CHUVA_MM).length / ps.length);
-          // vento: o valor do meio entre os modelos (um modelo exagerado sozinho não manda mais)
+          // vento: o 3º mais forte dos modelos (a média "amaciava" o vento; assim, se 1/3 dos modelos vê vento, o app mostra)
           const vs = MODELOS_NUVEM.map((md) => (nh["wind_speed_10m_" + md] || [])[k]).filter((v) => v != null).sort((a, b) => a - b);
-          if (vs.length >= 3) ventoMeio[ts] = vs.length % 2 ? vs[(vs.length - 1) / 2] : (vs[vs.length / 2 - 1] + vs[vs.length / 2]) / 2;
+          if (vs.length >= 5) ventoMeio[ts] = vs[vs.length - 3]; else if (vs.length >= 3) ventoMeio[ts] = vs[(vs.length - 1) >> 1];
           // direção do vento: média dos modelos (soma dos vetores), a mesma turma que dá a velocidade
           let sx = 0, sy = 0, nd = 0;
           MODELOS_NUVEM.forEach((md) => { const d = (nh["wind_direction_10m_" + md] || [])[k], v = (nh["wind_speed_10m_" + md] || [])[k];

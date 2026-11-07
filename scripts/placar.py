@@ -13,7 +13,7 @@ PONTOS = {"SBRJ": (-22.9105, -43.1631), "SBJR": (-22.9875, -43.3700)}
 ARQ = os.path.join(RAIZ, "data", "placar.json")
 
 def estado(nuv, chuva):
-    return "chuva" if chuva >= 50 else "nublado" if nuv >= 70 else "parcial" if nuv >= 25 else "sol"
+    return "chuva" if chuva >= 50 else "nublado" if nuv >= 70 else "parcial" if nuv >= 40 else "sol"
 
 def previsao(lat, lon, dia):
     url = (f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&hourly=cloud_cover,precipitation"

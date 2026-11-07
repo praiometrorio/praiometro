@@ -100,7 +100,8 @@ def hora_a_hora(t, m, data, mar=None, pid=None, propria=None):
                 km = mh["time"].index(ts)
                 vs = [mh.get("wind_speed_10m_" + md, [None] * len(mh["time"]))[km] for md in MODELOS]
                 vs = [x for x in vs if x is not None]
-                if len(vs) >= 3: v = mediana(vs)
+                if len(vs) >= 5: v = sorted(vs)[-3]   # igual ao app (nov/2026): 3º vento mais forte
+                elif len(vs) >= 3: v = mediana(vs)
                 # chance de chuva = % dos 9 modelos com 0,3 mm ou mais na hora (igual ao app)
                 ps = [x for x in (mh.get("precipitation_" + md, [None] * len(mh["time"]))[km] for md in MODELOS) if x is not None]
                 if len(ps) >= 3: chuva = round(100 * sum(1 for x in ps if x >= 0.3) / len(ps))

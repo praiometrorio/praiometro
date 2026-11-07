@@ -4,6 +4,7 @@
 #  - na véspera: confirma ou cancela o aviso; se não teve pré-aviso e virou praião, avisa também
 # Guarda o que já mandou em data/alertas.json para não repetir.
 import json, os, sys, datetime, urllib.request, urllib.parse
+ATE_AMANHA = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).date() + datetime.timedelta(days=1)).isoformat()
 
 FUSO = "America/Sao_Paulo"
 SITE = "https://praiometrorio.com.br/"
@@ -70,11 +71,13 @@ def analisar_dia(t, n, data):
             if len(xs) >= 3:
                 media[ts] = sum(xs) / len(xs)
                 # igual ao app: se 1/3 dos modelos acha que fecha (nuvem >= 60%), vira "entre nuvens", não solzão
-                if sum(1 for x in xs if x >= 60) >= len(xs) / 3: media[ts] = max(media[ts], 40)
+                if ts[:10] <= ATE_AMANHA and sum(1 for x in xs if x >= 60) >= len(xs) / 3: media[ts] = max(media[ts], 40)
             ps = [x for x in (nh.get("precipitation_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if x is not None]
             if len(ps) >= 3: chance[ts] = round(100 * sum(1 for x in ps if x >= CHUVA_MM) / len(ps))   # igual ao app
             vs = sorted(v for v in (nh.get("wind_speed_10m_" + m, [None] * len(nh["time"]))[k] for m in MODELOS) if v is not None)
-            if len(vs) >= 3: meio[ts] = vs[(len(vs) - 1) // 2] if len(vs) % 2 else (vs[len(vs) // 2 - 1] + vs[len(vs) // 2]) / 2
+            # igual ao app (nov/2026): 3º vento mais forte dos modelos (a média amaciava)
+            if len(vs) >= 5: meio[ts] = vs[-3]
+            elif len(vs) >= 3: meio[ts] = vs[(len(vs) - 1) // 2]
     d = t["daily"]["time"].index(data) if data in t["daily"]["time"] else None
     nas = minutos((t["daily"]["sunrise"][d] or "T05:30")[11:16]) if d is not None else 330
     por = minutos((t["daily"]["sunset"][d] or "T18:30")[11:16]) if d is not None else 1110
@@ -91,8 +94,8 @@ def analisar_dia(t, n, data):
         if 9 <= hr <= 17 and c < 50 and nv < 70: chuva = max(chuva, c)
         if v is not None and 9 <= hr <= 17: vento = max(vento, round(v))
         escuro = hr * 60 + 30 < nas - 10 or hr * 60 + 30 > por + 10
-        if not escuro and c < 50 and nv < 25: sol += 1
-        if 9 <= hr <= 17: estados[hr] = "chuva" if c >= 50 else "nublado" if nv >= 70 else "parcial" if nv >= 25 else "sol"
+        if not escuro and c < 50 and nv < 40: sol += 1
+        if 9 <= hr <= 17: estados[hr] = "chuva" if c >= 50 else "nublado" if nv >= 70 else "parcial" if nv >= 40 else "sol"
     return estados, vento, chuva
 
 def pontos(estados, de=9, ate=17):
