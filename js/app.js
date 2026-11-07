@@ -79,6 +79,13 @@
   const icHora = (y) => y.raio ? IC.raio : y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE ? IC.poucas : IC[y.est];
   // ícone do dia/praia (mapa, abas, listas): sol com nuvenzinha quando o sol é firme mas o céu não está limpo
   const icDia = (a) => a.ceu === "sol" && a.poucas ? IC.poucas : IC[a.ceu];
+  // HOJE, de dia: o céu de AGORA (hora atual, com radar: chuva/tempestade na hora). Outros dias (ou de noite): o resumo do dia.
+  const ceuAgora = (x, a) => {
+    if (estado.dia === 0) { const hA = +relogio.format(new Date()).slice(0, 2), y = (x.horas || []).find((q) => q.h === hA);
+      if (y && y.est !== "noite") return { ceu: y.est, ic: icHora(y), raio: !!y.raio, poucas: y.est === "sol" && (y.tot ?? 0) >= LIMPO_ATE }; }
+    return { ceu: a.ceu, ic: icDia(a), raio: false, poucas: !!a.poucas };
+  };
+  const icAgora = (x, a) => { const c = ceuAgora(x, a); return `<span class="ic ${c.ceu}">${c.ic}</span>`; };
   // vento "de praia" (vento médio, km/h): calmo · ventinho · brisa · ventando · ventando muito · ventania
   const FAIXAS_VENTO = [
     { ate: 5, n: "Calmo", c: "#A8DDBE", frase: "sem vento, abafado no sol" },
@@ -255,7 +262,7 @@
     }
     if (escura) {
       const c = ["#45525B", "#3F4B54", "#38434B"];
-      s += `<path d="M-20 64h150a30 30 0 0 0 2-60 40 40 0 0 0-76-6 28 28 0 0 0-76 66z" fill="${c[0]}"/><path d="M200 90h170a28 28 0 0 0 2-56 38 38 0 0 0-72-8 26 26 0 0 0-100 64z" fill="${c[1]}"/><path d="M100 114h110a22 22 0 0 0 1-44 30 30 0 0 0-56-5 20 20 0 0 0-55 49z" fill="${c[2]}"/>`;
+      if (!a.raio) s += `<path d="M-20 64h150a30 30 0 0 0 2-60 40 40 0 0 0-76-6 28 28 0 0 0-76 66z" fill="${c[0]}"/><path d="M200 90h170a28 28 0 0 0 2-56 38 38 0 0 0-72-8 26 26 0 0 0-100 64z" fill="${c[1]}"/><path d="M100 114h110a22 22 0 0 0 1-44 30 30 0 0 0-56-5 20 20 0 0 0-55 49z" fill="${c[2]}"/>`;
       s += `<g stroke="#9AAAB5" stroke-width="2" stroke-linecap="round" opacity="0.9"><path d="M40 86l-6 14M72 90l-6 14M240 106l-6 14M274 102l-6 14M314 108l-6 14M140 126l-5 12M180 124l-5 12M110 92l-6 14M350 96l-6 14M210 128l-5 12"/></g>`;
     }
     // paisagem da praia: silhueta real dos morros vista da areia (calculada com o relevo por satélite)
@@ -280,6 +287,11 @@
       s += `<path d="${linha(perfil.longe)}" fill="${longeCor}"/><path d="${linha(perfil.perto)}" fill="${morro}"/>`;
     } else {
       s += `<path d="M0 142 C 26 122, 50 108, 74 114 C 92 118, 102 102, 124 98 C 146 95, 164 124, 192 142 Z" fill="${morro}"/>`;
+    }
+    // tempestade agora: raio saindo da nuvem, desenhado DEPOIS dos morros (sempre no céu, nunca atrás da montanha)
+    if (a.raio) {
+      // tempestade agora: nuvens carregadas no topo + dois raios (arte pronta em icons/tempestade.webp, 783x247)
+      s += `<image href="icons/tempestade.webp" x="0" y="0" width="400" height="126.2" preserveAspectRatio="none"/>`;
     }
     if (x.vento > 15) s += `<g stroke="${escura ? "#C9D3DA" : cinza ? "#9AAAB5" : "#FFFFFF"}" stroke-width="3" stroke-linecap="round" fill="none" opacity="0.9"><path d="M236 100h70a10 10 0 1 0-10-10M256 116h90a10 10 0 1 1-10 10M226 132h50"/></g>`;
     s += `<rect x="0" y="140" width="400" height="56" fill="${mar}"/>`;
@@ -1564,12 +1576,11 @@
     linhas = PRAIAS.map((p) => { const x = previsao[p.id][estado.dia]; return { p, x, a: analisar(x, p) }; });
     const atual = praiaAtual();
 
-    linhas.forEach(({ p, a }) => {
+    linhas.forEach(({ p, x, a }) => {
       const pin = pinos[p.id];
       if (!pin) return;
       const ic = pin.el.querySelector(".ic");
-      ic.className = "ic " + a.ceu;
-      ic.innerHTML = icDia(a);
+      ic.className = "ic " + a.ceu; ic.innerHTML = icDia(a);   // mapa: sempre o céu que predomina no dia
       pin.el.classList.toggle("on", p.id === atual.p.id);
     });
 
@@ -1609,7 +1620,7 @@
     const { p, x, a } = l;
     const ord = linhas.slice().sort((q, r) => r.a.score - q.a.score);
     const melhor = ord[0].p.id === p.id;
-    const c = cena(a, x, p);
+    const ca = ceuAgora(x, a), c = cena({ ...a, ceu: ca.ceu, raio: ca.raio }, x, p);
     // sombra na areia: se o relevo já está guardado, o texto já vem pronto (sem "Calculando…")
     const hzOk = Array.isArray(horizontes[p.id]) || horizontes[p.id] === "erro";
     const somb = hzOk ? sombraDoDia(p, x) : null;
@@ -1838,7 +1849,7 @@
     const vis = filtradas.filter((l) => ehFavorita(l.p.id)).concat(filtradas.filter((l) => !ehFavorita(l.p.id)));
     $("#listaTitulo").textContent = "Praias " + nomeDia(estado.dia) + (estado.regiao === "todas" ? "" : " · " + REGIOES[estado.regiao].nome);
     $("#lista").innerHTML = vis.map((l) => `<li><button data-id="${l.p.id}" aria-current="${l.p.id === atual.p.id}">
-      <span class="ic ${l.a.ceu}">${icDia(l.a)}</span>
+      ${icAgora(l.x, l.a)}
       <span class="nm"><b>${ehFavorita(l.p.id) ? '<i class="fav" aria-label="favorita">★</i> ' : ""}${l.p.nome}</b><span>${l.a.resumo}</span></span>
       <span class="mini" aria-label="${miniTxt(l.x)}">${l.x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `<i class="${y.est}"></i>`).join("")}</span>
       <span class="nota-lista n${l.a.nota >= 8 ? 3 : l.a.nota >= 6.5 ? 2 : l.a.nota >= 5 ? 1 : 0}" aria-label="nota ${fmt1(l.a.nota)} de 10"><b>${fmt1(l.a.nota)}</b></span></button></li>`).join("");
@@ -1974,8 +1985,8 @@
         <span>Abra uma praia e toque em <b>Favoritar</b>. Ela aparece aqui, com a previsão resumida, sempre que você abrir.</span></div>`;
       return;
     }
-    $("#favLista").innerHTML = minhas.map(({ p, a }) => `<button class="fav-card simples" data-id="${p.id}">
-        <span class="ic ${a.ceu}">${icDia(a)}</span>
+    $("#favLista").innerHTML = minhas.map(({ p, x, a }) => `<button class="fav-card simples" data-id="${p.id}">
+        ${icAgora(x, a)}
         <span class="fav-nome"><b>${p.nome}</b></span>
         <span class="fav-abrir">Previsão completa ›</span>
       </button>`).join("");
@@ -3182,7 +3193,7 @@
       if (!inp.value.trim()) { res.hidden = true; return; }
       res.innerHTML = achadas.length ? achadas.map((p) => {
         const l = linhas.find((q) => q.p.id === p.id);
-        const ic = l ? `<span class="ic ${l.a.ceu}">${icDia(l.a)}</span>` : "";
+        const ic = l ? icAgora(l.x, l.a) : "";
         return `<li role="option"><button data-id="${p.id}">${ic}<span><b>${p.nome}</b><small>${l ? l.a.resumo : p.local}</small></span></button></li>`;
       }).join("") : `<li class="vazio">Não achei essa praia. Tente outro nome.</li>`;
       res.hidden = false;
