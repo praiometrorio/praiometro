@@ -20,6 +20,9 @@ jobs:
       - uses: actions/checkout@v4
       - run: python scripts/observado.py
       - run: python scripts/inmet.py
+            # satélite (fase de calibração): só anota o brilho do satélite, não mexe no app
+      - run: pip install pillow && python scripts/satelite.py
+        continue-on-error: true
         env:
           INMET_TOKEN: ${{ secrets.INMET_TOKEN }}
       - run: python scripts/placar.py
