@@ -1,8 +1,52 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo.",
- "atualizadoEm": "2026-11-08T11:39",
+ "atualizadoEm": "2026-11-08T12:36",
  "estacoes": {
+  "SBJR": {
+   "2026-11-08T12": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 22
+   },
+   "2026-11-08T11": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 21
+   },
+   "2026-11-08T10": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 22
+   },
+   "2026-11-08T09": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 22
+   },
+   "2026-11-08T08": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 23
+   },
+   "2026-11-08T07": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 25
+   }
+  },
   "SBRJ": {
+   "2026-11-08T12": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 21
+   },
    "2026-11-08T11": {
     "nuvens": 100,
     "total": 100,
@@ -80,47 +124,15 @@
     "total": 90,
     "chuva": true,
     "temp": 24
-   },
-   "2026-11-07T22": {
-    "nuvens": 90,
-    "total": 90,
-    "chuva": true,
-    "temp": 24
-   }
-  },
-  "SBJR": {
-   "2026-11-08T11": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-08T10": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 22
-   },
-   "2026-11-08T09": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   },
-   "2026-11-08T08": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 23
-   },
-   "2026-11-08T07": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 25
    }
   },
   "SBGL": {
+   "2026-11-08T12": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 22
+   },
    "2026-11-08T11": {
     "nuvens": 100,
     "total": 100,
@@ -197,12 +209,6 @@
     "nuvens": 100,
     "total": 100,
     "chuva": false,
-    "temp": 24
-   },
-   "2026-11-07T22": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
     "temp": 24
    }
   }
