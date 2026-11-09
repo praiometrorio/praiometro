@@ -1,94 +1,68 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo.",
- "atualizadoEm": "2026-11-08T20:10",
+ "atualizadoEm": "2026-11-09T06:09",
  "estacoes": {
-  "SBGL": {
-   "2026-11-08T20": {
+  "SBRJ": {
+   "2026-11-09T06": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 19
+   },
+   "2026-11-09T05": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 19
+   },
+   "2026-11-09T04": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 19
+   },
+   "2026-11-09T03": {
     "nuvens": 100,
     "total": 100,
     "chuva": true,
     "temp": 20
    },
-   "2026-11-08T19": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-08T18": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-08T17": {
+   "2026-11-09T02": {
     "nuvens": 100,
     "total": 100,
     "chuva": true,
-    "temp": 21
+    "temp": 19
    },
-   "2026-11-08T16": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-08T15": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-08T14": {
+   "2026-11-09T01": {
     "nuvens": 100,
     "total": 100,
     "chuva": true,
+    "temp": 19
+   },
+   "2026-11-09T00": {
+    "nuvens": 90,
+    "total": 90,
+    "chuva": false,
+    "temp": 20
+   },
+   "2026-11-08T23": {
+    "nuvens": 86,
+    "total": 86,
+    "chuva": false,
+    "temp": 20
+   },
+   "2026-11-08T22": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 20
+   },
+   "2026-11-08T21": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
     "temp": 21
    },
-   "2026-11-08T13": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 21
-   },
-   "2026-11-08T12": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   },
-   "2026-11-08T11": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   },
-   "2026-11-08T10": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 23
-   },
-   "2026-11-08T09": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 24
-   },
-   "2026-11-08T08": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 23
-   },
-   "2026-11-08T07": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 25
-   }
-  },
-  "SBRJ": {
    "2026-11-08T20": {
     "nuvens": 100,
     "total": 100,
@@ -112,69 +86,101 @@
     "total": 100,
     "chuva": false,
     "temp": 22
+   }
+  },
+  "SBGL": {
+   "2026-11-09T06": {
+    "nuvens": 95,
+    "total": 95,
+    "chuva": true,
+    "temp": 18
    },
-   "2026-11-08T16": {
+   "2026-11-09T05": {
+    "nuvens": 95,
+    "total": 95,
+    "chuva": true,
+    "temp": 18
+   },
+   "2026-11-09T04": {
+    "nuvens": 95,
+    "total": 95,
+    "chuva": true,
+    "temp": 18
+   },
+   "2026-11-09T03": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 19
+   },
+   "2026-11-09T02": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 19
+   },
+   "2026-11-09T01": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": true,
+    "temp": 19
+   },
+   "2026-11-09T00": {
     "nuvens": 100,
     "total": 100,
     "chuva": false,
-    "temp": 22
+    "temp": 19
    },
-   "2026-11-08T15": {
+   "2026-11-08T23": {
     "nuvens": 100,
     "total": 100,
     "chuva": true,
     "temp": 20
    },
-   "2026-11-08T14": {
+   "2026-11-08T22": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 20
+   },
+   "2026-11-08T21": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 20
+   },
+   "2026-11-08T20": {
     "nuvens": 100,
     "total": 100,
     "chuva": true,
-    "temp": 22
+    "temp": 20
    },
-   "2026-11-08T13": {
+   "2026-11-08T19": {
     "nuvens": 100,
     "total": 100,
-    "chuva": true,
-    "temp": 22
+    "chuva": false,
+    "temp": 21
    },
-   "2026-11-08T12": {
+   "2026-11-08T18": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 21
+   },
+   "2026-11-08T17": {
     "nuvens": 100,
     "total": 100,
     "chuva": true,
     "temp": 21
-   },
-   "2026-11-08T11": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 21
-   },
-   "2026-11-08T10": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 22
-   },
-   "2026-11-08T09": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 22
-   },
-   "2026-11-08T08": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 24
-   },
-   "2026-11-08T07": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 25
    }
   },
   "SBJR": {
+   "2026-11-08T21": {
+    "nuvens": 90,
+    "total": 90,
+    "chuva": false,
+    "temp": 20
+   },
    "2026-11-08T20": {
     "nuvens": 100,
     "total": 100,
@@ -198,66 +204,6 @@
     "total": 100,
     "chuva": false,
     "temp": 23
-   },
-   "2026-11-08T16": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 23
-   },
-   "2026-11-08T15": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 23
-   },
-   "2026-11-08T14": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 21
-   },
-   "2026-11-08T13": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 23
-   },
-   "2026-11-08T12": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   },
-   "2026-11-08T11": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-08T10": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 22
-   },
-   "2026-11-08T09": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   },
-   "2026-11-08T08": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": true,
-    "temp": 23
-   },
-   "2026-11-08T07": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 25
    }
   }
  }
