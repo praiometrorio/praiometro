@@ -791,6 +791,160 @@
     },
     "previstoAs": "06:09"
    }
+  },
+  "2026-11-10": {
+   "SBRJ": {
+    "previsto": {
+     "06": {
+      "nuvens": 64,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "07": {
+      "nuvens": 72,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "08": {
+      "nuvens": 73,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "09": {
+      "nuvens": 76,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "10": {
+      "nuvens": 76,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 77,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 85,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "13": {
+      "nuvens": 85,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "14": {
+      "nuvens": 88,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "15": {
+      "nuvens": 89,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "16": {
+      "nuvens": 89,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "17": {
+      "nuvens": 89,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "18": {
+      "nuvens": 90,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "19": {
+      "nuvens": 81,
+      "chuva": 0,
+      "est": "nublado"
+     }
+    },
+    "visto": {},
+    "previstoAs": "05:56"
+   },
+   "SBJR": {
+    "previsto": {
+     "06": {
+      "nuvens": 58,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "07": {
+      "nuvens": 64,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "08": {
+      "nuvens": 64,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "09": {
+      "nuvens": 68,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "10": {
+      "nuvens": 76,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 79,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 79,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "13": {
+      "nuvens": 81,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "14": {
+      "nuvens": 81,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "15": {
+      "nuvens": 80,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "16": {
+      "nuvens": 81,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "17": {
+      "nuvens": 84,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "18": {
+      "nuvens": 86,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "19": {
+      "nuvens": 85,
+      "chuva": 0,
+      "est": "nublado"
+     }
+    },
+    "visto": {},
+    "previstoAs": "05:56"
+   }
   }
  },
  "resumo": {
@@ -809,5 +963,5 @@
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-09T19:45"
+ "atualizadoEm": "2026-11-10T05:56"
 }
