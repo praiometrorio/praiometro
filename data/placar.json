@@ -874,6 +874,10 @@
      "07": {
       "nuvens": 90,
       "est": "nublado"
+     },
+     "08": {
+      "nuvens": 90,
+      "est": "nublado"
      }
     },
     "previstoAs": "05:56"
@@ -955,6 +959,10 @@
      "07": {
       "nuvens": 81,
       "est": "nublado"
+     },
+     "08": {
+      "nuvens": 81,
+      "est": "nublado"
      }
     },
     "previstoAs": "05:56"
@@ -963,19 +971,19 @@
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 84,
+   "horas": 86,
    "acertoExato": 64,
-   "acertoSolOuNao": 94,
+   "acertoSolOuNao": 93,
    "viesNuvens": -8,
    "leitura": "previsão otimista (menos nuvem que o real)"
   },
   "ultimos30dias": {
-   "horas": 84,
+   "horas": 86,
    "acertoExato": 64,
-   "acertoSolOuNao": 94,
+   "acertoSolOuNao": 93,
    "viesNuvens": -8,
    "leitura": "previsão otimista (menos nuvem que o real)"
   }
  },
- "atualizadoEm": "2026-11-10T07:54"
+ "atualizadoEm": "2026-11-10T08:51"
 }
