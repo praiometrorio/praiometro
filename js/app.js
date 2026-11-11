@@ -33,8 +33,8 @@
   const svg = (corpo) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${corpo}</svg>`;
   const IC = {
     sol: svg('<circle cx="12" cy="12" r="4.5"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
-    // sol com poucas nuvens: o sol inteiro e uma nuvenzinha pequena no canto
-    poucas: svg('<circle cx="10" cy="10" r="4"/><path d="M10 1.5v2M1.5 10h2M3.9 3.9l1.4 1.4M16.1 3.9l-1.4 1.4M3.9 16.1l1.4-1.4M18.5 10h-1"/><path class="nv-branca" fill="#FFFFFF" stroke="#AEB9C4" d="M13.5 21.5h6a2.6 2.6 0 0 0 .3-5.2 3.7 3.7 0 0 0-7.1 1.1 2.1 2.1 0 0 0 .8 4.1z"/>'),
+    // sol com nuvens (nov/2026): o sol inteiro e duas nuvens brancas embaixo = tem nuvem, mas o sol chega firme
+    poucas: svg('<circle cx="11" cy="9.5" r="4"/><path d="M11 1.5v1.8M3 9.5h1.8M17.2 9.5H19M5.3 3.8l1.3 1.3M16.7 3.8l-1.3 1.3"/><path class="nv-branca" fill="#FFFFFF" stroke="#AEB9C4" d="M14 22h6.2a2.8 2.8 0 0 0 .3-5.6 4 4 0 0 0-7.6 1.2 2.2 2.2 0 0 0 1.1 4.4z"/><path class="nv-branca" fill="#FFFFFF" stroke="#AEB9C4" d="M2.6 21.2h5.2a2.1 2.1 0 0 0 .2-4.2 3 3 0 0 0-5.7.9 1.7 1.7 0 0 0 .3 3.3z"/>'),
     parcial: svg('<path d="M8 2.5v1.5M2.5 8H4M4.1 4.1l1 1M11.9 4.1l-1 1"/><path d="M5.2 10.5A3.5 3.5 0 0 1 11.3 6.6"/><path class="nv-cinza" fill="#D3DAE1" stroke="#7E8B98" d="M8 20h10a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6 1.4A2.8 2.8 0 0 0 8 20z"/>'),
     noite: svg('<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>'),
     nublado: svg('<path d="M7 19h11a4.5 4.5 0 0 0 .3-9A6 6 0 0 0 6.6 11.6 3.8 3.8 0 0 0 7 19z"/>'),
@@ -95,7 +95,23 @@
     { ate: 30, n: "Ventando muito", c: "#D9534F", frase: "areia batendo na perna" },
     { ate: 999, n: "Ventania", c: "#8E3B8E", frase: "melhor não abrir guarda-sol" }];
   const faixaVento = (v) => FAIXAS_VENTO.find((f) => (v ?? 0) <= f.ate);
-  const estadoHora = (chuva, nuvens) => chuva >= 50 ? "chuva" : nuvens >= NUBLADO_DE ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
+  // nov/2026: o que importa na areia é QUANTO SOL CHEGA, não só quanta nuvem tem. "sol" (fração do sol de céu limpo que chega,
+  // mediana dos modelos, pela radiação direta): ≥ 70% = sol (com nuvens), 30–70% = sol vai e vem, < 30% = nublado.
+  // Céu com menos de 20% de nuvem é sempre sol. Sem a radiação (hora observada, sol baixo), vale a regra antiga da nuvem.
+  const SOL_FIRME = 70, SOL_FRACO = 30;
+  // radiação direta de céu limpo (W/m², fórmula de Meinel) no meio da hora anterior (a radiação da Open-Meteo é a média da hora que passou).
+  // Sol muito baixo (menos de 12°) dá conta instável: aí não usa.
+  const dniLimpo = (lat, lon, ts) => {
+    const d = new Date(Date.parse(ts + ":00-03:00") - 30 * 60000), ano0 = Date.UTC(d.getUTCFullYear(), 0, 0);
+    const n = Math.floor((d - ano0) / 864e5), hUtc = d.getUTCHours() + d.getUTCMinutes() / 60, rad = Math.PI / 180;
+    const dec = 23.44 * Math.sin(2 * Math.PI / 365 * (n - 81)) * rad, ha = 15 * (hUtc + lon / 15 - 12) * rad, la = lat * rad;
+    const el = Math.asin(Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(ha)) / rad;
+    if (el < 12) return null;
+    return 1361 * Math.pow(0.7, Math.pow(1 / Math.sin(el * rad), 0.678));
+  };
+  const estadoHora = (chuva, nuvens, sol) => chuva >= 50 ? "chuva" : nuvens < LIMPO_ATE ? "sol"
+    : sol != null ? (sol >= SOL_FIRME ? "sol" : sol >= SOL_FRACO ? "parcial" : "nublado")
+    : nuvens >= NUBLADO_DE ? "nublado" : nuvens >= SOL_ATE ? "parcial" : "sol";
 
   // Maior sequência de horas seguidas (entre 6h e 20h) que satisfazem a condição
   function maiorSequencia(horas, cond) {
@@ -134,8 +150,8 @@
     const selos = [];
     if (chuvaTarde) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol de manhã", s: `Chuva a partir das ${chuvaNuc.h}h` });
     else if (ceu === "chuva") selos.push({ cls: "neutro", ic: IC.chuva, t: "Dia de chuva", s: pancada ? `Chuva a partir das ${pancada.h}h` : "Chuva em boa parte do dia" });
-    else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: limpo ? IC.sol : IC.poucas, t: tam(janela) >= 5 && limpo ? "Solzão" : "Sol", s: limpo ? `Céu limpo das ${janela.ini}h às ${janela.fim}h` : `Poucas nuvens das ${janela.ini}h às ${janela.fim}h` });
-    else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol entre nuvens", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
+    else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: limpo ? IC.sol : IC.poucas, t: tam(janela) >= 5 && limpo ? "Solzão" : "Sol", s: limpo ? `Céu limpo das ${janela.ini}h às ${janela.fim}h` : `Sol com nuvens das ${janela.ini}h às ${janela.fim}h` });
+    else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol vai e vem", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
     else selos.push({ cls: "neutro", ic: IC.nublado, t: "Céu fechado", s: "Sem sol firme hoje" });
 
     // UV: pico do dia (com o horário) e, se for hoje, o de agora
@@ -200,10 +216,12 @@
     if (chuvaTarde) ceuTxt = `Sol de manhã, chuva a partir das ${chuvaNuc.h}h`;
     else if (ceu === "chuva") ceuTxt = pancada ? `Dia de chuva, a partir das ${pancada.h}h` : "Dia de chuva";
     else if (tam(janela) >= 5 && limpo) ceuTxt = `Solzão das ${janela.ini}h às ${janela.fim}h`;
-    else if (tam(janela) >= 2 && !limpo) ceuTxt = `Sol com poucas nuvens das ${janela.ini}h às ${janela.fim}h`;
+    // sol firme de manhã e depois sol vai e vem (2h ou mais) → "Sol com nuvens até as Xh, depois vai e vem"
+    else if (tam(janela) >= 2 && !limpo && x.horas.filter((y) => y.h > janela.fim && y.h <= HORA_FIM && y.est === "parcial").length >= 2) ceuTxt = `Sol com nuvens até as ${janela.fim}h, depois vai e vem`;
+    else if (tam(janela) >= 2 && !limpo) ceuTxt = `Sol com nuvens das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janela) >= 2) ceuTxt = `Sol das ${janela.ini}h às ${janela.fim}h`;
     else if (tam(janelaParcial) >= 2) ceuTxt = tam(janelaParcial) <= 3 && ceu === "nublado"
-      ? `Sol só das ${janelaParcial.ini}h às ${janelaParcial.fim}h, depois fecha` : "Sol entre nuvens";
+      ? `Sol só das ${janelaParcial.ini}h às ${janelaParcial.fim}h, depois fecha` : "Sol vai e vem";
     else ceuTxt = "Céu fechado o dia todo";
 
     const resto = [];
@@ -222,7 +240,7 @@
     const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 30 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : ventoRef > 22 ? (depois ? ` Ventando muito a partir das ${picoV.h}h.` : " Ventando muito.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
-    const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Entre nuvens" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
+    const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Sol vai e vem" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       ventoRef > 20 ? "ventania" : ventoRef > 15 ? "ventando" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
     // ---- nota de 0 a 10 (ordena a lista "Praias hoje") ----
@@ -463,7 +481,7 @@
   };
   const MODELOS_NUVEM = ["ecmwf_ifs025", "ecmwf_aifs025_single", "gfs_seamless", "icon_seamless", "meteofrance_seamless", "ukmo_seamless", "jma_seamless", "gem_seamless", "cma_grapes_global"];
   const urlNuvens = () => "https://api.open-meteo.com/v1/forecast?latitude=" + listaLat() + "&longitude=" + listaLon() +
-    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,precipitation,temperature_2m&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
+    "&hourly=cloud_cover,cloud_cover_low,cloud_cover_mid,cloud_cover_high,wind_speed_10m,wind_direction_10m,precipitation,temperature_2m,direct_normal_irradiance&models=" + MODELOS_NUVEM.join(",") + "&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,secondary_swell_wave_height,secondary_swell_wave_direction,secondary_swell_wave_period,wind_wave_height,wind_wave_direction,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
@@ -712,7 +730,7 @@
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
       const ATE_AMANHA = new Date(Date.parse(diaHoje() + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
       const nuvemTotal = {};   // céu inteiro (todas as camadas, sem desconto): pra saber se é "céu limpo" ou "sol com poucas nuvens"
-      const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {};
+      const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {}, solChega = {};
       // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
       // alta (o véu fino lá em cima) deixa o sol passar. Sem as camadas, usa o total do modelo.
       // "continua o que o aeroporto está vendo": se a última observação de hoje está mais nublada (ou quente/fria)
@@ -795,6 +813,11 @@
           // chance de chuva: quantos dos 9 modelos põem chuva de verdade (0,3 mm ou mais) naquela hora
           const ps = MODELOS_NUVEM.map((md) => (nh["precipitation_" + md] || [])[k]).filter((v) => v != null);
           if (ps.length >= 3) chuvaModelos[ts] = Math.round(100 * ps.filter((v) => v >= CHUVA_MM).length / ps.length);
+          // quanto sol chega: radiação direta de cada modelo ÷ a de céu limpo naquela posição do sol (mediana dos modelos)
+          const lim = dniLimpo(p.lat, p.lon, ts); if (lim != null) {
+            const fs = MODELOS_NUVEM.map((md) => (nh["direct_normal_irradiance_" + md] || [])[k]).filter((v) => v != null).map((v) => Math.min(100, 100 * v / lim)).sort((a, b) => a - b);
+            if (fs.length >= 3) solChega[ts] = Math.round(fs.length % 2 ? fs[(fs.length - 1) / 2] : (fs[fs.length / 2 - 1] + fs[fs.length / 2]) / 2);
+          }
           // vento: o 3º mais forte dos modelos (a média "amaciava" o vento; assim, se 1/3 dos modelos vê vento, o app mostra)
           const vs = MODELOS_NUVEM.map((md) => (nh["wind_speed_10m_" + md] || [])[k]).filter((v) => v != null).sort((a, b) => a - b);
           if (vs.length >= 5) ventoMeio[ts] = vs[vs.length - 3]; else if (vs.length >= 3) ventoMeio[ts] = vs[(vs.length - 1) >> 1];
@@ -937,6 +960,7 @@
             const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0 || h.temperature_2m[k] == null) return null;
             let chuva = chuvaEm(k), nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
             let tot = Math.round(nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            const n0 = nuvens;
             // igual às horas do cartão: hoje, o que já passou vem do aeroporto
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
             if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20); }
@@ -948,13 +972,14 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             return { h: hr, t: tC, ur: urHoje(d, data, hr, h.relative_humidity_2m ? h.relative_humidity_2m[k] : null), chuva, nuvens, tot,
-              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens), raio: raioRadar(d, hr) };
+              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens, !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null), raio: raioRadar(d, hr) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
           horas: idx.map((k) => {
             let chuva = chuvaEm(k);
             let nuvens = Math.round(nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0));
+            const n0 = nuvens;
             const hr = +h.time[k].slice(11, 13);
             // hoje, horas que já passaram (e a de agora): usa o que foi observado de verdade no aeroporto
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
@@ -968,9 +993,11 @@
             // hora sem sol (antes do nascer ou depois do pôr): mostra noite, a não ser que chova
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
-            const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens);
+            // quanto sol chega (só quando a nuvem é a dos modelos: se o aeroporto/correção mexeu, vale a regra da nuvem)
+            const sol = !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null;
+            const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens, sol);
             const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
-            return { h: hr, t: Math.round(tC), chuva, nuvens, tot, est, uv: uvEm(k, nuvens), v: vt.v,
+            return { h: hr, t: Math.round(tC), chuva, nuvens, tot, sol, est, uv: uvEm(k, nuvens), v: vt.v,
               vd: vt.vd, raj: vt.raj, raio: raioRadar(d, hr) };
           })
         };
@@ -1635,13 +1662,13 @@
     const porTxt = nuvensTarde >= 20 && nuvensTarde <= 60 ? "boa chance de céu colorido" : nuvensTarde < 20 ? "céu limpo, cores suaves" : "as nuvens devem esconder";
     // faixa hora a hora: horário, ícone do céu e temperatura
     const horaAgora = +relogio.format(new Date()).slice(0, 2);
-    const NOME_EST = { sol: "Sol", parcial: "Entre nuvens", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
+    const NOME_EST = { sol: "Sol", parcial: "Sol vai e vem", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
     const horas = [];
     for (let h = HORA_INI; h <= HORA_FIM; h++) {
       const y = x.horas.find((q) => q.h === h);
       if (!y) continue;
       const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
-      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${y.raio ? "Tempestade" : icHora(y) === IC.poucas ? "Poucas nuvens" : NOME_EST[y.est]}">
+      horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${y.raio ? "Tempestade" : icHora(y) === IC.poucas ? "Sol com nuvens" : NOME_EST[y.est]}">
         <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${icHora(y)}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
@@ -1843,7 +1870,7 @@
   }
 
   // texto da mini faixa para leitores de tela
-  const miniTxt = (x) => x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `${y.h}h ${({ sol: "sol", parcial: "entre nuvens", nublado: "nublado", chuva: "chuva", noite: "sem sol" })[y.est]}`).join(", ");
+  const miniTxt = (x) => x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM).map((y) => `${y.h}h ${({ sol: "sol", parcial: "sol vai e vem", nublado: "nublado", chuva: "chuva", noite: "sem sol" })[y.est]}`).join(", ");
 
   function desenharLista() {
     if (!linhas.length || !$("#lista")) return;   // a lista "Praias hoje" saiu da tela (nov/2026)
@@ -2866,7 +2893,7 @@
   function pararOnd() { if (ondPlay) clearInterval(ondPlay); ondPlay = null; if ($("#ondPlay")) $("#ondPlay").textContent = "▶"; }
 
   // ---------- relatório detalhado de cada quadradinho (selo): gráfico com régua arrastável ----------
-  const NOME_CEU = { sol: "Sol", parcial: "Sol entre nuvens", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
+  const NOME_CEU = { sol: "Sol", parcial: "Sol vai e vem", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
   const COR_CEU = { sol: "#FFB627", parcial: "#FFD98A", nublado: "#8C9AA5", chuva: "#5B7FA3", noite: "#B9C0D4" };
   const SAUDE_UV = ["Risco baixo para a pele.", "Use protetor solar.", "Protetor, chapéu e óculos.", "Protetor FPS 50 e reaplique sempre.", "Queima rápido: proteção máxima."];
   // UV é sempre mostrado em número inteiro, então a faixa (Leve, Moderado...) também sai do número inteiro: 5 = Moderado, 6 = Alto
@@ -3000,7 +3027,7 @@
         $("#c24I").innerHTML = icHora(y);
         $("#c24I").className = "ci " + y.est;
         $("#c24T").textContent = Math.round(vt) + "°";
-        $("#c24D").textContent = `${icHora(y) === IC.poucas ? "Poucas nuvens" : NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
+        $("#c24D").textContent = `${icHora(y) === IC.poucas ? "Sol com nuvens" : NOME_CEU[y.est]} · chuva ${y.chuva || 0}%`;
       }
     };
     const agora = relogio.format(new Date()), minAg = +agora.slice(0, 2) * 60 + +agora.slice(3, 5);
