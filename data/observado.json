@@ -1,8 +1,46 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo.",
- "atualizadoEm": "2026-11-11T06:57",
+ "atualizadoEm": "2026-11-11T07:59",
  "estacoes": {
+  "SBJR": {
+   "2026-11-11T07": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 23
+   },
+   "2026-11-10T21": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 21
+   },
+   "2026-11-10T20": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 22
+   },
+   "2026-11-10T19": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 21
+   },
+   "2026-11-10T18": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 23
+   }
+  },
   "SBRJ": {
+   "2026-11-11T07": {
+    "nuvens": 58,
+    "total": 58,
+    "chuva": false,
+    "temp": 22
+   },
    "2026-11-11T06": {
     "nuvens": 25,
     "total": 25,
@@ -80,15 +118,15 @@
     "total": 100,
     "chuva": false,
     "temp": 23
-   },
-   "2026-11-10T17": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 23
    }
   },
   "SBGL": {
+   "2026-11-11T07": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 21
+   },
    "2026-11-11T06": {
     "nuvens": 25,
     "total": 25,
@@ -160,44 +198,6 @@
     "total": 100,
     "chuva": false,
     "temp": 22
-   },
-   "2026-11-10T17": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   }
-  },
-  "SBJR": {
-   "2026-11-10T21": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-10T20": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 22
-   },
-   "2026-11-10T19": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 21
-   },
-   "2026-11-10T18": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 23
-   },
-   "2026-11-10T17": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 23
    }
   }
  }
