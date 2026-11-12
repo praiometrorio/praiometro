@@ -53,7 +53,8 @@ for est in PONTOS:
     for chave, o in obs.get(est, {}).items():
         d, hr = chave[:10], chave[11:13]
         if d in placar["dias"] and est in placar["dias"][d] and 6 <= int(hr) <= 19:
-            placar["dias"][d][est]["visto"][hr] = {"nuvens": o["nuvens"], "est": "chuva" if o.get("chuva") else estado(o["nuvens"], 0)}
+            if o.get("nuvens") is None and not o.get("chuva"): continue   # CAVOK etc.: céu desconhecido, não entra no placar
+            placar["dias"][d][est]["visto"][hr] = {"nuvens": o.get("nuvens") if o.get("nuvens") is not None else 90, "est": "chuva" if o.get("chuva") else estado(o["nuvens"], 0)}
 # resumo: acerto exato, acerto "sol x sem sol" e viés (previsto - visto)
 def resumo(dias):
     n = ok = ok2 = 0; vies = []

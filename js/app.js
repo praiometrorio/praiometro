@@ -393,15 +393,20 @@
         img.onerror = erro; img.src = `${m.host}${q.path}/256/${Z}/${x}/${y}/2/0_0.png`;
       }));
       // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul = chuva; amarelo/laranja/vermelho = forte
-      const forca = (d, i) => { const a = d[i + 3]; if (a < 40) return 0; if (a < 200) return 1; return d[i] >= 200 ? 3 : 2; };
+      // v16.6: eco fraco (meio transparente) NÃO conta — perto dos morros (Pão de Açúcar, Tijuca) é quase sempre eco do próprio morro
+      // ("clutter") ou chuva que evapora no ar. Só conta chuva de verdade (azul) e forte (amarelo/laranja/vermelho).
+      const forca = (d, i) => { const a = d[i + 3]; if (a < 200) return 0; return d[i] >= 200 ? 3 : 2; };
       await Promise.all(PRAIAS.map(async (p) => {
         const o = pos(p); const d = await tile(o.x, o.y);
-        let aqui = 0, perto = 0;
+        let aqui = 0, perto = 0, nAqui = 0, nPerto = 0, fAqui = 0, fPerto = 0;
         for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
           const X = o.px + dx, Y = o.py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255 || dx * dx + dy * dy > 64) continue;
           const f = forca(d, (Y * 256 + X) * 4);
-          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) aqui = Math.max(aqui, f); else perto = Math.max(perto, f);
+          if (!f) continue;
+          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) { nAqui++; fAqui = Math.max(fAqui, f); } else { nPerto++; fPerto = Math.max(fPerto, f); }
         }
+        // um pixel sozinho pode ser ruído: "aqui" pede chuva em 2+ dos 9 pixels (~3 km); "perto" pede 4+ pixels (~5 km²)
+        if (nAqui >= 2) aqui = fAqui; if (nPerto >= 4) perto = fPerto;
         novo[p.id] = { aqui, perto };
       }));
       radar = { t: q.time * 1000, praias: novo };
@@ -420,7 +425,8 @@
   // o aeroporto só corrige quando é DECISIVO: céu fechado (≥ 75%, BKN/OVC), céu limpo (≤ 20%) ou chuva.
   // "Poucas" ou "algumas nuvens" (FEW/SCT) no aeroporto costumam ser nuvem presa nos morros, que não chega na praia:
   // nesses casos fica a previsão (ex.: 07/11, Leme com sol e Santos Dumont marcando nuvens espalhadas)
-  const obsEm = (p, data, hr) => { if (p.pedra) return null; for (const e of ESTACAO(p)) { const o = (observado.estacoes[e] || {})[`${data}T${pad(hr)}`]; if (o) return o.chuva || o.nuvens >= 75 || o.nuvens <= 20 ? o : null; } return null; };
+  const obsEm = (p, data, hr) => { if (p.pedra) return null; for (const e of ESTACAO(p)) { const o = (observado.estacoes[e] || {})[`${data}T${pad(hr)}`]; if (o) { if (o.nuvens == null) return o.chuva ? { ...o, nuvens: 90, total: 90 } : null;   // CAVOK: céu desconhecido (v16.6)
+        return o.chuva || o.nuvens >= 75 || o.nuvens <= 20 ? o : null; } } return null; };
   const horizontes = {};   // ângulo do relevo por praia (36 direções) ou "carregando" / "erro"
 
   // ---------- busca da previsão ----------

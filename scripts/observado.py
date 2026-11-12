@@ -46,12 +46,17 @@ for m in dados if isinstance(dados, list) else []:
       t = datetime.datetime.fromtimestamp(m["obsTime"], BR)
       chave = t.strftime("%Y-%m-%dT%H")
       wx = (m.get("wxString") or "")
-      cobertura = "CAVOK" if (m.get("rawOb") or "").find("CAVOK") >= 0 else None
-      n = 0 if cobertura else total(m.get("clouds"))   # nov/2026: céu coberto total, como a previsão
+      # v16.6: CAVOK / NSC / NCD NÃO querem dizer céu limpo: só que não há nuvem ABAIXO de ~1.500 m (5.000 pés).
+      # Nuvem média e alta (altocúmulo, cirro) pode cobrir o céu inteiro com CAVOK (ex.: 12/11, Botafogo fechado e SBRJ "CAVOK").
+      # Então, sem grupo de nuvem no METAR, o céu fica "desconhecido" (None); só SKC/CLR = limpo de verdade.
+      raw = (m.get("rawOb") or "").split()
+      if m.get("clouds"): n = total(m.get("clouds"))
+      elif "SKC" in raw or "CLR" in raw: n = 0
+      else: n = None
       saida["estacoes"].setdefault(est, {})
       # guarda a observação mais próxima da hora cheia
       if chave not in saida["estacoes"][est] or t.minute <= 15:
-          saida["estacoes"][est][chave] = {"nuvens": n, "total": 0 if cobertura else total(m.get("clouds")), "chuva": any(x in wx for x in ("RA", "DZ", "SH", "TS")), "temp": m.get("temp")}
+          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": any(x in wx for x in ("RA", "DZ", "SH", "TS")), "temp": m.get("temp")}
   except Exception as e:
     print("pulei uma observação:", e)
 if not saida["estacoes"]:
