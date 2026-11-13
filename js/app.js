@@ -101,6 +101,12 @@
   const SOL_FIRME = 70, SOL_FRACO = 30;
   // radiação direta de céu limpo (W/m², fórmula de Meinel) no meio da hora anterior (a radiação da Open-Meteo é a média da hora que passou).
   // Sol muito baixo (menos de 12°) dá conta instável: aí não usa.
+  // altura do sol (graus) num instante
+  const alturaSol = (lat, lon, d) => {
+    const ano0 = Date.UTC(d.getUTCFullYear(), 0, 0), n = Math.floor((d - ano0) / 864e5), hUtc = d.getUTCHours() + d.getUTCMinutes() / 60, rad = Math.PI / 180;
+    const dec = 23.44 * Math.sin(2 * Math.PI / 365 * (n - 81)) * rad, ha = 15 * (hUtc + lon / 15 - 12) * rad, la = lat * rad;
+    return Math.asin(Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(ha)) / rad;
+  };
   const dniLimpo = (lat, lon, ts) => {
     const d = new Date(Date.parse(ts + ":00-03:00") - 30 * 60000), ano0 = Date.UTC(d.getUTCFullYear(), 0, 0);
     const n = Math.floor((d - ano0) / 864e5), hUtc = d.getUTCHours() + d.getUTCMinutes() / 60, rad = Math.PI / 180;
@@ -411,6 +417,40 @@
       }));
       radar = { t: q.time * 1000, praias: novo };
     } catch (e) { console.warn("Radar indisponível agora", e); }
+  }
+  // SATÉLITE (v16.7): imagem visível do GOES-19 (NASA GIBS, ~1 km, nova a cada 10 min, chega com ~35 min de atraso).
+  // Brilho do pixel da praia (média 3×3) dividido por √(seno da altura do sol) = brilho "como se o sol estivesse a pino".
+  // Calibrado com as fotos de 11–13/nov + 7 dias de aeroporto: até 105 = sol firme (céu limpo, cirro fino, nuvem fina);
+  // 115–160 = nuvem grossa passando (sol vai e vem); 160+ = fechado. Entre 105 e 115 fica a previsão.
+  let satel = { t: 0, praias: {} };
+  const SAT_SOL = 105, SAT_GROSSA = 115, SAT_FECHADO = 160;
+  async function carregarSatelite() {
+    try {
+      const agora = Date.now(), Z = 7, n = 2 ** Z;
+      for (let atras = 30; atras <= 90; atras += 10) {
+        const t0 = new Date(Math.floor((agora - atras * 60000) / 600000) * 600000);
+        if (t0.getTime() <= satel.t) return;                          // já temos essa (ou mais nova)
+        const ts = t0.toISOString().slice(0, 19) + "Z", tiles = {}, novo = {};
+        const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
+          const img = new Image(); img.crossOrigin = "anonymous";
+          img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
+          img.onerror = erro;
+          img.src = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band2_Red_Visible_1km/default/${ts}/GoogleMapsCompatible_Level7/${Z}/${y}/${x}.png`;
+        }));
+        try {
+          for (const p of PRAIAS) {
+            const el = alturaSol(p.lat, p.lon, t0); if (el < 15) return;   // sol baixo: a imagem fica escura demais
+            const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
+            const d = await tile(Math.floor(xf), Math.floor(yf)), px = Math.floor((xf % 1) * 256), py = Math.floor((yf % 1) * 256);
+            let soma = 0, q = 0;
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = px + dx, Y = py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; soma += d[(Y * 256 + X) * 4]; q++; }
+            const b = soma / q; if (b < 5) throw new Error("imagem vazia");   // ainda não chegou
+            novo[p.id] = Math.round(b / Math.sqrt(Math.sin(el * Math.PI / 180)));
+          }
+          satel = { t: t0.getTime(), praias: novo }; return;
+        } catch (e) { /* essa imagem ainda não está pronta: tenta 10 min antes */ }
+      }
+    } catch (e) { console.warn("Satélite indisponível agora", e); }
   }
   // decisões do robô do praião (data/alertas.json): "hoje tem praião" só se a previsão da VÉSPERA cravou
   let alertas = {};
@@ -785,6 +825,13 @@
         return c;
       };
       // tempestade agora: radar com chuva FORTE (amarelo/laranja/vermelho) em cima da praia
+      // satélite manda no céu da hora de agora (e da hora da imagem), só de dia e só se a hora não é de chuva
+      const ceuSatelite = (d, hr, est) => {
+        const v = satel.praias[p.id]; if (d !== 0 || v == null || Date.now() - satel.t > 100 * 60000 || est === "chuva" || est === "noite") return est;
+        const hImg = +relogio.format(new Date(satel.t)).slice(0, 2), hAgora = +relogio.format(new Date()).slice(0, 2);
+        if (hr !== hImg && hr !== hAgora) return est;
+        return v <= SAT_SOL ? "sol" : v >= SAT_FECHADO ? "nublado" : v >= SAT_GROSSA ? (est === "nublado" ? "nublado" : "parcial") : est;
+      };
       const raioRadar = (d, hr) => { const r = radar.praias[p.id]; return d === 0 && !!r && r.aqui === 3 && Date.now() - radar.t <= 40 * 60000 && hr === +relogio.format(new Date()).slice(0, 2); };
       const urHoje = (d, data, hr, ur) => { if (d !== 0) return ur; const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr) : null; return io && io.ur != null ? io.ur : ur; };
       const ajustaHoje = (d, data, hr, nuv, tot, tc) => {
@@ -978,7 +1025,7 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             return { h: hr, t: tC, ur: urHoje(d, data, hr, h.relative_humidity_2m ? h.relative_humidity_2m[k] : null), chuva, nuvens, tot,
-              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : estadoHora(chuva, nuvens, !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null), raio: raioRadar(d, hr) };
+              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null)), raio: raioRadar(d, hr) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
@@ -1001,7 +1048,7 @@
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             // quanto sol chega (só quando a nuvem é a dos modelos: se o aeroporto/correção mexeu, vale a regra da nuvem)
             const sol = !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null;
-            const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : estadoHora(chuva, nuvens, sol);
+            const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, sol));
             const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
             return { h: hr, t: Math.round(tC), chuva, nuvens, tot, sol, est, uv: uvEm(k, nuvens), v: vt.v,
               vd: vt.vd, raj: vt.raj, raio: raioRadar(d, hr) };
@@ -3348,7 +3395,7 @@
       alertas = await buscarJSON("data/alertas.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => alertas) || {};
       const im = await buscarJSON("data/inmet.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => null);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
-      const [dados] = await Promise.all([carregar(), Promise.race([carregarRadar(), new Promise((ok) => setTimeout(ok, 4000))])]);
+      const [dados] = await Promise.all([carregar(), Promise.race([Promise.all([carregarRadar(), carregarSatelite()]), new Promise((ok) => setTimeout(ok, 4000))])]);
       montar(dados);
       desenharDias();
       desenhar();
@@ -3371,7 +3418,7 @@
     buscando = true;
     try {
       const [dados, bal, obs] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null),
-        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null), carregarRadar()]);
+        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null), carregarRadar(), carregarSatelite()]);
       if (bal && bal.praias) { balneab = bal; guarda.gravar("pm-balneab-foto", bal); }
       if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
       const im = await buscarJSON("data/inmet.json?t=" + Date.now()).catch(() => null);
