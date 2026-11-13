@@ -776,7 +776,7 @@
       // média das nuvens dos vários modelos, hora a hora (se não vier, usa a previsão padrão)
       const ATE_AMANHA = new Date(Date.parse(diaHoje() + "T12:00:00Z") + 864e5).toISOString().slice(0, 10);
       const nuvemTotal = {};   // céu inteiro (todas as camadas, sem desconto): pra saber se é "céu limpo" ou "sol com poucas nuvens"
-      const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {}, solChega = {};
+      const nuvemMedia = {}, ventoMeio = {}, dirMeio = {}, chuvaModelos = {}, solChega = {}, nuvemGrossa = {};
       // Nuvem que tapa o sol, por modelo: nuvem baixa tapa quase tudo, média tapa bastante,
       // alta (o véu fino lá em cima) deixa o sol passar. Sem as camadas, usa o total do modelo.
       // "continua o que o aeroporto está vendo": se a última observação de hoje está mais nublada (ou quente/fria)
@@ -825,10 +825,15 @@
         return c;
       };
       // tempestade agora: radar com chuva FORTE (amarelo/laranja/vermelho) em cima da praia
+      // v16.8: se a conta da luz dá "vai e vem" mas quase toda a nuvem prevista é ALTA (baixa+média < 20%), é cirro fino:
+      // o sol chega firme (fotos de 13/11 em Arpoador, Ipanema e Botafogo). Vira "sol com nuvens".
+      const solComCirro = (ts, sol) => sol != null && sol < SOL_FIRME && sol >= SOL_FRACO && nuvemGrossa[ts] != null && nuvemGrossa[ts] < 20 ? SOL_FIRME : sol;
       // satélite manda no céu da hora de agora (e da hora da imagem), só de dia e só se a hora não é de chuva
       const ceuSatelite = (d, hr, est) => {
         const v = satel.praias[p.id]; if (d !== 0 || v == null || Date.now() - satel.t > 100 * 60000 || est === "chuva" || est === "noite") return est;
         const hImg = +relogio.format(new Date(satel.t)).slice(0, 2), hAgora = +relogio.format(new Date()).slice(0, 2);
+        // nas 2 horas seguintes, se o satélite vê sol firme agora e a previsão só dá "vai e vem", mantém o sol (o céu muda devagar)
+        if (hr > hAgora && hr <= hAgora + 2) return v <= SAT_SOL && est === "parcial" ? "sol" : est;
         if (hr !== hImg && hr !== hAgora) return est;
         return v <= SAT_SOL ? "sol" : v >= SAT_FECHADO ? "nublado" : v >= SAT_GROSSA ? (est === "nublado" ? "nublado" : "parcial") : est;
       };
@@ -866,6 +871,10 @@
           // chance de chuva: quantos dos 9 modelos põem chuva de verdade (0,3 mm ou mais) naquela hora
           const ps = MODELOS_NUVEM.map((md) => (nh["precipitation_" + md] || [])[k]).filter((v) => v != null);
           if (ps.length >= 3) chuvaModelos[ts] = Math.round(100 * ps.filter((v) => v >= CHUVA_MM).length / ps.length);
+          // nuvem que tapa de verdade = baixa + média (gota d'água). Cirro (alta, cristal de gelo fino) deixa o sol passar.
+          const gs = MODELOS_NUVEM.map((md) => { const b = (nh["cloud_cover_low_" + md] || [])[k], m = (nh["cloud_cover_mid_" + md] || [])[k];
+            return b == null || m == null ? null : 100 * (1 - (1 - b / 100) * (1 - m / 100)); }).filter((v) => v != null);
+          if (gs.length >= 3) nuvemGrossa[ts] = media(gs);
           // quanto sol chega: radiação direta de cada modelo ÷ a de céu limpo naquela posição do sol (mediana dos modelos)
           const lim = dniLimpo(p.lat, p.lon, ts); if (lim != null) {
             const fs = MODELOS_NUVEM.map((md) => (nh["direct_normal_irradiance_" + md] || [])[k]).filter((v) => v != null).map((v) => Math.min(100, 100 * v / lim)).sort((a, b) => a - b);
@@ -1025,7 +1034,7 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             return { h: hr, t: tC, ur: urHoje(d, data, hr, h.relative_humidity_2m ? h.relative_humidity_2m[k] : null), chuva, nuvens, tot,
-              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null)), raio: raioRadar(d, hr) };
+              est: escuro ? (chuva >= 50 ? "chuva" : nuvens >= 70 ? "nublado" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, !ob && Math.abs(nuvens - n0) < 10 ? solComCirro(h.time[k], solChega[h.time[k]] ?? null) : null)), raio: raioRadar(d, hr) };
           }).filter(Boolean),
           mareHoras: Array.from({ length: 15 }, (_, i) => ({ h: 6 + i, n: nivelEm(data, 6 + i) })).filter((q) => q.n != null),
           mares: todasMares.filter((e) => e.data < data).slice(-1).map((e) => ({ ...e, min: e.min - 1440 })).concat(todasMares.filter((e) => e.data === data)).concat(todasMares.filter((e) => e.data > data).slice(0, 1).map((e) => ({ ...e, min: e.min + 1440 }))),
@@ -1047,7 +1056,7 @@
             const nas = minutosDe((t.daily.sunrise[d] || "").slice(11, 16) || "05:30"), por = minutosDe((t.daily.sunset[d] || "").slice(11, 16) || "18:30");
             const escuro = hr * 60 + 30 < nas - 10 || hr * 60 + 30 > por + 10;
             // quanto sol chega (só quando a nuvem é a dos modelos: se o aeroporto/correção mexeu, vale a regra da nuvem)
-            const sol = !ob && Math.abs(nuvens - n0) < 10 ? solChega[h.time[k]] ?? null : null;
+            const sol = !ob && Math.abs(nuvens - n0) < 10 ? solComCirro(h.time[k], solChega[h.time[k]] ?? null) : null;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, sol));
             const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
             return { h: hr, t: Math.round(tC), chuva, nuvens, tot, sol, est, uv: uvEm(k, nuvens), v: vt.v,
