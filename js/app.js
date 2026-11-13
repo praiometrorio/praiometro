@@ -387,34 +387,51 @@
   async function carregarRadar() {
     try {
       const m = await buscarJSON("https://api.rainviewer.com/public/weather-maps.json");
-      const q = m.radar && m.radar.past && m.radar.past[m.radar.past.length - 1]; if (!q) return;
+      const passado = (m.radar && m.radar.past) || [];
+      const q = passado[passado.length - 1], q0 = passado[passado.length - 2]; if (!q) return;
       if (Date.now() - q.time * 1000 > 40 * 60000) return;          // imagem velha demais: não usa
       if (radar.t === q.time * 1000) return;                          // já é essa
-      const Z = 7, n = 2 ** Z, tiles = {}, novo = {};
+      const Z = 7, n = 2 ** Z, tiles = {};
       const pos = (p) => { const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
         return { x: Math.floor(xf), y: Math.floor(yf), px: Math.floor((xf - Math.floor(xf)) * 256), py: Math.floor((yf - Math.floor(yf)) * 256) }; };
-      const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
+      const tile = (fr, x, y) => tiles[fr.path + x + "/" + y] || (tiles[fr.path + x + "/" + y] = new Promise((ok, erro) => {
         const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
-        img.onerror = erro; img.src = `${m.host}${q.path}/256/${Z}/${x}/${y}/2/0_0.png`;
+        img.onerror = erro; img.src = `${m.host}${fr.path}/256/${Z}/${x}/${y}/2/0_0.png`;
       }));
-      // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul = chuva; amarelo/laranja/vermelho = forte
+      // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul-clarinho = chuva fraca; azul = chuva; amarelo/laranja/vermelho = forte
       // v16.6: eco fraco (meio transparente) NÃO conta — perto dos morros (Pão de Açúcar, Tijuca) é quase sempre eco do próprio morro
       // ("clutter") ou chuva que evapora no ar. Só conta chuva de verdade (azul) e forte (amarelo/laranja/vermelho).
-      const forca = (d, i) => { const a = d[i + 3]; if (a < 200) return 0; return d[i] >= 200 ? 3 : 2; };
-      await Promise.all(PRAIAS.map(async (p) => {
-        const o = pos(p); const d = await tile(o.x, o.y);
-        let aqui = 0, perto = 0, nAqui = 0, nPerto = 0, fAqui = 0, fPerto = 0;
-        for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
-          const X = o.px + dx, Y = o.py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255 || dx * dx + dy * dy > 64) continue;
-          const f = forca(d, (Y * 256 + X) * 4);
-          if (!f) continue;
-          if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) { nAqui++; fAqui = Math.max(fAqui, f); } else { nPerto++; fPerto = Math.max(fPerto, f); }
-        }
-        // um pixel sozinho pode ser ruído: "aqui" pede chuva em 2+ dos 9 pixels (~3 km); "perto" pede 4+ pixels (~5 km²)
-        if (nAqui >= 2) aqui = fAqui; if (nPerto >= 4) perto = fPerto;
-        novo[p.id] = { aqui, perto };
-      }));
+      // v16.9: o azul-clarinho (108,209,235) é o degrau mais fraco de chuva: conta como "fraquinha" (1), não como chuva (2).
+      // (13/11 17h: um eco azul-clarinho num quadro só pôs 85% em Botafogo/Flamengo; a foto da hora mostrou céu fechado, sem chuva)
+      const forca = (d, i) => { const a = d[i + 3]; if (a < 200) return 0; if (d[i] >= 200) return 3; return d[i + 1] >= 180 && d[i + 2] >= 200 ? 1 : 2; };
+      const medir = async (fr) => {
+        const res = {};
+        await Promise.all(PRAIAS.map(async (p) => {
+          const o = pos(p); const d = await tile(fr, o.x, o.y);
+          let aqui = 0, perto = 0, nAqui = 0, nPerto = 0, fAqui = 0, fPerto = 0;
+          for (let dy = -8; dy <= 8; dy++) for (let dx = -8; dx <= 8; dx++) {
+            const X = o.px + dx, Y = o.py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255 || dx * dx + dy * dy > 64) continue;
+            const f = forca(d, (Y * 256 + X) * 4);
+            if (!f) continue;
+            if (Math.abs(dx) <= 1 && Math.abs(dy) <= 1) { nAqui++; fAqui = Math.max(fAqui, f); } else { nPerto++; fPerto = Math.max(fPerto, f); }
+          }
+          // um pixel sozinho pode ser ruído: "aqui" pede chuva em 2+ dos 9 pixels (~3 km); "perto" pede 4+ pixels (~5 km²)
+          if (nAqui >= 2) aqui = fAqui; if (nPerto >= 4) perto = fPerto;
+          res[p.id] = { aqui, perto };
+        }));
+        return res;
+      };
+      const novo = await medir(q);
+      // v16.9: chuva que aparece num quadro só (10 min) e não estava no anterior perde um degrau:
+      // pancadinha passageira ou eco que some no quadro seguinte não pode virar "85% agora".
+      // Chuva forte (3) não perde degrau: tempestade chegando tem que avisar na hora.
+      const ant = q0 ? await medir(q0).catch(() => null) : null;
+      if (ant) Object.keys(novo).forEach((id) => {
+        const r = novo[id], a0 = ant[id] || { aqui: 0, perto: 0 };
+        if (r.aqui && r.aqui < 3 && !a0.aqui) r.aqui = r.aqui - 1;
+        if (r.perto && r.perto < 3 && !a0.perto && !a0.aqui) r.perto = r.perto - 1;
+      });
       radar = { t: q.time * 1000, praias: novo };
     } catch (e) { console.warn("Radar indisponível agora", e); }
   }
@@ -1763,6 +1780,7 @@
         </div>
       </div>
       <div class="horario" id="horas" role="list" aria-label="Céu hora a hora">${horas.join("")}</div>
+      <div class="hr-det" id="hrDet" hidden aria-live="polite"></div>
       <div class="corpo">
         <p class="veredito">${a.veredito}</p>
         <div class="selos">${a.selos.map((s) => `<button class="selo ${s.cls}" data-k="${s.k}" aria-label="${s.t}. ${s.s}. Toque para ver o detalhe hora a hora">${s.ic}<b>${s.t}</b><span>${s.s}</span><i class="selo-mais" aria-hidden="true">›</i></button>`).join("")}</div>
@@ -1772,6 +1790,40 @@
         ${graficoUv(x)}
         ${graficoMare(x)}
       </div>`;
+  }
+  // ---------- detalhe de uma hora (v16.9) ----------
+  function detalheHora(l, h, el) {
+    const { p, x } = l, box = $("#hrDet");
+    if (!box) return;
+    const jaAberta = el.classList.contains("sel");
+    document.querySelectorAll("#horas .hr.sel").forEach((e) => e.classList.remove("sel"));
+    if (jaAberta) { box.hidden = true; box.innerHTML = ""; return; }
+    const y = x.horas.find((q) => q.h === h);
+    if (!y) return;
+    el.classList.add("sel");
+    const NOME = { sol: "Sol", parcial: "Sol vai e vem", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
+    const ceuTxt = y.raio ? "Tempestade" : icHora(y) === IC.poucas ? "Sol com nuvens" : NOME[y.est];
+    const ehAgora = estado.dia === 0 && h === +relogio.format(new Date()).slice(0, 2);
+    const m = (x.marH || []).find((q) => q.h === h);
+    const mare = (x.mareDia || []).find((q) => q.h === h);
+    const linhas = [];
+    const L = (ic, rot, val) => linhas.push(`<div class="hd-l">${ic}<span>${rot}</span><b>${val}</b></div>`);
+    L(icHora(y), "Céu", `${ceuTxt}${y.est !== "noite" && y.nuvens != null ? ` <small>· ${y.nuvens}% de nuvens</small>` : ""}`);
+    L(IC.termo, "Temperatura", `${y.t}°C`);
+    L(IC.chuva, "Chuva", y.chuva >= 5 ? `${y.chuva}% de chance` : "Sem chuva");
+    if (y.uv != null && y.est !== "noite") { const u = Math.round(y.uv), f = faixaUv(u); L(IC.gota, "UV", `<span class="hd-uv" style="background:${f.cor};color:${f.nome === "Moderado" ? "#3D2E00" : "#fff"}">${u} · ${f.nome}</span>`); }
+    if (y.v != null) {
+      const fv = faixaVento(y.v);
+      L(IC.vento, "Vento", `${y.vd != null ? rumo(y.vd) + " " : ""}${y.v} km/h <small>· ${fv.n}</small>${y.raj && y.raj >= y.v + 5 ? `<br><small>${y.raj >= 25 ? "💨 " : ""}rajadas de até ${y.raj} km/h</small>` : ""}`);
+    }
+    if (p.baia) L(IC.calmo, "Mar", "Mar de baía, calminho");
+    else if (m && m.o != null) L(IC.onda, "Ondas", `${fmt(m.o)} m${m.per ? ` <small>· ${Math.round(m.per)} s</small>` : ""}`);
+    if (m && m.s != null) L(IC.termo, "Água", `~${fmt(m.s)}°C`);
+    if (mare && mare.n != null) L(IC.onda, "Maré", `${fmt1(mare.n)} m`);
+    if (el.classList.contains("sombra")) L(IC.sombra, "Sombra", "Areia na sombra");
+    box.innerHTML = `<div class="hd-top"><b>${ehAgora ? "Agora · " : ""}${h}h</b><button class="hd-x" aria-label="Fechar">✕</button></div>${linhas.join("")}`;
+    box.hidden = false;
+    box.querySelector(".hd-x").onclick = () => { el.classList.remove("sel"); box.hidden = true; box.innerHTML = ""; };
   }
   function desenharCartao(l) {
     const { p, x } = l;
@@ -1796,6 +1848,12 @@
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     $("#compartilhar").onclick = () => compartilhar(l);
+    // toque num quadradinho da faixa de horas: abre o detalhe daquela hora logo abaixo (toque de novo fecha)
+    document.querySelectorAll("#horas .hr[data-h]").forEach((el) => {
+      el.setAttribute("role", "button"); el.tabIndex = 0;
+      el.onclick = () => detalheHora(l, +el.dataset.h, el);
+      el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); detalheHora(l, +el.dataset.h, el); } };
+    });
     document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => { guarda.gravar("pm-dica-selo", true); abrirRelatorio(b.dataset.k, l); });
 
     // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
