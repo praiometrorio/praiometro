@@ -1,16 +1,4 @@
 {
-  "2026-11-08": {
-    "praiao": false,
-    "tipo": null,
-    "praias": [],
-    "ids": []
-  },
-  "2026-11-09": {
-    "praiao": false,
-    "tipo": null,
-    "praias": [],
-    "ids": []
-  },
   "2026-11-10": {
     "praiao": false,
     "tipo": null,
@@ -24,6 +12,12 @@
     "ids": []
   },
   "2026-11-12": {
+    "praiao": false,
+    "tipo": null,
+    "praias": [],
+    "ids": []
+  },
+  "2026-11-14": {
     "praiao": false,
     "tipo": null,
     "praias": [],
