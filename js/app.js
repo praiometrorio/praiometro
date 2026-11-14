@@ -1802,6 +1802,8 @@
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     $("#compartilhar").onclick = () => compartilhar(l);
     document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => { guarda.gravar("pm-dica-selo", true); abrirRelatorio(b.dataset.k, l); });
+    // tocar numa hora da faixa abre o "Céu hora a hora" já naquela hora
+    document.querySelectorAll("#horas [data-h]").forEach((b) => b.onclick = () => abrirCeu(p, estado.dia, +b.dataset.h * 60));
 
     // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
     const sol = $("#abrirSol"), temCeu = !!(window.CEU && CEU.suportado());
@@ -3020,9 +3022,9 @@
     return `C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)},${cl(b[1] + (c[1] - a[1]) / 6).toFixed(1)} ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)},${cl(c[1] - (e[1] - b[1]) / 6).toFixed(1)} ${c[0].toFixed(1)},${c[1].toFixed(1)}`;
   }).join(" ");
   let ceuSt = null;
-  function abrirCeu(p, d) {
+  function abrirCeu(p, d, min = null) {
     contar("abriu-ceu");
-    ceuSt = { p, d, min: null };
+    ceuSt = { p, d, min };
     $("#relTela").classList.add("ceu24");
     $("#relTitulo").textContent = "Céu hora a hora";
     $("#relLocal").textContent = p.nome;
