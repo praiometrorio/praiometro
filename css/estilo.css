@@ -175,7 +175,7 @@ footer{color:#CFE3EF;font-size:12px;display:grid;gap:4px}
 /* faixa hora a hora logo abaixo da paisagem */
 .horario{display:flex;gap:6px;overflow-x:auto;padding:12px 14px 10px;background:var(--surface);border-bottom:1px solid var(--line);scroll-snap-type:x proximity;scrollbar-width:none}
 .horario::-webkit-scrollbar{display:none}
-.hr{flex:0 0 54px;display:grid;justify-items:center;gap:3px;padding:8px 0 6px;border-radius:14px;background:#F4F6F8;scroll-snap-align:start;position:relative;overflow:hidden}
+.hr{cursor:pointer;flex:0 0 54px;display:grid;justify-items:center;gap:3px;padding:8px 0 6px;border-radius:14px;background:#F4F6F8;scroll-snap-align:start;position:relative;overflow:hidden}
 .hr .hh{font-size:12px;font-weight:700;color:var(--muted)}
 .hr svg{width:26px;height:26px}
 .hr b{font-size:14px}
