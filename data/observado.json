@@ -1,8 +1,14 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo.",
- "atualizadoEm": "2026-11-15T08:39",
+ "atualizadoEm": "2026-11-15T09:50",
  "estacoes": {
   "SBRJ": {
+   "2026-11-15T09": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 25
+   },
    "2026-11-15T08": {
     "nuvens": 58,
     "total": 58,
@@ -80,15 +86,15 @@
     "total": 86,
     "chuva": false,
     "temp": 24
-   },
-   "2026-11-14T19": {
-    "nuvens": 86,
-    "total": 86,
-    "chuva": false,
-    "temp": 24
    }
   },
   "SBGL": {
+   "2026-11-15T09": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 26
+   },
    "2026-11-15T08": {
     "nuvens": 44,
     "total": 44,
@@ -166,15 +172,15 @@
     "total": 94,
     "chuva": false,
     "temp": 24
-   },
-   "2026-11-14T19": {
-    "nuvens": 98,
-    "total": 98,
-    "chuva": false,
-    "temp": 25
    }
   },
   "SBJR": {
+   "2026-11-15T09": {
+    "nuvens": 81,
+    "total": 81,
+    "chuva": false,
+    "temp": 29
+   },
    "2026-11-15T08": {
     "nuvens": 81,
     "total": 81,
@@ -194,12 +200,6 @@
     "temp": 24
    },
    "2026-11-14T20": {
-    "nuvens": 81,
-    "total": 81,
-    "chuva": false,
-    "temp": 24
-   },
-   "2026-11-14T19": {
     "nuvens": 81,
     "total": 81,
     "chuva": false,
