@@ -2162,6 +2162,10 @@
      "06": {
       "nuvens": 25,
       "est": "sol"
+     },
+     "07": {
+      "nuvens": 81,
+      "est": "nublado"
      }
     },
     "previstoAs": "06:47"
@@ -2246,19 +2250,19 @@
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 156,
+   "horas": 157,
    "acertoExato": 45,
-   "acertoSolOuNao": 67,
+   "acertoSolOuNao": 68,
    "viesNuvens": 1,
    "leitura": "sem viés claro"
   },
   "ultimos30dias": {
-   "horas": 210,
+   "horas": 211,
    "acertoExato": 48,
    "acertoSolOuNao": 74,
    "viesNuvens": -1,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-15T06:47"
+ "atualizadoEm": "2026-11-15T07:44"
 }
