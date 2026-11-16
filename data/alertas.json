@@ -1,10 +1,4 @@
 {
-  "2026-11-12": {
-    "praiao": false,
-    "tipo": null,
-    "praias": [],
-    "ids": []
-  },
   "2026-11-14": {
     "praiao": false,
     "tipo": null,
@@ -16,5 +10,32 @@
     "tipo": null,
     "praias": [],
     "ids": []
+  },
+  "2026-11-17": {
+    "praiao": true,
+    "praia": false,
+    "tipo": "tarde",
+    "praias": [
+      "Piratininga",
+      "Barra",
+      "Recreio",
+      "Prainha",
+      "Reserva",
+      "Joatinga",
+      "Ipanema",
+      "Copacabana"
+    ],
+    "ids": [
+      "piratininga",
+      "barra",
+      "recreio",
+      "prainha",
+      "reserva",
+      "joatinga",
+      "ipanema",
+      "copacabana"
+    ],
+    "temp": 27,
+    "vespera": true
   }
 }
