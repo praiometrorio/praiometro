@@ -1549,19 +1549,29 @@
     return tot >= 8 ? "todo" : manha >= 4 && tarde <= 1.5 ? "manha" : tarde >= 3.5 && manha <= 2 ? "tarde" : "nuvens";
   };
   const JEITO_PRAIAO = { todo: "praião o dia todo", manha: "praião, mais pela manhã", tarde: "praião, mais à tarde", nuvens: "praião com visitas de algumas nuvens" };
-  const ehPraiao = (d) => praiaoDia(d).n;
+  // PRAIÃO (dia raro): 4+ praias com 5+ horas de SOL FIRME (9h às 17h), chuva < 20% nessas horas e vento até 15 km/h
+  // VAI DAR PRAIA (dia bom normal): 4+ praias com 5+ pontos de sol (sol vai e vem = meio), chuva < 40%, vento até 15 (igual ao robô)
+  const firmes = (x, de = 9, ate = 17) => x.horas.filter((y) => y.h >= de && y.h <= ate && y.est === "sol").length;
+  const tipoFirme = (x) => { const t = firmes(x), m = firmes(x, 9, 13), ta = firmes(x, 14, 17);
+    return t >= 8 ? "todo" : m >= 4 && ta <= 1 ? "manha" : ta >= 3 && m <= 1 ? "tarde" : "maior"; };
+  const SOL_PRAIAO = { todo: "solzão o dia todo", manha: "solzão de manhã", tarde: "solzão à tarde", maior: "solzão na maior parte do dia" };
+  const SOL_PRAIA = { todo: "sol na maior parte do dia", manha: "sol de manhã", tarde: "sol à tarde", nuvens: "sol vai e vem", maior: "sol na maior parte do dia" };
+  const ehPraiao = (d) => praiaoDia(d).nivel === "praiao";
   function praiaoDia(d) {
-    const boas = PRAIAS.filter((p) => !p.baia).filter((p) => { const x = previsao[p.id][d]; // chuva: só nas horas boas (sol ou entre nuvens, 9h às 17h); chuva só depois vira "mais pela manhã"
+    const mar = PRAIAS.filter((p) => !p.baia);
+    const top = mar.filter((p) => { const x = previsao[p.id][d];
+      const chuvaSol = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && y.est === "sol").map((y) => y.chuva || 0));
+      return firmes(x) >= 5 && x.vento <= 15 && chuvaSol < 20; });
+    const boas = mar.filter((p) => { const x = previsao[p.id][d]; // chuva: só nas horas boas (sol ou entre nuvens, 9h às 17h)
       const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
       return pontosPraia(x) >= 5 && x.vento <= 15 && chuvaBoa < 40; });
-    if (boas.length < 4) return { n: 0 };
-    const conta = {}; boas.forEach((p) => { const t = tipoPraiao(previsao[p.id][d]); conta[t] = (conta[t] || 0) + 1; });
-    const tipo = ["todo", "manha", "tarde", "nuvens"].reduce((m, t) => ((conta[t] || 0) > (conta[m] || 0) ? t : m), "todo");
-    const REG = { zs: "Zona Sul", zo: "Zona Oeste", nit: "Niterói" };
-    const regs = [...new Set(boas.map((p) => p.regiao))];
-    const onde = regs.length === 1 ? ` na ${REG[regs[0]] || ""}`.replace("na Niterói", "em Niterói") : "";
-    const nomes = boas.slice(0, 3).map((p) => p.nome).join(", ") + (boas.length > 3 ? ` e mais ${boas.length - 3}` : "");
-    return { n: boas.length, tipo, onde, nomes };
+    const nivel = top.length >= 4 ? "praiao" : boas.length >= 4 ? "praia" : null;
+    if (!nivel) return { n: 0 };
+    const lista = nivel === "praiao" ? top : boas, tp = nivel === "praiao" ? tipoFirme : tipoPraiao;
+    const conta = {}; lista.forEach((p) => { const t = tp(previsao[p.id][d]); conta[t] = (conta[t] || 0) + 1; });
+    const tipo = Object.keys(conta).reduce((m, t) => (conta[t] > (conta[m] || 0) ? t : m), Object.keys(conta)[0]);
+    const nomes = lista.slice(0, 3).map((p) => p.nome).join(", ") + (lista.length > 3 ? ` e mais ${lista.length - 3}` : "");
+    return { n: lista.length, nivel, tipo, nomes, temp: previsao[lista[0].id][d].temp };
   }
   const nomeDia = (d) => d === 0 ? "hoje" : d === 1 ? "amanhã" : SEMANA_LONGA[new Date(datas[d] + "T12:00:00").getDay()];
 
@@ -1837,18 +1847,23 @@
     // HOJE: vale o que a previsão da véspera decidiu (o aeroporto mede o que já passou, não decide praião)
     if (estado.dia === 0) {
       const rec = alertas[datas[0]];
-      if (rec && rec.praiao) {
-        const ps = (rec.ids || []).map((id) => PRAIAS.find((p) => p.id === id)).filter(Boolean);
-        const REG = { zs: "Zona Sul", zo: "Zona Oeste", nit: "Niterói" }, regs = [...new Set(ps.map((p) => p.regiao))];
-        const onde = regs.length === 1 ? (regs[0] === "nit" ? " em Niterói" : ` na ${REG[regs[0]]}`) : "";
+      if (rec && (rec.praiao || rec.praia)) {
         const nm = rec.praias || [];
-        pr = { n: nm.length, tipo: rec.tipo || "todo", onde, nomes: nm.slice(0, 3).join(", ") + (nm.length > 3 ? ` e mais ${nm.length - 3}` : "") };
+        // registro antigo (antes de nov/2026) não tinha "praia": tipo "nuvens" era o praião fraco, hoje "vai dar praia"
+        const nivel = rec.praiao && rec.tipo !== "nuvens" ? "praiao" : "praia";
+        pr = { n: nm.length, nivel, tipo: rec.tipo || "todo", temp: rec.temp, nomes: nm.slice(0, 3).join(", ") + (nm.length > 3 ? ` e mais ${nm.length - 3}` : "") };
       } else pr = { n: 0 };
     }
     const n = pr.n;
     const banner = $("#praiao");
     banner.hidden = !n;
-    if (n) banner.innerHTML = `${IC.sol}<div>${nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase())} tem ${JEITO_PRAIAO[pr.tipo]}!<small>${pr.nomes}${pr.onde} · com sol e vento tranquilo</small></div>`;
+    banner.classList.toggle("praia", pr.nivel === "praia");
+    if (n) { const D = nomeDia(estado.dia) === "hoje" ? "Hoje" : nomeDia(estado.dia).replace(/^./, (c) => c.toUpperCase());
+      const sol = (pr.nivel === "praiao" ? SOL_PRAIAO : SOL_PRAIA)[pr.tipo] || (pr.nivel === "praiao" ? "solzão" : "sol");
+      const extra = `${sol}${pr.temp != null ? `, ${pr.temp}°` : ""}${pr.nivel === "praiao" ? " e vento fraco" : ""}`;
+      banner.innerHTML = pr.nivel === "praiao"
+        ? `${IC.sol}<div>${D} tem PRAIÃO!<small>${pr.nomes} · ${extra}</small></div>`
+        : `${IC.poucas || IC.sol}<div>${D} vai dar praia<small>${pr.nomes} · ${extra}</small></div>`; }
     // foto do topo (abas dos dias + faixa do praião) para a próxima abertura já mostrar tudo na hora, sem "pular"
     if (estado.dia === 0) guarda.gravar("pm-topo-foto", { data: datas[0], dias: $("#dias").innerHTML, praiao: n ? banner.innerHTML : "" });
 

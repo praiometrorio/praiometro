@@ -42,6 +42,7 @@ h1 span{color:#7FD3F0}
 .praiao{display:flex;align-items:center;gap:10px;background:#FFB627;color:#3D2600;border-radius:16px;padding:12px 16px;font-weight:700}
 .praiao svg{width:26px;height:26px;flex:none}
 .praiao small{display:block;font-weight:500}
+.praiao.praia{background:#D7EEF7;color:#0E4D6B}
 
 /* grade principal */
 .grade{display:grid;grid-template-columns:minmax(0,420px) minmax(0,1fr);gap:16px;align-items:start}
@@ -891,6 +892,7 @@ html,body{overscroll-behavior-y:none}
 .praiao{background:rgba(255,182,39,.14);color:#FFD36B;padding:9px 12px;border-radius:12px;font-size:13.5px;font-weight:700}
 .praiao svg{width:18px;height:18px;color:#FFB627}
 .praiao small{display:inline;color:#FFE7B3;font-weight:500;opacity:.85;margin-left:4px}
+.praiao.praia{background:rgba(120,200,235,.14);color:#9FDCF5}.praiao.praia svg{color:#7CC8EA}.praiao.praia small{color:#CFEFFC}
 /* barra de baixo */
 .atalhos4{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#0A2840;
   border-radius:26px 26px 0 0;padding:0 8px calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(0,10,25,.35)}
