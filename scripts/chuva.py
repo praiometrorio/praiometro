@@ -4,6 +4,7 @@
 # Salva em data/chuva.json:
 #   "agora":  última leitura de cada estação  {nome: {"lat","lon","m15","h01","em"}}   (mm em 15 min e em 1 hora)
 #   "horas":  chuva de cada hora fechada      {"2026-11-16T11": {nome: mm na hora}}    (guarda 30 dias)
+# v18.3: o robô agora lê a cada 5 min (rodada longa no computador), então toda hora fechada tem leitura nos primeiros minutos.
 import json, os, sys, time, datetime, urllib.request, urllib.error
 
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")

@@ -396,7 +396,7 @@
   window.pmRadar = () => radar; window.pmSatel = () => satel;      // para conferência (console)
   // v17.7 PLUVIÔMETROS do Alerta Rio (Prefeitura): chuva medida no chão, leitura a cada 5 min. Para cada praia, a estação
   // mais próxima a até 3 km. Tenta ler direto da Prefeitura (mais fresco); se o navegador não deixar, usa o arquivo do robô.
-  let pluv = { t: 0, praias: {} };
+  let pluv = { t: 0, praias: {}, horas: {} };
   async function carregarChuva() {
     try {
       // o site da Prefeitura não deixa o navegador ler direto: vem do robô (computador do Praiômetro, a cada 15 min)
@@ -412,12 +412,22 @@
         }
         if (melhor) novo[p.id] = melhor;
       }
-      pluv = { t: Date.now(), praias: novo };
+      pluv = { t: Date.now(), praias: novo, horas: r.horas || {} };
     } catch (e) { console.warn("Pluviômetros indisponíveis agora", e); }
   }
   // leitura do pluviômetro da praia, se for recente (até 25 min). null = sem estação perto ou leitura velha.
   const pluvEm = (p) => { const g = pluv.praias[p.id]; return g && Date.now() - g.t <= 25 * 60000 ? g : null; };
   window.pmPluv = () => pluv;
+  // v18.3: chuva MEDIDA numa hora que já fechou (mm), no pluviômetro da praia (até 3 km). null = sem dado.
+  // É o que manda nas horas que já passaram: aeroporto marcando chuva (às vezes garoa só lá) não vale se o pluviômetro ficou seco.
+  const pluvHora = (p, data, hr) => { const g = pluv.praias[p.id], H = pluv.horas[`${data}T${pad(hr)}`];
+    return g && H && isFinite(H[g.nome]) ? H[g.nome] : null; };
+  const chuvaMedida = (p, data, hr, chuva, ob) => {
+    const mm = pluvHora(p, data, hr);
+    if (mm != null) return mm >= 0.2 ? Math.max(chuva, 85) : Math.min(chuva, 10);
+    if (ob) return ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20);
+    return chuva;
+  };
   const movRadar = (r) => {
     if (!r || !r.mov || Date.now() - radar.t > 40 * 60000) return null;
     const idade = (Date.now() - radar.t) / 60000, aj = (v) => v == null ? null : Math.max(0, Math.round((v - idade) / 5) * 5);
@@ -1181,7 +1191,8 @@
             const n0 = nuvens;
             // igual às horas do cartão: hoje, o que já passou vem do aeroporto
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
-            if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20); }
+            if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); }
+            if (d === 0 && hr < +relogio.format(new Date()).slice(0, 2)) chuva = chuvaMedida(p, data, hr, chuva, ob); else if (ob) chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20);
             chuva = chuvaRadar(d, hr, chuva);
             let tC = h.temperature_2m[k];
             if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);
@@ -1202,7 +1213,8 @@
             // hoje, horas que já passaram (e a de agora): usa o que foi observado de verdade no aeroporto
             const ob = d === 0 && hr <= +relogio.format(new Date()).slice(0, 2) ? obsEm(p, data, hr) : null;
             let tot = Math.round(nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0));
-            if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); if (ob.chuva) chuva = Math.max(chuva, 80); else chuva = Math.min(chuva, 20); }
+            if (ob) { nuvens = ob.nuvens; tot = Math.max(ob.nuvens, ob.total ?? ob.nuvens); }
+            if (d === 0 && hr < +relogio.format(new Date()).slice(0, 2)) chuva = chuvaMedida(p, data, hr, chuva, ob); else if (ob) chuva = ob.chuva ? Math.max(chuva, 80) : Math.min(chuva, 20);
             chuva = chuvaRadar(d, hr, chuva);
             let tC = h.temperature_2m[k];
             if (!ob) [nuvens, tot] = ajustaHoje(d, data, hr, nuvens, tot, tC);

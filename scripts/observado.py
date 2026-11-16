@@ -9,6 +9,12 @@ ESTACOES = ["SBRJ", "SBJR", "SBGL"]
 COBRE = {"FEW": 0.19, "SCT": 0.44, "BKN": 0.75, "OVC": 1.0, "VV": 1.0}
 BR = datetime.timezone(datetime.timedelta(hours=-3))
 
+def chove(wx):
+    """v18.3: chuva NO aeroporto. "VC..." (VCSH = pancada nas redondezas, não no aeroporto) não conta,
+    nem garoa fraquinha ("-DZ"). Antes, "SH" de VCSH marcava chuva e o app pintava a Zona Sul toda de chuva (16/11)."""
+    toks = [t for t in wx.split() if not t.startswith("VC")]
+    return any("RA" in t or "TS" in t or ("DZ" in t and not t.startswith("-")) for t in toks)
+
 def total(nuvens):
     """céu inteiro coberto (0 a 100), sem desconto pela altura"""
     livre = 1.0
@@ -56,7 +62,7 @@ for m in dados if isinstance(dados, list) else []:
       saida["estacoes"].setdefault(est, {})
       # guarda a observação mais próxima da hora cheia
       if chave not in saida["estacoes"][est] or t.minute <= 15:
-          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": any(x in wx for x in ("RA", "DZ", "SH", "TS")), "temp": m.get("temp")}
+          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": chove(wx), "temp": m.get("temp")}
   except Exception as e:
     print("pulei uma observação:", e)
 if not saida["estacoes"]:
