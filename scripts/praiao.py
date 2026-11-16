@@ -3,7 +3,7 @@
 #  - 3 dias antes: se a previsão estiver MUITO boa, avisa "a princípio tem praião"
 #  - na véspera: confirma ou cancela o aviso; se não teve pré-aviso e virou praião, avisa também
 # Guarda o que já mandou em data/alertas.json para não repetir.
-import json, os, sys, datetime, urllib.request, urllib.parse
+import urllib.error, json, os, sys, datetime, urllib.request, urllib.parse
 ATE_AMANHA = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).date() + datetime.timedelta(days=1)).isoformat()
 
 FUSO = "America/Sao_Paulo"
@@ -29,8 +29,19 @@ FAMA = ["ipanema", "copacabana", "leblon", "barra", "arpoador", "leme", "recreio
 DIAS = ["segunda", "terça", "quarta", "quinta", "sexta", "sábado", "domingo"]
 
 def baixar(url):
-    with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Praiometro"}), timeout=60) as r:
-        return json.load(r)
+    # O Open-Meteo grátis tem limite por IP, e as máquinas do GitHub são compartilhadas com muita gente:
+    # às vezes responde 429 ("limite estourado") ou cai. Tenta de novo até 5 vezes, esperando cada vez mais.
+    import time
+    for t in range(5):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Praiometro"}), timeout=60) as r:
+                return json.load(r)
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 500, 502, 503, 504) or t == 4: raise
+            print(f"Open-Meteo respondeu {e.code}, tentando de novo em {30 * (t + 1)} s"); time.sleep(30 * (t + 1))
+        except (urllib.error.URLError, TimeoutError) as e:
+            if t == 4: raise
+            print("Open-Meteo não respondeu, tentando de novo:", e); time.sleep(30 * (t + 1))
 
 def previsao():
     lat = ",".join(str(p[2]) for p in PRAIAS); lon = ",".join(str(p[3]) for p in PRAIAS)

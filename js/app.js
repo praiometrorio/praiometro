@@ -398,10 +398,12 @@
       const Z = 7, n = 2 ** Z, tiles = {}, novo = {};
       const pos = (p) => { const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
         return { x: Math.floor(xf), y: Math.floor(yf), px: Math.floor((xf - Math.floor(xf)) * 256), py: Math.floor((yf - Math.floor(yf)) * 256) }; };
-      const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
+      // v17.3: também a imagem ANTERIOR (10 min antes), para saber se a chuva em cima da praia é nova ou já vinha
+      const q0 = m.radar.past.length > 1 ? m.radar.past[m.radar.past.length - 2] : null;
+      const tile = (x, y, qq = q) => tiles[qq.path + x + "/" + y] || (tiles[qq.path + x + "/" + y] = new Promise((ok, erro) => {
         const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
-        img.onerror = erro; img.src = `${m.host}${q.path}/256/${Z}/${x}/${y}/2/0_0.png`;
+        img.onerror = erro; img.src = `${m.host}${qq.path}/256/${Z}/${x}/${y}/2/0_0.png`;
       }));
       // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul = chuva; amarelo/laranja/vermelho = forte
       // v16.6: eco fraco (meio transparente) NÃO conta — perto dos morros (Pão de Açúcar, Tijuca) é quase sempre eco do próprio morro
@@ -418,6 +420,17 @@
         }
         // um pixel sozinho pode ser ruído: "aqui" pede chuva em 2+ dos 9 pixels (~3 km); "perto" pede 4+ pixels (~5 km²)
         if (nAqui >= 2) aqui = fAqui; if (nPerto >= 4) perto = fPerto;
+        // v17.3: manchinha NOVA e PEQUENA não crava chuva. 15/11 13h10: eco de 1–2 km em cima de Ipanema/Arpoador que não
+        // existia às 13h — lá estava só mormaço, sem chuva (relato de quem estava na praia). Chuva "aqui" só vale se a mancha
+        // é grande (15+ pixels ≈ 18 km² num raio de ~9 km) ou se já aparecia na imagem anterior a até ~3 km. Senão vira "perto".
+        if (aqui && aqui < 3 && nAqui + nPerto < 15 && q0) {
+          let antes = 0;
+          try {
+            const d0 = await tile(o.x, o.y, q0);
+            for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const X = o.px + dx, Y = o.py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; if (forca(d0, (Y * 256 + X) * 4)) antes++; }
+          } catch (e) { antes = 2; }   // sem a imagem anterior: fica como estava
+          if (antes < 2) { aqui = 0; perto = Math.max(perto, 2); }
+        }
         novo[p.id] = { aqui, perto };
       }));
       radar = { t: q.time * 1000, praias: novo };
@@ -429,6 +442,20 @@
   // 115–160 = nuvem grossa passando (sol vai e vem); 160+ = fechado. Entre 105 e 115 fica a previsão.
   let satel = { t: 0, praias: {} };
   const SAT_SOL = 105, SAT_GROSSA = 115, SAT_FECHADO = 160;
+  // v17.2: histórico do robô do satélite (data/satelite.json, uma leitura a cada 10 min) para as horas que JÁ PASSARAM hoje.
+  // Antes, essas horas vinham só do aeroporto, que marca "BKN" (nuvens de 5 a 7 oitavos) como céu fechado mesmo com o sol
+  // passando entre os cúmulos (14/11, Botafogo à tarde: aeroporto 90%, satélite e foto = sol vai e vem).
+  let satHist = { leituras: {} };
+  const satPassado = (p, data, hr) => {
+    const vs = [];
+    for (let m = 0; m < 60; m += 10) {
+      const k = `${data}T${pad(hr)}:${pad(m)}`, r = satHist.leituras && satHist.leituras[k]; if (!r || !r[p.id]) continue;
+      const el = alturaSol(p.lat, p.lon, new Date(Date.parse(k + ":00-03:00"))); if (el < 15) continue;
+      vs.push(r[p.id][0] / Math.sqrt(Math.sin(el * Math.PI / 180)));
+    }
+    if (vs.length < 2) return null;
+    vs.sort((x, y) => x - y); return vs[Math.floor(vs.length / 2)];   // mediana da hora
+  };
   async function carregarSatelite() {
     try {
       const agora = Date.now(), Z = 7, n = 2 ** Z;
@@ -835,6 +862,10 @@
       const solComCirro = (ts, sol) => sol != null && sol < SOL_FIRME && sol >= SOL_FRACO && nuvemGrossa[ts] != null && nuvemGrossa[ts] < 20 ? SOL_FIRME : sol;
       // satélite manda no céu da hora de agora (e da hora da imagem), só de dia e só se a hora não é de chuva
       const ceuSatelite = (d, hr, est) => {
+        if (d === 0 && est !== "chuva" && est !== "noite" && hr < +relogio.format(new Date()).slice(0, 2)) {
+          const vp = satPassado(p, diaHoje(), hr);
+          if (vp != null) return vp <= SAT_SOL ? "sol" : vp >= SAT_FECHADO ? "nublado" : vp >= SAT_GROSSA ? "parcial" : est;
+        }
         const v = satel.praias[p.id]; if (d !== 0 || v == null || Date.now() - satel.t > 100 * 60000 || est === "chuva" || est === "noite") return est;
         const hImg = +relogio.format(new Date(satel.t)).slice(0, 2), hAgora = +relogio.format(new Date()).slice(0, 2);
         // nas 2 horas seguintes, se o satélite vê sol firme agora e a previsão só dá "vai e vem", mantém o sol (o céu muda devagar)
@@ -1802,8 +1833,8 @@
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     $("#compartilhar").onclick = () => compartilhar(l);
     document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => { guarda.gravar("pm-dica-selo", true); abrirRelatorio(b.dataset.k, l); });
-    // tocar numa hora da faixa abre o "Céu hora a hora" já naquela hora
-    document.querySelectorAll("#horas [data-h]").forEach((b) => b.onclick = () => abrirCeu(p, estado.dia, +b.dataset.h * 60));
+    // tocar numa hora da faixa abre um resumo escrito daquela hora logo abaixo (tocar de novo fecha)
+    document.querySelectorAll("#horas [data-h]").forEach((b) => b.onclick = () => resumoHora(b, x));
 
     // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
     const sol = $("#abrirSol"), temCeu = !!(window.CEU && CEU.suportado());
@@ -3022,6 +3053,35 @@
     return `C${(b[0] + (c[0] - a[0]) / 6).toFixed(1)},${cl(b[1] + (c[1] - a[1]) / 6).toFixed(1)} ${(c[0] - (e[0] - b[0]) / 6).toFixed(1)},${cl(c[1] - (e[1] - b[1]) / 6).toFixed(1)} ${c[0].toFixed(1)},${c[1].toFixed(1)}`;
   }).join(" ");
   let ceuSt = null;
+  // resumo de uma hora em linhas (aparece embaixo da faixa de horas; tocar de novo ou no × fecha)
+  function resumoHora(b, x) {
+    const h = +b.dataset.h, y = x.horas.find((q) => q.h === h), velho = $("#horaRes");
+    const mesma = velho && +velho.dataset.h === h;
+    if (velho) velho.remove();
+    document.querySelectorAll("#horas .hr.sel").forEach((e) => e.classList.remove("sel"));
+    if (mesma || !y) return;
+    b.classList.add("sel");
+    const NOMES = { sol: "Sol", parcial: "Sol vai e vem", nublado: "Nublado", chuva: "Chuva", noite: "Sem sol" };
+    const ceu = y.raio ? "Tempestade" : icHora(y) === IC.poucas ? "Sol com nuvens" : NOMES[y.est];
+    const ch = y.chuva || 0, fv = faixaVento(y.v), uv = y.uv != null ? Math.round(y.uv) : null, fu = uv != null ? faixaUv(uv) : null;
+    const somb = b.classList.contains("sombra"), dia = y.est !== "noite";
+    const dicaUv = { "Leve": "sem perigo pra pele", "Moderado": "use protetor", "Alto": "protetor e chapéu", "Muito alto": "protetor FPS 50", "Extremo": "evite o sol" };
+    const L = [
+      ["Céu", `${ceu}, ${y.t}°`, y.est === "sol" ? "#F2C12E" : y.est === "parcial" ? "#F5D27A" : y.est === "chuva" ? "#3C6E9E" : "#9AA7B3"],
+      ["Chuva", ch >= 50 ? `Deve chover (${ch}%)` : ch >= 20 ? `Pode chover (${ch}%)` : `Chuva improvável (${ch}%)`, "#3C6E9E"],
+      y.v != null ? ["Vento", `${fv.n}, ${y.v} km/h: ${fv.frase.split(",")[0]}${y.raj >= 25 ? ` · rajadas de ${y.raj}` : ""}`, fv.c] : null,
+      dia && uv != null ? ["UV", `UV ${uv}, ${fu.nome.toLowerCase()}: ${dicaUv[fu.nome]}`, fu.cor] : null,
+      // areia: sombra do morro/prédios; se o céu está fechado não tem "sol batendo"
+      dia ? ["Areia", somb ? "Sombra do morro ou dos prédios" : y.est === "sol" || y.est === "parcial" ? "Sol batendo na areia" : "Sem sol direto (céu fechado)", "#D9B77E"] : null
+    ].filter(Boolean);
+    const el = document.createElement("div");
+    el.id = "horaRes"; el.className = "hora-res"; el.dataset.h = h;
+    el.innerHTML = `<div class="hl-cab"><b>${nomeDiaTreino(estado.dia)}, ${h}h</b><button class="hres-x" aria-label="Fechar">×</button></div>` +
+      L.map(([t, txt, cor]) => `<div class="hl" style="border-left-color:${cor}"><small>${t}</small>${txt}</div>`).join("");
+    $("#horas").after(el);
+    el.querySelector(".hres-x").onclick = () => { el.remove(); b.classList.remove("sel"); };
+  }
+
   function abrirCeu(p, d, min = null) {
     contar("abriu-ceu");
     ceuSt = { p, d, min };
@@ -3409,6 +3469,7 @@
       if (balneab && balneab.praias) guarda.gravar("pm-balneab-foto", balneab);
       if (observado && observado.estacoes) guarda.gravar("pm-observado-foto", observado);
       alertas = await buscarJSON("data/alertas.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => alertas) || {};
+      { const sh = await buscarJSON("data/satelite.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => null); if (sh && sh.leituras) satHist = sh; }
       const im = await buscarJSON("data/inmet.json?t=" + Math.floor(Date.now() / 6e5)).catch(() => null);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
       const [dados] = await Promise.all([carregar(), Promise.race([Promise.all([carregarRadar(), carregarSatelite()]), new Promise((ok) => setTimeout(ok, 4000))])]);
@@ -3439,6 +3500,7 @@
       if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
       const im = await buscarJSON("data/inmet.json?t=" + Date.now()).catch(() => null);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
+      { const sh = await buscarJSON("data/satelite.json?t=" + Date.now()).catch(() => null); if (sh && sh.leituras) satHist = sh; }
       {
         montar(dados);
         desenharDias();
