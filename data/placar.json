@@ -2426,6 +2426,10 @@
      "06": {
       "nuvens": 90,
       "est": "nublado"
+     },
+     "08": {
+      "nuvens": 90,
+      "est": "nublado"
      }
     },
     "previstoAs": "07:15"
@@ -2507,6 +2511,10 @@
      "07": {
       "nuvens": 100,
       "est": "chuva"
+     },
+     "08": {
+      "nuvens": 100,
+      "est": "chuva"
      }
     },
     "previstoAs": "07:15"
@@ -2515,19 +2523,19 @@
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 157,
+   "horas": 159,
    "acertoExato": 34,
-   "acertoSolOuNao": 54,
+   "acertoSolOuNao": 55,
    "viesNuvens": 7,
    "leitura": "sem viés claro"
   },
   "ultimos30dias": {
-   "horas": 238,
+   "horas": 240,
    "acertoExato": 45,
-   "acertoSolOuNao": 68,
+   "acertoSolOuNao": 69,
    "viesNuvens": 2,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-16T07:15"
+ "atualizadoEm": "2026-11-16T08:47"
 }
