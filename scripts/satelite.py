@@ -2,8 +2,9 @@
 # (NASA GIBS, camada GOES-East_ABI_Band2_Red_Visible_1km, ~1 km, nova a cada 10 min, ~35 min de atraso)
 # em cima dos aeroportos e de cada praia. Junto com o que o aeroporto observou (observado.json),
 # isso vai mostrar qual brilho = céu limpo / poucas nuvens / nublado, conforme a hora do dia.
-# Ainda NÃO mexe no app: só junta dados em data/satelite.json (guarda os últimos 14 dias).
-import json, os, re, io, sys, datetime, urllib.request
+# Anota [brilho ~3 km, brilho ~9 km, textura] (o app usa nas horas que já passaram) e a cor do infravermelho ("_ir", calibração).
+# Guarda os últimos 14 dias em data/satelite.json.
+import json, os, re, io, sys, math, datetime, urllib.request
 from PIL import Image
 
 RAIZ = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -41,6 +42,7 @@ def brilho(im, px, py, r):
     v = [im.getpixel((min(255, max(0, px + dx)), min(255, max(0, py + dy)))) for dy in range(-r, r + 1) for dx in range(-r, r + 1)]
     return round(sum(v) / len(v), 1)
 
+IR_CACHE = {}
 dados = json.load(open(ARQ)) if os.path.exists(ARQ) else {}
 try: obs = json.load(open(os.path.join(RAIZ, "data", "observado.json"))).get("estacoes", {})
 except Exception: obs = {}
@@ -61,8 +63,28 @@ for atras in range(30, 81, 10):
         if im is None: break
         b1, b4 = brilho(im, px, py, 1), brilho(im, px, py, 4)
         if b4 == 0: im = None; break          # imagem ainda vazia (não chegou)
-        lido[nome] = [b1, b4]                 # [~3 km em volta, ~9 km em volta]
+        # textura: desvio-padrão do brilho no quadrado de ~9 km. Liso = véu uniforme (mormaço); manchado = nuvens soltas
+        vs = [im.getpixel((min(255, max(0, px + dx)), min(255, max(0, py + dy)))) for dy in range(-4, 5) for dx in range(-4, 5)]
+        md = sum(vs) / len(vs); tex = round((sum((v - md) ** 2 for v in vs) / len(vs)) ** 0.5, 1)
+        lido[nome] = [b1, b4, tex]            # [brilho ~3 km, brilho ~9 km, textura ~9 km]
+    # INFRAVERMELHO (banda 13, ~2 km): mostra a temperatura do topo da nuvem (cinza = quente/baixa; colorido = topo muito frio/alto).
+    # Fase de calibração: só anota a cor do pixel [R, G, B] em cada ponto, para depois aprendermos a separar cirro fino de nuvem
+    # grossa e a ver o céu com o sol baixo (quando a imagem visível não serve). Se a imagem não existir, segue sem ela.
+    ir = {}
+    try:
+        for nome, (la, lo) in pontos.items():
+            n6 = 2 ** 6; xf = (lo + 180) / 360 * n6; lr = math.radians(la)
+            yf = (1 - math.log(math.tan(lr) + 1 / math.cos(lr)) / math.pi) / 2 * n6
+            k = ("ir", t, int(xf), int(yf))
+            if k not in IR_CACHE:
+                url = f"https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band13_Clean_Infrared/default/{t}/GoogleMapsCompatible_Level6/6/{int(yf)}/{int(xf)}.png"
+                with urllib.request.urlopen(urllib.request.Request(url, headers={"User-Agent": "Praiometro"}), timeout=40) as r:
+                    IR_CACHE[k] = Image.open(io.BytesIO(r.read())).convert("RGB")
+            ir[nome] = list(IR_CACHE[k].getpixel((int((xf - int(xf)) * 256), int((yf - int(yf)) * 256))))
+    except Exception as e:
+        print("sem infravermelho", t, e); ir = {}
     if lido and len(lido) == len(pontos):
+        if ir: lido["_ir"] = ir
         # junta o que o aeroporto viu na hora cheia mais próxima (o METAR sai na hora cheia)
         hc = (local + datetime.timedelta(minutes=30)).strftime("%Y-%m-%dT%H")
         lido["_aeroporto"] = {e: obs.get(e, {}).get(hc) for e in AEROPORTOS if obs.get(e, {}).get(hc)}

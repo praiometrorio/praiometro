@@ -88,6 +88,8 @@
     ["Céu limpo das #h às #h", "Clear sky from #h to #h", "Cielo despejado de #h a #h", "Ciel dégagé de #h à #h"], ["Céu limpo das", "Clear sky from", "Cielo despejado de", "Ciel dégagé de"],
     ["céu limpo", "clear sky", "cielo despejado", "ciel dégagé"], ["Céu fechado", "Overcast", "Cielo cubierto", "Ciel couvert"],
     ["Céu fechado o dia todo", "Overcast all day", "Cielo cubierto todo el día", "Ciel couvert toute la journée"],
+    ["Mormaço", "Hazy sun", "Bochorno", "Voile nuageux"], ["Nublado, mas queima: use protetor", "Cloudy, but it burns: wear sunscreen", "Nublado, pero quema: usa protector", "Nuageux, mais ça brûle : crème solaire"],
+    ["Mormaço: nublado, mas queima", "Hazy: cloudy, but it burns", "Bochorno: nublado, pero quema", "Voile nuageux : ça brûle quand même"],
     ["Céu hora a hora", "Sky hour by hour", "Cielo hora a hora", "Ciel heure par heure"],
     ["Dia de praia raiz!", "A proper beach day!", "¡Día de playa de verdad!", "Vraie journée de plage !"],
     ["Dia de praião", "Great beach day", "Día de playa top", "Super journée de plage"],
