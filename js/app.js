@@ -399,13 +399,8 @@
   let pluv = { t: 0, praias: {} };
   async function carregarChuva() {
     try {
-      let est = null;
-      try {
-        const b = await buscarJSON("https://websempre.rio.rj.gov.br/json/chuvas");
-        est = {}; for (const o of b.objects || []) if (o.data && o.location) est[o.name] = { lat: o.location[0], lon: o.location[1], m15: +o.data.m15, h01: +o.data.h01, em: String(o.read_at).slice(0, 16) };
-        if (Object.keys(est).length < 5) est = null;
-      } catch (e) { est = null; }
-      if (!est) { const r = await buscarJSON("data/chuva.json?t=" + Math.floor(Date.now() / 3e5)); est = r && r.agora; }
+      // o site da Prefeitura não deixa o navegador ler direto: vem do robô (computador do Praiômetro, a cada 15 min)
+      const r = await buscarJSON("data/chuva.json?t=" + Math.floor(Date.now() / 3e5), 8000); const est = r && r.agora;
       if (!est) return;
       const novo = {};
       for (const p of PRAIAS) {
@@ -442,7 +437,7 @@
       const tile = (x, y, qq = q) => tiles[qq.path + x + "/" + y] || (tiles[qq.path + x + "/" + y] = new Promise((ok, erro) => {
         const img = new Image(); img.crossOrigin = "anonymous";
         img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
-        img.onerror = erro; img.src = `${m.host}${qq.path}/256/${Z}/${x}/${y}/2/0_0.png`;
+        img.onerror = erro; setTimeout(() => erro(new Error("imagem demorou")), 8000); img.src = `${m.host}${qq.path}/256/${Z}/${x}/${y}/2/0_0.png`;
       }));
       // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul = chuva; amarelo/laranja/vermelho = forte
       // v16.6: eco fraco (meio transparente) NÃO conta — perto dos morros (Pão de Açúcar, Tijuca) é quase sempre eco do próprio morro
@@ -456,13 +451,14 @@
       try {
         const o0 = pos(PRAIAS[0]), qs = m.radar.past.slice(-3);
         const ds = await Promise.all(qs.map((qq) => tile(o0.x, o0.y, qq)));
-        const pts = ds.map((d) => { const a = []; for (let i = 0; i < 65536; i++) if (forca(d, i * 4)) a.push(i); return a; });
+        const pts = ds.map((d) => { const a = []; for (let i = 0; i < 65536; i++) if (forca(d, i * 4)) a.push(i);
+          if (a.length <= 1500) return a; const passo = a.length / 1500; return Array.from({ length: 1500 }, (_, k) => a[Math.floor(k * passo)]); });
         const desloc = (A, dB, nB) => {
           let melhor = null;
           for (let dy = -12; dy <= 12; dy++) for (let dx = -12; dx <= 12; dx++) {
             let inter = 0;
             for (let k = 0; k < A.length; k++) { const X = (A[k] & 255) + dx, Y = (A[k] >> 8) + dy; if (X >= 0 && Y >= 0 && X < 256 && Y < 256 && forca(dB, (Y * 256 + X) * 4)) inter++; }
-            const nota = inter / (A.length + nB - inter);
+            const nota = inter / (A.length + Math.min(nB, A.length) - inter);
             if (!melhor || nota > melhor.nota) melhor = { nota, dx, dy };
           }
           return melhor;
@@ -558,7 +554,7 @@
         const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
           const img = new Image(); img.crossOrigin = "anonymous";
           img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
-          img.onerror = erro;
+          img.onerror = erro; setTimeout(() => erro(new Error("imagem demorou")), 8000);
           img.src = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band2_Red_Visible_1km/default/${ts}/GoogleMapsCompatible_Level7/${Z}/${y}/${x}.png`;
         }));
         try {
@@ -659,8 +655,11 @@
   const urlMar = () => "https://marine-api.open-meteo.com/v1/marine?latitude=" + listaLat() + "&longitude=" + listaLon() +
     "&hourly=wave_height,wave_direction,wave_period,swell_wave_height,swell_wave_direction,swell_wave_period,secondary_swell_wave_height,secondary_swell_wave_direction,secondary_swell_wave_period,wind_wave_height,wind_wave_direction,sea_surface_temperature,sea_level_height_msl&timezone=" + encodeURIComponent(FUSO) + "&forecast_days=7";
 
-  async function buscarJSON(url) {
-    const r = await fetch(url);
+  async function buscarJSON(url, ms = 20000) {
+    // v17.9: limite de tempo — um site lento (Prefeitura, satélite, GitHub) não pode deixar o app "carregando" para sempre
+    const c = typeof AbortController !== "undefined" ? new AbortController() : null, t = c && setTimeout(() => c.abort(), ms);
+    let r;
+    try { r = await fetch(url, c ? { signal: c.signal } : undefined); } finally { if (t) clearTimeout(t); }
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
   }
@@ -3402,7 +3401,7 @@
     const c = cena(a, x, p);
     const svgTxt = c.svg.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="760" ');
     const img = new Image();
-    await new Promise((ok, erro) => { img.onload = ok; img.onerror = erro; img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgTxt); });
+    await new Promise((ok, erro) => { img.onload = ok; img.onerror = erro; setTimeout(() => erro(new Error("imagem demorou")), 8000); img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgTxt); });
     ctx.save(); arred(ctx, 40, 40, W - 80, 760, 56); ctx.clip(); ctx.drawImage(img, 40, 40, W - 80, 760); ctx.restore();
     const escuro = c.escura;
     ctx.fillStyle = escuro ? "#FFFFFF" : "#10283A";
@@ -3621,13 +3620,17 @@
     if (buscando || document.hidden || !linhas.length) return;
     buscando = true;
     try {
+      const extras = Promise.all([carregarRadar(), carregarSatelite(), carregarChuva()]);
+      let extrasProntos = false; extras.then(() => extrasProntos = true);
       const [dados, bal, obs] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null),
-        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null), carregarRadar(), carregarSatelite(), carregarChuva()]);
+        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null), Promise.race([extras, new Promise((ok) => setTimeout(ok, 5000))])]);
+      // radar/satélite atrasados: quando chegarem, refaz a tela com eles (sem deixar o usuário esperando)
+      if (!extrasProntos) extras.then(() => { try { montar(dados); desenhar(); } catch (e) {} });
       if (bal && bal.praias) { balneab = bal; guarda.gravar("pm-balneab-foto", bal); }
       if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
-      const im = await buscarJSON("data/inmet.json?t=" + Date.now()).catch(() => null);
+      const [im, sh] = await Promise.all([buscarJSON("data/inmet.json?t=" + Date.now(), 8000).catch(() => null), buscarJSON("data/satelite.json?t=" + Date.now(), 8000).catch(() => null)]);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
-      { const sh = await buscarJSON("data/satelite.json?t=" + Date.now()).catch(() => null); if (sh && sh.leituras) satHist = sh; }
+      if (sh && sh.leituras) satHist = sh;
       {
         montar(dados);
         desenharDias();
