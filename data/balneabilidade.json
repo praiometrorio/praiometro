@@ -1,158 +1,167 @@
 {
-  "_comoFunciona": "Gerado automaticamente a partir dos 'Dados Brutos - Balneabilidade' do INEA (enterococos). nota = 0 a 10 pelas últimas 10 análises de cada ponto (as mais recentes pesam mais). propria = regra CONAMA 274 nas últimas 5 análises: true se todos os pontos estão próprios, false se nenhum, null se parte.",
-  "fonte": "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/",
-  "atualizadoEm": "2026-08-24",
-  "praias": {
-    "flamengo": {
-      "ok": 2,
-      "total": 2,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "botafogo": {
-      "ok": 0,
-      "total": 2,
-      "propria": false,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "vermelha": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "leme": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "copacabana": {
-      "ok": 4,
-      "total": 4,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "arpoador": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "ipanema": {
-      "ok": 1,
-      "total": 3,
-      "propria": null,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "leblon": {
-      "ok": 3,
-      "total": 3,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "saoconrado": {
-      "ok": 3,
-      "total": 3,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "barra": {
-      "ok": 2,
-      "total": 4,
-      "propria": null,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "reserva": {
-      "ok": 2,
-      "total": 2,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "recreio": {
-      "ok": 2,
-      "total": 2,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "prainha": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "grumari": {
-      "ok": 2,
-      "total": 2,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "icarai": {
-      "nota": 9.5,
-      "ok": 4,
-      "total": 4,
-      "propria": true,
-      "data": "2026-08-24"
-    },
-    "piratininga": {
-      "nota": 9.7,
-      "ok": 4,
-      "total": 4,
-      "propria": true,
-      "data": "2026-08-24"
-    },
-    "itaipu": {
-      "nota": 9.0,
-      "ok": 3,
-      "total": 4,
-      "propria": null,
-      "data": "2026-08-24"
-    },
-    "itacoatiara": {
-      "nota": 7.9,
-      "ok": 0,
-      "total": 2,
-      "propria": false,
-      "data": "2026-08-24"
-    },
-    "joatinga": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "diabo": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    },
-    "vidigal": {
-      "ok": 1,
-      "total": 1,
-      "propria": true,
-      "data": "2026-10-21",
-      "fonte": "boletim semanal INEA"
-    }
+ "_comoFunciona": "Gerado automaticamente a partir dos 'Dados Brutos - Balneabilidade' do INEA (enterococos). nota = 0 a 10 pelas últimas 10 análises de cada ponto (as mais recentes pesam mais). propria = regra CONAMA 274 nas últimas 5 análises: true se todos os pontos estão próprios, false se nenhum, null se parte.",
+ "fonte": "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/",
+ "atualizadoEm": "2026-11-16",
+ "praias": {
+  "flamengo": {
+   "ok": 2,
+   "total": 2,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
   },
-  "boletimSemanal": {
-    "url": "https://www.inea.rj.gov.br/wp-content/uploads/2026/10/Boletim-Semanal-de-Balneabilidade-22_10_2026.pdf",
-    "lidoEm": "2026-10-28"
+  "botafogo": {
+   "ok": 0,
+   "total": 2,
+   "propria": false,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "vermelha": {
+   "ok": 1,
+   "total": 1,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "leme": {
+   "ok": 1,
+   "total": 1,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "copacabana": {
+   "ok": 2,
+   "total": 4,
+   "propria": null,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "arpoador": {
+   "ok": 1,
+   "total": 1,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "ipanema": {
+   "ok": 0,
+   "total": 3,
+   "propria": false,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "leblon": {
+   "ok": 0,
+   "total": 3,
+   "propria": false,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "saoconrado": {
+   "ok": 1,
+   "total": 3,
+   "propria": null,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "barra": {
+   "ok": 1,
+   "total": 3,
+   "propria": null,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "reserva": {
+   "ok": 3,
+   "total": 3,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "recreio": {
+   "ok": 2,
+   "total": 2,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "prainha": {
+   "ok": 1,
+   "total": 1,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "grumari": {
+   "ok": 2,
+   "total": 2,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "icarai": {
+   "nota": 9.5,
+   "ok": 2,
+   "total": 4,
+   "propria": null,
+   "data": "2026-11-12",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "piratininga": {
+   "nota": 9.7,
+   "ok": 4,
+   "total": 4,
+   "propria": true,
+   "data": "2026-11-12",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "itaipu": {
+   "nota": 9.0,
+   "ok": 4,
+   "total": 4,
+   "propria": true,
+   "data": "2026-11-12",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "itacoatiara": {
+   "nota": 7.9,
+   "ok": 2,
+   "total": 2,
+   "propria": true,
+   "data": "2026-11-12",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "joatinga": {
+   "ok": 1,
+   "total": 1,
+   "propria": true,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "diabo": {
+   "ok": 0,
+   "total": 1,
+   "propria": false,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
+  },
+  "vidigal": {
+   "ok": 0,
+   "total": 1,
+   "propria": false,
+   "data": "2026-11-11",
+   "fonte": "portal SEIRHI/INEA"
   }
+ },
+ "boletimSemanal": {
+  "url": "https://www.inea.rj.gov.br/wp-content/uploads/2026/10/Boletim-Semanal-de-Balneabilidade-22_10_2026.pdf",
+  "lidoEm": "2026-10-28"
+ },
+ "portalINEA": {
+  "url": "https://seirhi.inea.rj.gov.br/publico",
+  "coletasAte": null,
+  "lidoEm": "2026-11-16"
+ }
 }
