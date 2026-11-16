@@ -1,5 +1,5 @@
 # Robô do céu observado: a cada meia hora, das 5h às 19h (Brasília), salva as observações reais dos aeroportos.
-name: Céu observado (aeroportos + INMET + satélite + pluviômetros)
+name: Céu observado (aeroportos + INMET + satélite)
 
 on:
   schedule:
@@ -22,9 +22,6 @@ jobs:
       - run: python scripts/inmet.py
         env:
           INMET_TOKEN: ${{ secrets.INMET_TOKEN }}
-      # pluviômetros do Alerta Rio: chuva medida no chão (se o site da Prefeitura não responder, segue sem)
-      - run: python scripts/chuva.py
-        continue-on-error: true
       # satélite: anota brilho, textura e infravermelho em cima de cada praia
       - run: pip install pillow && python scripts/satelite.py
         continue-on-error: true

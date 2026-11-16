@@ -1,0 +1,36 @@
+# Robô dos pluviômetros (Alerta Rio): a cada 15 minutos, das 5h às 19h, guarda a chuva medida no chão em data/chuva.json.
+# Roda no computador do Praiômetro (runner próprio, Windows), porque o site da Prefeitura só responde para máquinas no Brasil.
+# Com o computador desligado, o app segue só com o radar (não quebra nada).
+name: Pluviômetros (Alerta Rio)
+
+on:
+  schedule:
+    - cron: "*/15 8-22 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: chuva                # se várias rodadas acumularem (computador desligado), fica só a mais nova na fila
+  cancel-in-progress: false
+
+jobs:
+  chuva:
+    runs-on: [self-hosted, Windows]
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - run: python scripts/chuva.py
+      - name: Salvar no site
+        shell: bash
+        run: |
+          git config user.name "robo-praiometro"
+          git config user.email "robo-praiometro@users.noreply.github.com"
+          git add data/chuva.json
+          git diff --cached --quiet && exit 0
+          git commit -m "Pluviômetros"
+          for i in 1 2 3 4; do git pull --rebase -X theirs && git push && exit 0; sleep 15; done
+          exit 1
