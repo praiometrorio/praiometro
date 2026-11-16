@@ -259,6 +259,33 @@
     if (window.goatcounter && window.goatcounter.count) window.goatcounter.count({ path: "instalou-o-app", title: "Instalou o app (Android)", event: true });
   });
 </script>
+<script>
+  // NÃO CONTAR ESTE APARELHO (os testes da equipe não entram nas estatísticas).
+  // Liga/desliga de dois jeitos: abrindo o site com #nao-contar (ou #contar para voltar a contar),
+  // ou tocando 5 vezes seguidas no texto "Previsão atualizada às..." no fim da tela (serve no app instalado do iPhone,
+  // que tem memória separada do Safari). Usa a mesma marca do próprio GoatCounter ("skipgc"), que então não envia nada.
+  (function () {
+    var marcar = function (sim) { try { sim ? localStorage.setItem("skipgc", "t") : localStorage.removeItem("skipgc"); } catch (e) {} };
+    var aviso = function (txt) {
+      var d = document.createElement("div"); d.textContent = txt;
+      d.style.cssText = "position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#10283A;color:#fff;padding:10px 16px;border-radius:12px;font:600 14px system-ui,sans-serif;z-index:9999;box-shadow:0 4px 14px rgba(0,0,0,.3)";
+      (document.body || document.documentElement).appendChild(d); setTimeout(function () { d.remove(); }, 3500);
+    };
+    var h = location.hash;
+    if (h === "#nao-contar" || h === "#contar") {
+      marcar(h === "#nao-contar"); history.replaceState(null, "", location.pathname + location.search);
+      window.addEventListener("DOMContentLoaded", function () { aviso(h === "#nao-contar" ? "Este aparelho não entra mais nas estatísticas" : "Este aparelho voltou a contar nas estatísticas"); });
+    }
+    var toques = 0, ultimo = 0;
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest || !e.target.closest("#atualizado")) return;
+      var agora = Date.now(); toques = agora - ultimo < 700 ? toques + 1 : 1; ultimo = agora;
+      if (toques < 5) return; toques = 0;
+      var ignorado = false; try { ignorado = localStorage.getItem("skipgc") === "t"; } catch (e2) {}
+      marcar(!ignorado); aviso(!ignorado ? "Este aparelho não entra mais nas estatísticas" : "Este aparelho voltou a contar nas estatísticas");
+    });
+  })();
+</script>
 <script data-goatcounter="https://praiometro.goatcounter.com/count" async src="https://gc.zgo.at/count.js"></script>
 <script>
   // Contagem de PESSOAS (aparelhos) sem dado pessoal: cada celular avisa uma vez só por dia, semana e mês.
@@ -280,6 +307,7 @@
       : /^idioma-/.test(n) ? "Escolheu o idioma " + n.slice(7).toUpperCase() : /^abriu-/.test(n) ? "Abriu " + n.slice(6) : n); };
     function enviar() {
       if (!(window.goatcounter && window.goatcounter.count)) return false;
+      try { if (localStorage.getItem("skipgc") === "t") { fila.length = 0; return true; } } catch (e) {}
       while (fila.length) { var n = fila.shift(); window.goatcounter.count({ path: n, title: titulo(n), event: true }); }
       return true;
     }
