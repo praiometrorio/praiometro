@@ -47,6 +47,26 @@ def altura_sol(lat, lon, t):
     ha = math.radians((t.hour * 60 + t.minute + eq + 4 * lon) / 4 - 180); la = math.radians(lat)
     return math.degrees(math.asin(math.sin(la) * math.sin(dec) + math.cos(la) * math.cos(dec) * math.cos(ha)))
 
+def azimute_sol(lat, lon, t):
+    """direção do sol (graus a partir do norte, sentido horário)"""
+    n = t.timestamp() / 86400 + 2440587.5 - 2451545.0
+    L = (280.46 + 0.9856474 * n) % 360; g = math.radians((357.528 + 0.9856003 * n) % 360)
+    lam = math.radians(L + 1.915 * math.sin(g) + 0.02 * math.sin(2 * g)); eps = math.radians(23.439)
+    ra = math.atan2(math.cos(eps) * math.sin(lam), math.cos(lam)); dec = math.asin(math.sin(eps) * math.sin(lam))
+    ha = math.radians((280.46061837 + 360.98564736629 * n + lon) % 360) - ra; la = math.radians(lat)
+    return (math.degrees(math.atan2(-math.sin(ha), math.tan(dec) * math.cos(la) - math.sin(la) * math.cos(ha))) + 360) % 360
+def brilho_no_raio(t, la, lo, el):
+    """v19.10: brilho médio (corrigido pela altura do sol) no caminho até o sol, onde estaria uma nuvem a 1, 2 e 3 km de
+    altura. Com o sol baixo, quem tapa o sol é a nuvem desse caminho, não a que está em cima da praia (17/11 16h30, Botafogo:
+    em cima 129, no caminho 174; a foto mostrou o sol escondido)."""
+    az = azimute_sol(la, lo, t); vs = []
+    for H in (1, 2, 3):
+        d = H / math.tan(math.radians(el))
+        la2 = la + d * math.cos(math.radians(az)) / 111.32; lo2 = lo + d * math.sin(math.radians(az)) / (111.32 * math.cos(math.radians(la)))
+        x, y, px, py = pos(la2, lo2); im = tile(t.strftime("%Y-%m-%dT%H:%M:%SZ"), x, y)
+        if im is None: return None
+        vs.append(brilho(im, px, py, 1))
+    return round(sum(vs) / len(vs) / math.sqrt(math.sin(math.radians(el))), 1)
 def brilho(im, px, py, r):
     """média do brilho (0-255) num quadrado de (2r+1) x (2r+1) pixels (~1,1 km cada)"""
     v = [im.getpixel((min(255, max(0, px + dx)), min(255, max(0, py + dy)))) for dy in range(-r, r + 1) for dx in range(-r, r + 1)]
@@ -79,7 +99,8 @@ for atras in range(30, 81, 10):
         # v19.4: quanto do quadrado de ~9 km é nuvem (pixel com brilho corrigido acima de 130), em %
         el = altura_sol(la, lo, t0); f = math.sqrt(math.sin(math.radians(el))) if el > 5 else None
         frac = round(100 * sum(v / f > 130 for v in vs) / len(vs)) if f else None
-        lido[nome] = [b1, b4, tex, frac]      # [brilho ~3 km, brilho ~9 km, textura ~9 km, % do quadrado com nuvem]
+        raio = brilho_no_raio(t0, la, lo, el) if el >= 15 else None
+        lido[nome] = [b1, b4, tex, frac, raio]   # [brilho ~3 km, ~9 km, textura, % com nuvem, brilho corrigido no caminho do sol]
     # INFRAVERMELHO (banda 13, ~2 km): mostra a temperatura do topo da nuvem (cinza = quente/baixa; colorido = topo muito frio/alto).
     # Fase de calibração: só anota a cor do pixel [R, G, B] em cada ponto, para depois aprendermos a separar cirro fino de nuvem
     # grossa e a ver o céu com o sol baixo (quando a imagem visível não serve). Se a imagem não existir, segue sem ela.

@@ -1147,6 +1147,8 @@ div.servico svg{width:15px;height:15px}
   .lado{position:fixed;inset:0;z-index:900;display:block;visibility:hidden;pointer-events:none}
   body.mapa-aberto{overflow:hidden}
   body.mapa-aberto .lado{visibility:visible;pointer-events:auto}
+  /* v19.8: o crédito do mapa (OpenFreeMap) se marca como "visível" sozinho e furava o esconderijo, aparecendo por cima da página */
+  body:not(.mapa-aberto) .lado *{visibility:hidden!important}
   body.mapa-aberto .atalhos4{display:none}
   .lado .mapcard{height:100%;border-radius:0;box-shadow:none;display:flex;flex-direction:column}
   .maptop{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 8px;align-items:center;

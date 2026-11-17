@@ -565,7 +565,7 @@
       const k = `${data}T${pad(hr)}:${pad(m)}`, r = satHist.leituras && satHist.leituras[k]; if (!r || !r[p.id]) continue;
       const el = alturaSol(p.lat, p.lon, new Date(Date.parse(k + ":00-03:00"))); if (el < 15) continue;
       const f = Math.sqrt(Math.sin(el * Math.PI / 180));
-      vs.push(r[p.id][0] / f); if (r[p.id][2] != null) ts.push(r[p.id][2] / f); if (r[p.id][3] != null) fs.push(r[p.id][3]);
+      vs.push(r[p.id][4] != null ? r[p.id][4] : r[p.id][0] / f); if (r[p.id][2] != null) ts.push(r[p.id][2] / f); if (r[p.id][3] != null) fs.push(r[p.id][3]);   // v19.10: [4] já vem corrigido, no caminho do sol
     }
     if (vs.length < 2) return null;
     vs.sort((x, y) => x - y); ts.sort((x, y) => x - y); fs.sort((x, y) => x - y);
@@ -576,7 +576,7 @@
       const agora = Date.now(), Z = 7, n = 2 ** Z;
       // lê uma imagem do satélite (horário t0) e devolve o brilho de cada praia; dá erro se a imagem ainda não saiu
       const lerImagem = async (t0) => {
-        const ts = t0.toISOString().slice(0, 19) + "Z", tiles = {}, novo = {}, tex = {}, frac = {};
+        const ts = t0.toISOString().slice(0, 19) + "Z", tiles = {}, novo = {}, tex = {}, frac = {}, raio = {};
         const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
           const img = new Image(); img.crossOrigin = "anonymous";
           img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
@@ -598,8 +598,17 @@
           let nv = 0;
           for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const X = Math.min(255, Math.max(0, px + dx)), Y = Math.min(255, Math.max(0, py + dy)); if (d[(Y * 256 + X) * 4] / Math.sqrt(Math.sin(el * Math.PI / 180)) > 130) nv++; }
           frac[p.id] = Math.round(100 * nv / 81);
+          // v19.10: brilho no caminho até o sol (onde estaria uma nuvem a 1, 2 e 3 km de altura). Com o sol baixo,
+          // quem tapa o sol é a nuvem desse caminho, não a de cima da praia (17/11 16h30, Botafogo: em cima 129, no caminho 174,
+          // e a foto mostrou o sol escondido atrás da nuvem do Corcovado). Com o sol alto, os dois dão quase igual.
+          const sp = SOL.posicao(t0, p.lat, p.lon); let sr = 0, qr = 0;
+          for (const H of [1, 2, 3]) { const km = H / Math.tan(el * Math.PI / 180), [lo2, la2] = SOL.destino(p.lat, p.lon, sp.az, km);
+            const xf2 = (lo2 + 180) / 360 * n, lr2 = la2 * Math.PI / 180, yf2 = (1 - Math.log(Math.tan(lr2) + 1 / Math.cos(lr2)) / Math.PI) / 2 * n;
+            const d2 = await tile(Math.floor(xf2), Math.floor(yf2)), px2 = Math.floor((xf2 % 1) * 256), py2 = Math.floor((yf2 % 1) * 256);
+            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = px2 + dx, Y = py2 + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; sr += d2[(Y * 256 + X) * 4]; qr++; } }
+          if (qr) raio[p.id] = Math.round(sr / qr / Math.sqrt(Math.sin(el * Math.PI / 180)));
         }
-        return { praias: novo, tex, frac };
+        return { praias: novo, tex, frac, raio };
       };
       for (let atras = 20; atras <= 90; atras += 10) {
         const t0 = new Date(Math.floor((agora - atras * 60000) / 600000) * 600000);
@@ -609,7 +618,7 @@
         // v19.4: pega a imagem mais nova que já saiu (começa 20 min atrás). Teste com 14 dias de satélite: a imagem de 30 min
         // atrás acerta o céu de agora 78% das vezes, a de 40 min 75%. Prever a "tendência" com as imagens anteriores PIOROU
         // (75% ou menos em todas as versões testadas): a nuvem do Rio não segue o mesmo ritmo por meia hora. Por isso não tem projeção.
-        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac };
+        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac, raio: r.raio };
         return;
       }
     } catch (e) { console.warn("Satélite indisponível agora", e); }
@@ -843,22 +852,48 @@
   // quadradinho colorido "UV 5 · Moderado" (cor da faixa, fonte do título)
   const uvSelo = (v) => { const f = faixaUv(v), escuro = f.nome === "Moderado";
     return `<span class="uv-selo" style="display:inline-flex;align-items:baseline;gap:5px;background:${f.cor};color:${escuro ? "#3D2E00" : "#fff"};border-radius:10px;padding:4px 10px;font-family:var(--f-display);font-weight:700;font-size:16px;line-height:1.1">UV ${Math.round(v)}<small style="font-family:var(--f-body);font-weight:700;font-size:11px;opacity:.9">${f.nome}</small></span>`; };
+  // ---------- v19.9: UV e maré minuto a minuto, com régua que anda livre (arrasta nos cartões; os dois andam juntos) ----------
+  const hmMin = (m) => { m = Math.round(m); return `${Math.floor(m / 60)}h${pad(((m % 60) + 60) % 60)}`; };
+  const hm5 = (m) => { m = Math.round(m / 5) * 5; return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
+  // UV de cada minuto: reta entre os valores de hora em hora (o valor da hora vale na hora cheia)
+  const uvMinuto = (pts, min) => {
+    if (!pts.length) return null;
+    const t = min / 60, i = pts.findIndex((q) => q[0] > t);
+    if (i === 0) return Math.max(0, pts[0][1] * (1 - (pts[0][0] - t)));
+    if (i < 0) { const u = pts[pts.length - 1]; return Math.max(0, u[1] * (1 - (t - u[0]))); }
+    const a = pts[i - 1], b = pts[i]; return a[1] + (b[1] - a[1]) * (t - a[0]) / (b[0] - a[0]);
+  };
+  // maré de cada minuto: entre uma baixa e uma alta o mar sobe em curva (devagar perto das pontas, rápido no meio)
+  const mareMinuto = (es, mh, min) => {
+    for (let i = 0; i < es.length - 1; i++) { const a = es[i][0], la = es[i][1], b = es[i + 1][0], lb = es[i + 1][1];
+      if (min >= a && min <= b && b > a) return la + (lb - la) * (1 - Math.cos(Math.PI * (min - a) / (b - a))) / 2; }
+    if (!mh.length) return null;
+    const t = min / 60, i = mh.findIndex((q) => q[0] > t);
+    if (i <= 0) return mh[i < 0 ? mh.length - 1 : 0][1];
+    const a = mh[i - 1], b = mh[i]; return a[1] + (b[1] - a[1]) * (t - a[0]) / (b[0] - a[0]);
+  };
+  const minAgora = () => { const t = relogio.format(new Date()); return +t.slice(0, 2) * 60 + +t.slice(3, 5); };
+  const corTextoUv = (f) => (f.nome === "Moderado" ? "#3D2E00" : "#fff");
+  const faltaTxt = (f) => { f = Math.max(0, Math.round(f)); return f >= 60 ? `${Math.floor(f / 60)} h ${f % 60} min` : `${f} min`; };
+  const setaMare = (sobe) => `<svg class="arr-seta" viewBox="0 0 16 16" style="width:14px;height:14px" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${sobe ? '<path d="M4 12 L12 4 M6 4 H12 V10"/>' : '<path d="M4 4 L12 12 M12 6 V12 H6"/>'}</svg>`;
+  // régua: linha tracejada + botãozinho com setas
+  const reguaArr = (x, topo, base, cor, extra = "") => `<g class="arr-cur" transform="translate(${x.toFixed(1)} 0)" style="pointer-events:none"><line y1="${topo - 8}" y2="${base}" stroke="${cor}" stroke-width="2" stroke-dasharray="4 3"/>${extra}<circle cy="${base + 3}" r="8" fill="${cor}"/><path d="M-3 ${base} l-2.5 3 l2.5 3 M3 ${base} l2.5 3 l-2.5 3" stroke="#fff" stroke-width="1.5" fill="none" stroke-linecap="round"/></g>`;
+  // Gráfico do UV (6h às 20h): barrinhas de 15 minutos, cada uma com a cor da faixa de risco (escala da OMS)
   function graficoUv(x) {
     const hs = x.horas.filter((y) => y.uv != null && y.h >= HORA_INI && y.h <= HORA_FIM);
     if (hs.length < 6) return "";
-    const W = 320, topo = 18, base = 84, H = 102, larg = W / hs.length, gap = 4, alto = base - topo, max = 12;
-    const agoraH = x.hoje ? +relogio.format(new Date()).slice(0, 2) : -1;
+    const W = 320, topo = 18, base = 84, H = 102, alto = base - topo, max = 12;
+    const INI = hs[0].h * 60 - 30, FIM = hs[hs.length - 1].h * 60 + 30, pts = hs.map((y) => [y.h, y.uv]);
+    const X = (m) => (m - INI) / (FIM - INI) * W, hAlt = (v) => Math.max(1.5, Math.min(v, max) / max * alto);
     const pico = hs.reduce((m, y) => (y.uv > m.uv ? y : m));
-    const agora = hs.find((y) => y.h === agoraH);
-    const barras = hs.map((y, i) => {
-      const v = Math.round(y.uv), f = faixaUv(y.uv);
-      const x0 = i * larg + gap / 2, w = larg - gap, alt = Math.max(3, Math.min(v, max) / max * alto), y0 = base - alt;
-      const ag = y.h === agoraH;
-      return `<rect x="${x0}" y="${y0}" width="${w}" height="${alt}" rx="4" fill="${f.cor}"${ag ? ' stroke="#10283A" stroke-width="2"' : ""}/>
-        ${v >= 1 ? `<text x="${x0 + w / 2}" y="${y0 - 4}" text-anchor="middle" font-size="10" font-weight="800" fill="#10283A">${v}</text>` : ""}
-        ${ag || (y.h % 2 === 0 && Math.abs(y.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' font-weight="800" fill="#10283A"' : ""}>${ag ? "Agora" : y.h + "h"}</text>` : ""}`;
-    }).join("");
-    // recomendação de saúde conforme o pico do dia
+    const ag0 = Math.max(INI, Math.min(FIM - 1, x.hoje ? minAgora() : pico.h * 60));
+    const pw = W * 15 / (FIM - INI);
+    let fatias = "";
+    for (let m = INI; m < FIM; m += 15) { const v = uvMinuto(pts, m + 7.5), a = hAlt(v);
+      fatias += `<rect x="${(X(m) + 0.5).toFixed(1)}" y="${(base - a).toFixed(1)}" width="${(pw - 1).toFixed(1)}" height="${a.toFixed(1)}" rx="1.5" fill="${faixaUv(v).cor}"/>`; }
+    const nums = hs.map((y) => { const v = Math.round(y.uv); return v >= 1 ? `<text x="${X(y.h * 60).toFixed(1)}" y="${(base - hAlt(y.uv) - 4).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="800" fill="#10283A">${v}</text>` : ""; }).join("");
+    const eixo = hs.filter((y) => y.h % 2 === 0).map((y) => `<text x="${X(y.h * 60).toFixed(1)}" y="${base + 15}" text-anchor="middle">${y.h}h</text>`).join("");
+    const v0 = uvMinuto(pts, ag0), f0 = faixaUv(v0), q0 = x.hoje && Math.abs(ag0 - minAgora()) < 1 ? "AGORA" : hmMin(ag0).toUpperCase();
     const SAUDE = {
       "Leve": "Risco baixo para a pele.",
       "Moderado": "Use protetor solar.",
@@ -867,62 +902,100 @@
       "Extremo": "Queima rápido: proteção máxima."
     };
     const dica = SAUDE[faixaUv(pico.uv).nome];
-    const chip = (t, f, cl) => `<span class="chip" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:${f.cor};color:${cl}">${t}</span>`;
-    const corTexto = (f) => (f.nome === "Moderado" ? "#3D2E00" : "#fff");
     const legenda = FAIXAS_UV.map((f) => `<span style="display:inline-flex;align-items:center;gap:4px"><i style="width:10px;height:10px;border-radius:3px;background:${f.cor};display:inline-block"></i>${f.nome}</span>`).join("");
     return `<div class="info uv" style="display:block;background:#FFF3EC;color:#5A2410"><div style="display:grid;gap:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b>${agora ? `<span style="display:flex;align-items:center;gap:8px;background:${faixaUv(agora.uv).cor};color:${corTexto(faixaUv(agora.uv))};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right">AGORA<br>${faixaUv(agora.uv).nome}</small><b style="font-size:26px;line-height:1">${Math.round(agora.uv)}</b></span>` : '<small style="opacity:.7;font-size:12px">Hora a hora</small>'}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.sol.replace("<svg", '<svg style="width:22px;height:22px"')}Índice UV</b><span class="arr-selo" style="display:flex;align-items:center;gap:8px;background:${f0.cor};color:${corTextoUv(f0)};border-radius:14px;padding:4px 10px 4px 12px"><small style="font-size:11px;font-weight:700;line-height:1.1;text-align:right"><span class="arr-q">${q0}</span><br><span class="arr-n">${f0.nome}</span></small><b class="arr-v" style="font-size:26px;line-height:1">${Math.round(v0)}</b></span></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span style="font-weight:700;font-size:14px">Pico do UV ${picoUvTxt(x.horas)}</span></div>
-      <svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV hora a hora. Pico do UV ${picoUvTxt(x.horas)}.">${barras}</svg>
+      <svg viewBox="0 0 ${W} ${H + 4}" class="arrasta" data-tipo="uv" data-ini="${INI}" data-fim="${FIM}" data-w="${W}" data-hoje="${x.hoje ? 1 : 0}" data-uv="${pts.map((q) => q[0] + ":" + q[1].toFixed(2)).join(",")}" style="width:100%;height:auto;display:block;touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none" font-size="10" font-weight="600" fill="#6B4A3A" role="img" aria-label="UV de 15 em 15 minutos. Pico do UV ${picoUvTxt(x.horas)}. Arraste para ver cada horário.">${fatias}${nums}${eixo}${reguaArr(X(ag0), topo, base, "#6B3A12")}</svg>
       <div style="display:flex;flex-wrap:wrap;gap:4px 8px;font-size:10.5px;opacity:.85">${legenda}</div>
       <div style="font-size:14px;line-height:1.35">${dica}</div>
     </div></div>`;
   }
 
-  // Gráfico de barras da maré (6h às 19h) + resumo bem curto.
-  // Cada coluna é um pedaço de praia: a areia (bege) por cima e a água (azul) subindo por baixo.
-  // Quanto mais azul, maré mais cheia e menos areia.
+  // Gráfico da maré (6h às 20h): cada coluna é um pedaço de praia, areia (bege) por cima e água (azul) subindo por baixo.
+  // v19.9:
+  // ondinhas na água e grãos na areia; a régua anda livre e mostra se está subindo ou baixando.
+  let mareSeq = 0;
   function graficoMare(x) {
     const hs = x.mareHoras || [];
     if (hs.length < 6) return "";
-    const hh = (m) => { m = Math.round(m / 5) * 5; return m % 60 ? `${Math.floor(m / 60)}h${pad(m % 60)}` : `${m / 60}h`; };
-    const ns = hs.map((q) => q.n), lo = Math.min(...ns), hi = Math.max(...ns), amp = hi - lo || 1;
-    const agoraH = estado.dia === 0 ? +relogio.format(new Date()).slice(0, 2) : -1;
-    const W = 320, topo = 16, base = 84, H = 104, larg = W / hs.length, gap = 4, alto = base - topo;
-    const dia = (x.mares || []).filter((e) => e.min >= 6 * 60 - 30 && e.min <= 20 * 60 + 30);
-    const horaDe = (e) => Math.round(e.min / 60);
-    const colunas = hs.map((q, i) => {
-      const x0 = i * larg + gap / 2, w = larg - gap;
-      const agua = 0.18 + 0.72 * (q.n - lo) / amp;              // fração da coluna coberta de água
-      const ya = base - alto * agua;
-      const marca = dia.find((e) => horaDe(e) === q.h);
-      const ag = q.h === agoraH;
-      return `<g${ag ? ' class="ag"' : ""}>
-        <rect x="${x0}" y="${topo}" width="${w}" height="${alto}" rx="5" fill="#F3DFB5"/>
-        <rect x="${x0}" y="${ya}" width="${w}" height="${base - ya}" rx="5" fill="url(#mareAgua)"/>
-        ${ag ? `<rect x="${x0 - 1.5}" y="${topo - 1.5}" width="${w + 3}" height="${alto + 3}" rx="6" fill="none" stroke="#10283A" stroke-width="2"/>` : ""}
-        ${marca ? `<text x="${x0 + w / 2}" y="${topo - 4}" text-anchor="middle" class="m-${marca.tipo}" font-size="11" fill="${marca.tipo === "alta" ? "#1F6F9F" : "#B08A3A"}">${marca.tipo === "alta" ? "▲" : "▼"}</text>` : ""}
-        ${ag || (q.h % 2 === 0 && Math.abs(q.h - agoraH) > 1) ? `<text x="${x0 + w / 2}" y="${base + 13}" text-anchor="middle"${ag ? ' class="t-ag" fill="#10283A" font-weight="800"' : ""}>${ag ? "Agora" : q.h + "h"}</text>` : ""}
-      </g>`;
-    }).join("");
-    const baixa = dia.find((e) => e.tipo === "baixa" && e.min >= 6 * 60 && e.min <= 20 * 60), alta = dia.find((e) => e.tipo === "alta" && e.min >= 6 * 60 && e.min <= 20 * 60);
+    const W = 320, topo = 16, base = 84, H = 104, alto = base - topo, gap = 4, larg = W / hs.length;
+    const INI = hs[0].h * 60 - 30, FIM = hs[hs.length - 1].h * 60 + 30;
+    const es = (x.mares || []).filter((e) => e.nivel != null).slice().sort((a, b) => a.min - b.min);
+    const esA = es.map((e) => [e.min, e.nivel]), mh = hs.map((q) => [q.h, q.n]);
+    const N = (m) => mareMinuto(esA, mh, m);
+    const lo = Math.min(...hs.map((q) => q.n)), hi = Math.max(...hs.map((q) => q.n)), amp = hi - lo || 1;
+    const X = (m) => (m - INI) / (FIM - INI) * W, Y = (n) => base - alto * (0.18 + 0.72 * (n - lo) / amp);
+    const id = "mr" + (++mareSeq);
+    let defs = `<linearGradient id="${id}a" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9"/><stop offset="1" stop-color="#1F6F9F"/></linearGradient>`, cols = "";
+    // v19.9: colunas no estilo clássico (areia bege por cima, água azul por baixo); só a régua e o resto ficaram novos
+    hs.forEach((q, i) => {
+      const x0 = i * larg + gap / 2, w = larg - gap, ya = Y(q.n);
+      cols += `<rect x="${x0.toFixed(1)}" y="${topo}" width="${w.toFixed(1)}" height="${alto}" rx="5" fill="#F3DFB5"/>
+        <rect x="${x0.toFixed(1)}" y="${ya.toFixed(1)}" width="${w.toFixed(1)}" height="${(base - ya).toFixed(1)}" rx="5" fill="url(#${id}a)"/>`;
+    });
+    const dia = es.filter((e) => e.min >= INI && e.min <= FIM);
+    const marcas = dia.map((e) => `<text x="${X(e.min).toFixed(1)}" y="${topo - 4}" text-anchor="middle" class="m-${e.tipo}" font-size="11" fill="${e.tipo === "alta" ? "#1F6F9F" : "#B08A3A"}">${e.tipo === "alta" ? "▲" : "▼"}</text>`).join("");
+    const eixo = hs.filter((q) => q.h % 2 === 0).map((q) => `<text x="${X(q.h * 60).toFixed(1)}" y="${base + 15}" text-anchor="middle">${q.h}h</text>`).join("");
+    const baixa = es.find((e) => e.tipo === "baixa" && e.min >= 6 * 60 && e.min <= 20 * 60), alta = es.find((e) => e.tipo === "alta" && e.min >= 6 * 60 && e.min <= 20 * 60);
     const muita = hs.filter((q) => q.n - lo <= amp * 0.35).map((q) => q.h);
     let faixa = "";
     if (muita.length) {
       const grupos = []; muita.forEach((h) => { const g = grupos[grupos.length - 1]; if (g && h === g[1] + 1) g[1] = h; else grupos.push([h, h]); });
       faixa = grupos.filter(([a, b]) => b > a).map(([a, b]) => b >= 20 ? `a partir das ${a}h` : a <= 6 ? `até as ${b + 1}h` : `das ${a}h às ${b + 1}h`).join(" e ");
     }
-    const chips = [baixa ? `<span class="chip baixa" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:#F3DFB5;color:#6B4F12">▼ Baixa ${hh(baixa.min)}</span>` : "", alta ? `<span class="chip alta" style="font-weight:800;font-size:13px;border-radius:999px;padding:4px 10px;background:#1F6F9F;color:#fff">▲ Alta ${hh(alta.min)}</span>` : ""].join("");
+    // v19.9: alta em cima e baixa embaixo, compactas, ao lado do selo de agora (mesma altura dele)
+    const chips = [alta ? `<span class="chip alta" style="font-weight:800;font-size:11.5px;line-height:1;border-radius:999px;padding:4px 9px;background:#1F6F9F;color:#fff;white-space:nowrap">▲ Alta ${hm5(alta.min)}</span>` : "", baixa ? `<span class="chip baixa" style="font-weight:800;font-size:11.5px;line-height:1;border-radius:999px;padding:4px 9px;background:#F3DFB5;color:#6B4F12;white-space:nowrap">▼ Baixa ${hm5(baixa.min)}</span>` : ""].join("");
+    const ag0 = Math.max(INI, Math.min(FIM - 1, x.hoje ? minAgora() : 12 * 60));
+    const n0 = N(ag0), sobe0 = N(ag0 + 1) > n0, q0 = x.hoje && Math.abs(ag0 - minAgora()) < 1 ? "AGORA" : hmMin(ag0).toUpperCase();
+    const px0 = es.find((e) => e.min > ag0 && e.tipo === (sobe0 ? "alta" : "baixa"));
+    const prox0 = px0 ? `${sobe0 ? "Alta" : "Baixa"} às ${hm5(px0.min)} · falta ${faltaTxt(px0.min - ag0)}` : "";
     return `<div class="info mare" style="display:block"><div class="mare-c" style="display:grid;gap:8px">
-      <div class="mare-t" style="display:flex;justify-content:space-between;align-items:center"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.onda.replace("<svg", '<svg style="width:22px;height:22px"')}Maré</b><small style="opacity:.7;font-size:12px">Horários aprox.</small></div>
-      <div class="chips" style="display:flex;gap:6px;flex-wrap:wrap">${chips}</div>
-      <svg viewBox="0 0 ${W} ${H}" class="mare-g" style="width:100%;height:auto;display:block" font-size="10" font-weight="600" fill="#4A6A7A" role="img" aria-label="Maré de hora em hora.${baixa ? " Baixa às " + hh(baixa.min) + "." : ""}${alta ? " Alta às " + hh(alta.min) + "." : ""}${faixa ? " Mais areia " + faixa + "." : ""}">
-        <defs><linearGradient id="mareAgua" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#4FB3D9"/><stop offset="1" stop-color="#1F6F9F"/></linearGradient></defs>
-        ${colunas}
+      <div class="mare-t" style="display:flex;justify-content:space-between;align-items:center;gap:8px"><span style="display:grid;gap:2px"><b style="display:flex;align-items:center;gap:8px;font-size:15px">${IC.onda.replace("<svg", '<svg style="width:22px;height:22px"')}Maré</b><span class="arr-selo" style="display:flex;align-items:center;gap:4px;font-size:13px;color:#1F6F9F;font-weight:700">${setaMare(sobe0)}<span class="arr-v">${sobe0 ? "Subindo" : "Baixando"}</span><span style="color:#4A6A7A;font-weight:500">· <span class="arr-q">${x.hoje && Math.abs(ag0 - minAgora()) < 1 ? "agora" : hmMin(ag0)}</span></span></span></span>${chips ? `<span class="chips" style="display:flex;flex-direction:column;align-items:stretch;gap:3px">${chips}</span>` : ""}</div>
+      <svg viewBox="0 0 ${W} ${H + 4}" class="mare-g arrasta" data-tipo="mare" data-ini="${INI}" data-fim="${FIM}" data-w="${W}" data-hoje="${x.hoje ? 1 : 0}" data-es="${es.map((e) => e.min + ":" + e.nivel.toFixed(3) + ":" + e.tipo).join(",")}" data-mh="${mh.map((q) => q[0] + ":" + q[1].toFixed(3)).join(",")}" data-lo="${lo.toFixed(3)}" data-amp="${amp.toFixed(3)}" data-topo="${topo}" data-base="${base}" style="width:100%;height:auto;display:block;touch-action:pan-y;cursor:ew-resize;user-select:none;-webkit-user-select:none" font-size="10" font-weight="600" fill="#4A6A7A" role="img" aria-label="Maré minuto a minuto.${baixa ? " Baixa às " + hm5(baixa.min) + "." : ""}${alta ? " Alta às " + hm5(alta.min) + "." : ""}${faixa ? " Mais areia " + faixa + "." : ""} Arraste para ver cada horário.">
+        <defs>${defs}</defs>${cols}${marcas}${eixo}${reguaArr(X(ag0), topo, base, "#10283A", `<circle class="arr-bola" cy="${Y(hs[Math.max(0, Math.min(hs.length - 1, Math.round(ag0 / 60) - hs[0].h))].n).toFixed(1)}" r="5" fill="#fff" stroke="#10283A" stroke-width="2"/>`)}
       </svg>
+      <div class="mare-prox" style="font-size:13px;opacity:.85">${prox0}${prox0 ? " · " : ""}horários aprox.</div>
       ${faixa ? `<div class="mare-dica">🏖️ <b>Mais areia ${faixa}</b></div>` : ""}
     </div></div>`;
   }
+  // a régua dos cartões: tocar ou arrastar de lado move; rolar a página (dedo para cima/baixo) não mexe nela
+  const arrCache = new WeakMap();
+  const arrDados = (svg) => { let d = arrCache.get(svg); if (d) return d;
+    const ds = svg.dataset, par = (t) => (t || "").split(",").filter(Boolean).map((z) => z.split(":").map((v, i) => (i < 2 ? +v : v)));
+    d = { tipo: ds.tipo, ini: +ds.ini, fim: +ds.fim, w: +ds.w, hoje: ds.hoje === "1", uv: par(ds.uv), es: par(ds.es), mh: par(ds.mh), lo: +ds.lo, amp: +ds.amp, topo: +ds.topo, base: +ds.base };
+    arrCache.set(svg, d); return d; };
+  function arrPor(svg, min) {
+    const d = arrDados(svg); min = Math.max(d.ini, Math.min(d.fim - 1, min));
+    const cur = svg.querySelector(".arr-cur"); if (cur) cur.setAttribute("transform", `translate(${((min - d.ini) / (d.fim - d.ini) * d.w).toFixed(1)} 0)`);
+    const info = svg.closest(".info"), selo = info && info.querySelector(".arr-selo"); if (!selo) return;
+    const ehAgora = d.hoje && Math.abs(min - minAgora()) < 1;
+    const quando = d.tipo === "mare" ? (ehAgora ? "agora" : hmMin(min)) : ehAgora ? "AGORA" : hmMin(min).toUpperCase();
+    selo.querySelector(".arr-q").textContent = quando;
+    if (d.tipo === "uv") {
+      const v = uvMinuto(d.uv, min), f = faixaUv(v);
+      selo.style.background = f.cor; selo.style.color = corTextoUv(f);
+      selo.querySelector(".arr-n").textContent = f.nome; selo.querySelector(".arr-v").textContent = Math.round(v);
+    } else {
+      const es = d.es.map((e) => [e[0], e[1]]), n = mareMinuto(es, d.mh, min), sobe = mareMinuto(es, d.mh, min + 1) > n;
+      const hc = d.mh[Math.max(0, Math.min(d.mh.length - 1, Math.round(min / 60) - d.mh[0][0]))];   // bolinha em cima da coluna da hora
+      const bola = svg.querySelector(".arr-bola"); if (bola && hc) bola.setAttribute("cy", (d.base - (d.base - d.topo) * (0.18 + 0.72 * (hc[1] - d.lo) / d.amp)).toFixed(1));
+      selo.querySelector(".arr-v").textContent = sobe ? "Subindo" : "Baixando";
+      const st = selo.querySelector(".arr-seta"); if (st && st.dataset.s !== String(sobe)) { st.outerHTML = setaMare(sobe).replace('class="arr-seta"', `class="arr-seta" data-s="${sobe}"`); }
+      const px = d.es.find((e) => e[0] > min && e[2] === (sobe ? "alta" : "baixa")), pr = info.querySelector(".mare-prox");
+      if (pr) pr.textContent = (px ? `${sobe ? "Alta" : "Baixa"} às ${hm5(px[0])} · falta ${faltaTxt(px[0] - min)} · ` : "") + "horários aprox.";
+    }
+  }
+  let arrToque = null;
+  const arrMin = (svg, ev) => { const d = arrDados(svg), r = svg.getBoundingClientRect(); return d.ini + (ev.clientX - r.left) / r.width * (d.fim - d.ini); };
+  const arrTodos = (svg, min) => { const c = svg.closest(".corpo") || svg.parentElement; c.querySelectorAll("svg.arrasta").forEach((s) => arrPor(s, min)); };
+  document.addEventListener("pointerdown", (ev) => { const svg = ev.target.closest && ev.target.closest("svg.arrasta"); if (!svg) return;
+    arrToque = { svg, x0: ev.clientX, y0: ev.clientY, mov: ev.pointerType === "mouse" }; if (arrToque.mov) arrTodos(svg, arrMin(svg, ev)); });
+  document.addEventListener("pointermove", (ev) => { const t = arrToque; if (!t) return;
+    if (!t.mov) { const dx = ev.clientX - t.x0, dy = ev.clientY - t.y0; if (Math.abs(dx) > 4 && Math.abs(dx) > Math.abs(dy)) { t.mov = true; try { t.svg.setPointerCapture(ev.pointerId); } catch (e) {} } else if (Math.abs(dy) > 6) { arrToque = null; return; } }
+    if (t.mov) arrTodos(t.svg, arrMin(t.svg, ev)); });
+  document.addEventListener("pointerup", (ev) => { const t = arrToque; arrToque = null; if (t && !t.mov && Math.abs(ev.clientX - t.x0) < 6 && Math.abs(ev.clientY - t.y0) < 6) arrTodos(t.svg, arrMin(t.svg, ev)); });
+  document.addEventListener("pointercancel", () => { arrToque = null; });
 
   function textoMare(mares) {
     if (!mares || mares.length < 2) return null;
@@ -1044,11 +1117,14 @@
             return vp <= SAT_SOL ? "sol" : vp >= SAT_FECHADO ? "nublado" : vp >= SAT_GROSSA ? "parcial" : est;
           }
         }
-        const v = satel.praias[p.id]; if (d !== 0 || v == null || Date.now() - satel.t > 100 * 60000 || est === "chuva" || est === "noite") return est;
+        const v = satel.raio && satel.raio[p.id] != null ? satel.raio[p.id] : satel.praias[p.id];   // v19.10: o que está no caminho do sol
+        if (d !== 0 || v == null || Date.now() - satel.t > 100 * 60000 || est === "chuva" || est === "noite") return est;
         const hImg = +relogio.format(new Date(satel.t)).slice(0, 2), hAgora = +relogio.format(new Date()).slice(0, 2);
-        // nas 2 horas seguintes, se o satélite vê sol firme agora e a previsão só dá "vai e vem", mantém o sol (o céu muda devagar)
-        if (hr > hAgora && hr <= hAgora + 2) return (v <= SAT_SOL || nuvensSoltas(v, satel.tex && satel.tex[p.id], satel.frac && satel.frac[p.id])) && est === "parcial" ? "sol" : est;
-        if (hr !== hImg && hr !== hAgora) return est;
+        // v19.8: a hora de agora e as 2 SEGUINTES seguem o que o satélite vê agora, nos dois sentidos (abre e fecha); dali em diante,
+        // a previsão dos modelos. Teste de 14 dias (3/11 a 17/11, 21 praias, conferido com o satélite depois):
+        // daqui a 1 h o "céu continua igual" acerta 71% e o modelo 60%; daqui a 2 h, 65% contra 62%; a partir de 6 h o modelo ganha.
+        // Chuva continua vindo do radar e dos modelos (est === "chuva" já saiu lá em cima).
+        if (hr !== hImg && (hr < hAgora || hr > hAgora + 2)) return est;
         const tx = satel.tex && satel.tex[p.id];
         if (v >= SAT_GROSSA && v < SAT_FECHADO && tx != null && tx < SAT_LISO) { morm[hr] = true; return "nublado"; }   // véu liso = mormaço
         if (nuvensSoltas(v, tx, satel.frac && satel.frac[p.id])) return "sol";   // v19.4: nuvens soltas, mais azul que nuvem → sol com nuvens
@@ -1128,9 +1204,16 @@
         const uvEm = (k, nuv) => {
           const limpo = h.uv_index_clear_sky ? h.uv_index_clear_sky[k] : null;
           if (limpo == null) return h.uv_index ? h.uv_index[k] : null;
+          // v19.6: quanto do UV passa pela nuvem = tabela do Serviço Meteorológico dos EUA (NOAA/EPA): céu limpo 100%,
+          // nuvens espalhadas 89%, nuvens quebradas 73%, encoberto 31%. A conta antiga deixava passar 50% com céu fechado.
           const c = Math.min(100, Math.max(0, nuv)) / 100;
-          return Math.round(limpo * (1 - 0.5 * Math.pow(c, 2)) * 10) / 10;
+          const passa = c <= 0.375 ? 1 - 0.11 * c / 0.375 : c <= 0.75 ? 0.89 - 0.16 * (c - 0.375) / 0.375 : 0.73 - 0.42 * (c - 0.75) / 0.25;
+          return Math.round(limpo * passa * 10) / 10;
         };
+        // v19.6: o UV de cada hora usa a mesma nuvem do céu que o app mostra. Se o satélite, o aeroporto ou o radar
+        // mudaram o céu da hora (ex.: modelo com 5% de nuvem, satélite vendo "Nublado"), o UV acompanha.
+        const nuvemDoUV = (est, nuv) => est === "chuva" ? 100 : est === "nublado" ? Math.max(nuv, 90)
+          : est === "parcial" ? Math.min(80, Math.max(nuv, 50)) : est === "sol" ? Math.min(nuv, 40) : nuv;
         const ventoBase = (k) => { const v = ventoMeio[h.time[k]] ?? h.wind_speed_10m[k]; return v == null ? null : Math.round(v); };
         const dirEm = (k) => dirMeio[h.time[k]] ?? (h.wind_direction_10m ? h.wind_direction_10m[k] : null);
         // ESTIMATIVA DA PEDRA (praias com "pedra" em praias.js, ex.: São Conrado), só com vento do mar (de E a SW, 70°–250°):
@@ -1279,7 +1362,7 @@
             const sol = !ob && Math.abs(nuvens - n0) < 10 ? solComCirro(h.time[k], solChega[h.time[k]] ?? null) : null;
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, sol));
             const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
-            return { h: hr, t: Math.round(tC), chuva, nuvens, tot, sol, est, uv: uvEm(k, nuvens), v: vt.v,
+            return { h: hr, t: Math.round(tC), chuva, nuvens, tot, sol, est, uv: uvEm(k, nuvemDoUV(est, nuvens)), v: vt.v,
               vd: vt.vd, raj: vt.raj, raio: raioRadar(d, hr), mormaco: d === 0 && !!morm[hr] };
           })
         };
@@ -2424,7 +2507,7 @@
     c.addEventListener("touchstart", (e) => {
       ativo = false; modo = null; dx = 0;
       if (deslizando || e.touches.length > 1) return;
-      if (e.target.closest("#horas, input, .tab-surf, .mare-g")) return;   // essas partes rolam para o lado sozinhas
+      if (e.target.closest("#horas, input, .tab-surf, .mare-g, .arrasta")) return;   // essas partes rolam para o lado sozinhas
       if (!vizinhaFav(1)) return;
       ativo = true; x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = Date.now();
     }, { passive: true });
@@ -3360,7 +3443,9 @@
         return [j && j.fim - j.ini >= 1 ? `Sol firme ${faixaH(j)}` : "Sem sol firme", ch.length ? `Chance alta de chuva a partir das ${ch[0]}h` : "Sem chance alta de chuva", `Máxima de ${x.temp}°`]; },
       leg: Object.keys(NOME_CEU).map((e) => [COR_CEU[e], NOME_CEU[e]]), nota: "Altura da barra: temperatura · número azul: chance de chuva" };
     if (k === "uv") { const pts = hs.filter((y) => y.uv != null).map((y) => { const v = Math.round(y.uv); return { h: y.h, v, cor: FAIXAS_UV[faixaIdx(v)].cor, rot: v > 0 ? String(v) : "", rotCor: "#10283A", bruto: y.uv }; });
+      const uvPts = hs.filter((y) => y.uv != null).map((y) => [y.h, y.uv]);
       return { titulo: "Índice UV hora a hora", unid: "", max: Math.max(11, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "UV",
+        fluido: true, valorEm: (min) => uvMinuto(uvPts, min), corDe: (v) => FAIXAS_UV[faixaIdx(v)].cor,   // v19.9: régua livre e barrinhas de 15 min
         texto: (q) => `<b>UV ${Math.round(q.v)} · ${FAIXAS_UV[faixaIdx(q.v)].nome}</b><span>${SAUDE_UV[faixaIdx(q.v)]}</span>`,
         resumo: () => { const pk = pts.reduce((a, b) => (b.bruto > a.bruto ? b : a), pts[0] || { v: 0, h: 0, bruto: 0 }), alto = pts.filter((q) => q.v >= 6);
           const j = maiorSequencia(hs, (y) => y.uv != null && Math.round(y.uv) >= 6);
@@ -3566,7 +3651,12 @@
     const passo = (hi - lo) <= 3 ? 0.5 : (hi - lo) <= 12 ? 2 : (hi - lo) <= 30 ? 5 : 25;
     for (let v = Math.ceil(lo / passo) * passo; v <= hi + 1e-9; v += passo) grade += `<line x1="${esq}" x2="${W - dir}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#E8EEF2"/><text x="${esq - 4}" y="${(Y(v) + 3).toFixed(1)}" text-anchor="end" font-size="9" fill="#6B7A86">${fmt1(v)}</text>`;
     let marcas = "";
-    if (cfg.tipo === "barra") marcas = pts.map((q) => { const x0 = X(q.h * 60) + 2, y = Y(Math.max(lo, q.v)); return `<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${(larg - 4).toFixed(1)}" height="${Math.max(1.5, base - y).toFixed(1)}" rx="3" fill="${q.cor}"/>${q.rot ? `<text x="${(x0 + (larg - 4) / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${q.rotCor || "#2F6FB0"}">${q.rot}</text>` : ""}`; }).join("");
+    if (cfg.fluido) {   // v19.9: barrinhas de 15 em 15 minutos, cada uma com a cor do seu valor; número em cima de cada hora cheia
+      const pw = X(15) - X(0);
+      for (let m = h0 * 60; m < h1 * 60; m += 15) { const v = cfg.valorEm(m + 7.5), y = Y(Math.max(lo, v));
+        marcas += `<rect x="${(X(m) + 0.4).toFixed(1)}" y="${y.toFixed(1)}" width="${(pw - 0.8).toFixed(1)}" height="${Math.max(1.5, base - y).toFixed(1)}" rx="1.5" fill="${cfg.corDe(v)}"/>`; }
+      marcas += pts.map((q) => q.rot ? `<text x="${X(q.h * 60).toFixed(1)}" y="${(Y(Math.max(lo, q.v)) - 4).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${q.rotCor || "#2F6FB0"}">${q.rot}</text>` : "").join("");
+    } else if (cfg.tipo === "barra") marcas = pts.map((q) => { const x0 = X(q.h * 60) + 2, y = Y(Math.max(lo, q.v)); return `<rect x="${x0.toFixed(1)}" y="${y.toFixed(1)}" width="${(larg - 4).toFixed(1)}" height="${Math.max(1.5, base - y).toFixed(1)}" rx="3" fill="${q.cor}"/>${q.rot ? `<text x="${(x0 + (larg - 4) / 2).toFixed(1)}" y="${(y - 4).toFixed(1)}" text-anchor="middle" font-size="8.5" font-weight="800" fill="${q.rotCor || "#2F6FB0"}">${q.rot}</text>` : ""}`; }).join("");
     else { const d = pts.map((q, i) => `${i ? "L" : "M"}${X(q.h * 60 + 30).toFixed(1)},${Y(q.v).toFixed(1)}`).join(" ");
       marcas = `<path d="${d} L${X(pts[n - 1].h * 60 + 30).toFixed(1)},${base} L${X(pts[0].h * 60 + 30).toFixed(1)},${base} Z" fill="#16A3C9" opacity=".15"/><path d="${d}" fill="none" stroke="#16A3C9" stroke-width="2.5"/>`; }
     if (cfg.linha) { const d = cfg.linha.map((q, i) => `${i ? "L" : "M"}${X(q.h * 60 + 30).toFixed(1)},${(base - (base - topo) * q.v / 100).toFixed(1)}`).join(" ");
@@ -3588,6 +3678,15 @@
     const g = relGeo, cfg = relAtual;
     if (!g || !cfg || !$("#relSvg")) return;
     min = Math.min(g.h1 * 60 - 1, Math.max(g.h0 * 60, min));
+    if (cfg.fluido) {   // v19.9: a régua anda livre e o valor é o daquele minuto
+      const cx = g.X(min), h = Math.floor(min / 60);
+      $("#rcL").setAttribute("x1", cx); $("#rcL").setAttribute("x2", cx); $("#rcB").setAttribute("width", 0);
+      $("#rcA").setAttribute("x", cx - 9); $("#rcS").setAttribute("transform", `translate(${cx} 0)`);
+      const ag = estado.dia === 0 && Math.abs(min - minAgora()) < 1;
+      $("#relTxt").innerHTML = `<small>${ag ? "Agora · " : ""}${hmMin(min)}</small>${cfg.texto({ h, v: cfg.valorEm(min) })}`;
+      if (relAberto) relAberto.min = min;
+      return;
+    }
     const h = Math.floor(min / 60), q = cfg.pts.find((z) => z.h === h) || cfg.pts[0];
     const cx = g.X(h * 60) + g.larg / 2;
     $("#rcL").setAttribute("x1", cx); $("#rcL").setAttribute("x2", cx);
