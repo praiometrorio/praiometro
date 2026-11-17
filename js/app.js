@@ -677,7 +677,7 @@
     const cache = guarda.ler(CACHE_CHAVE);
     if (!forcar && cache && Date.now() - cache.t < CACHE_MIN * 60000) return cache;
     try {
-      const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao()), buscarJSON(urlMar()).catch(() => null), buscarJSON(urlNuvens()).catch(() => null)]);
+      const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao(), 15000), buscarJSON(urlMar(), 15000).catch(() => null), buscarJSON(urlNuvens(), 15000).catch(() => null)]);
       const novo = { t: Date.now(), tempo, mar, nuvens };
       guarda.gravar(CACHE_CHAVE, novo);
       return novo;
@@ -1937,7 +1937,11 @@
       </div>`;
     }
 
-    return `${navFav}
+    // v18.5: chave Favoritas / Orla toda (aparece com 2 ou mais favoritas): troca por onde o arrastar anda, e volta
+    const nFav = listaFavoritas().length;
+    const chave = nFav > 1 ? `<div class="modo-nav${sq.modo === "fav" ? " fav" : ""}" role="group" aria-label="Passar entre">
+        <button data-modo="fav" aria-pressed="${sq.modo === "fav"}">${IC.estrelaCheia}Favoritas</button><button data-modo="orla" aria-pressed="${sq.modo !== "fav"}">Orla toda</button></div>` : "";
+    return `${chave}${navFav}
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
         <div class="acoes na-arte">
@@ -1978,6 +1982,13 @@
         </div>`;
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
+    document.querySelectorAll(".modo-nav button").forEach((b) => b.onclick = () => {
+      if (b.getAttribute("aria-pressed") === "true") return;
+      if (b.dataset.modo === "orla") { estado.modoFav = false; desenhar(); contar("chave-orla"); return; }
+      contar("chave-favoritas");
+      if (favoritas.includes(p.id)) { estado.modoFav = true; desenhar(); }
+      else { const f = listaFavoritas()[0]; if (f) abrirPraia(f.p.id, true); }   // praia que não é favorita: vai para a melhor favorita do dia
+    });
     $("#compartilhar").onclick = () => compartilhar(l);
     document.querySelectorAll("#cartao .selo[data-k]").forEach((b) => b.onclick = () => { guarda.gravar("pm-dica-selo", true); abrirRelatorio(b.dataset.k, l); });
     // tocar numa hora da faixa abre um resumo escrito daquela hora logo abaixo (tocar de novo fecha)
@@ -3643,19 +3654,31 @@
 
   // atualização automática: a cada 10 minutos com o app aberto, e ao voltar para o app depois de 10 minutos fora
   let ultimaBusca = Date.now(), buscando = false;
-  async function atualizarPrevisao() {
-    if (buscando || document.hidden || !linhas.length) return;
+  // v18.4: a previsão dos modelos só é baixada de novo se tem 5 min ou mais (eles mudam de hora em hora; são ~3 MB).
+  // O que muda de minuto a minuto (radar, satélite, pluviômetros, aeroportos) é sempre buscado.
+  const PREV_MIN = 5;
+  let atualizando = null;
+  function atualizarPrevisao() {
+    if (atualizando) return atualizando;
+    if (document.hidden || !linhas.length) return Promise.resolve();
+    atualizando = atualizarAgora().finally(() => { atualizando = null; });
+    return atualizando;
+  }
+  async function atualizarAgora() {
     buscando = true;
     try {
       const extras = Promise.all([carregarRadar(), carregarSatelite(), carregarChuva()]);
       let extrasProntos = false; extras.then(() => extrasProntos = true);
-      const [dados, bal, obs] = await Promise.all([carregar(true), buscarJSON("data/balneabilidade.json?t=" + Date.now()).catch(() => null),
-        buscarJSON("data/observado.json?t=" + Date.now()).catch(() => null), Promise.race([extras, new Promise((ok) => setTimeout(ok, 5000))])]);
+      const velha = Date.now() - ((guarda.ler(CACHE_CHAVE) || {}).t || 0) >= PREV_MIN * 60000;
+      // tudo em paralelo (antes INMET e satélite só começavam depois do resto); radar e cia. esperam no máximo 2,5 s
+      const [dados, bal, obs, im, sh] = await Promise.all([carregar(velha), buscarJSON("data/balneabilidade.json?t=" + Date.now(), 8000).catch(() => null),
+        buscarJSON("data/observado.json?t=" + Date.now(), 8000).catch(() => null),
+        buscarJSON("data/inmet.json?t=" + Date.now(), 8000).catch(() => null), buscarJSON("data/satelite.json?t=" + Date.now(), 8000).catch(() => null),
+        Promise.race([extras, new Promise((ok) => setTimeout(ok, 2500))])]);
       // radar/satélite atrasados: quando chegarem, refaz a tela com eles (sem deixar o usuário esperando)
       if (!extrasProntos) extras.then(() => { try { montar(dados); desenhar(); } catch (e) {} });
       if (bal && bal.praias) { balneab = bal; guarda.gravar("pm-balneab-foto", bal); }
       if (obs && obs.estacoes) { observado = obs; guarda.gravar("pm-observado-foto", obs); }
-      const [im, sh] = await Promise.all([buscarJSON("data/inmet.json?t=" + Date.now(), 8000).catch(() => null), buscarJSON("data/satelite.json?t=" + Date.now(), 8000).catch(() => null)]);
       if (im && im.estacoes) { inmet = im; guarda.gravar("pm-inmet-foto", im); }
       if (sh && sh.leituras) satHist = sh;
       {
@@ -3738,9 +3761,13 @@
       mover(PARADO, true); acender(1); ind.classList.add("girando");
       const t0 = Date.now();
       if (!linhas.length) { location.reload(); return; }
-      ultimaBusca = 0; buscando = false;
-      await atualizarPrevisao();
-      await new Promise((r) => setTimeout(r, Math.max(0, 800 - (Date.now() - t0))));
+      ultimaBusca = 0;
+      // v18.4: o sol gira no MÁXIMO 2 s. Se a internet estiver lenta, a atualização termina sozinha por trás
+      // (o rodapé mostra "Atualizando…") e a tela se refaz quando chegar — ninguém fica olhando o sol girando.
+      const tarefa = atualizarPrevisao();
+      const terminou = await Promise.race([tarefa.then(() => true), new Promise((r) => setTimeout(() => r(false), 2000))]);
+      if (!terminou && $("#atualizado")) $("#atualizado").textContent = "Atualizando…";
+      await new Promise((r) => setTimeout(r, Math.max(0, 700 - (Date.now() - t0))));
       ind.classList.remove("girando");
       mover(0, true);
       setTimeout(() => { blocos.forEach((b) => b.style.transition = ""); ocupado = false; }, 320);
