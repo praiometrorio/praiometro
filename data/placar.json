@@ -2607,15 +2607,98 @@
     },
     "previstoAs": "07:15"
    }
+  },
+  "2026-11-17": {
+   "SBRJ": {
+    "previsto": null,
+    "visto": {},
+    "previstoAs": "05:59"
+   },
+   "SBJR": {
+    "previsto": {
+     "06": {
+      "nuvens": 37,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "07": {
+      "nuvens": 40,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "08": {
+      "nuvens": 42,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "09": {
+      "nuvens": 46,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "10": {
+      "nuvens": 43,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "11": {
+      "nuvens": 42,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "12": {
+      "nuvens": 41,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "13": {
+      "nuvens": 30,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "14": {
+      "nuvens": 29,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "15": {
+      "nuvens": 29,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "16": {
+      "nuvens": 26,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "17": {
+      "nuvens": 25,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "18": {
+      "nuvens": 23,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "19": {
+      "nuvens": 20,
+      "chuva": 0,
+      "est": "sol"
+     }
+    },
+    "visto": {},
+    "previstoAs": "05:59"
+   }
   }
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 181,
-   "acertoExato": 35,
-   "acertoSolOuNao": 55,
-   "viesNuvens": 5,
-   "leitura": "sem viés claro"
+   "horas": 154,
+   "acertoExato": 27,
+   "acertoSolOuNao": 50,
+   "viesNuvens": 9,
+   "leitura": "previsão pessimista (mais nuvem que o real)"
   },
   "ultimos30dias": {
    "horas": 262,
@@ -2625,5 +2708,5 @@
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-16T19:48"
+ "atualizadoEm": "2026-11-17T05:59"
 }
