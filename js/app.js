@@ -139,7 +139,9 @@
     // "céu limpo" só se o céu inteiro (até a nuvem alta, fininha) estiver quase sem nuvem; senão é "sol com poucas nuvens"
     const limpo = !!janela && x.horas.filter((y) => y.h >= janela.ini && y.h <= janela.fim).every((y) => (y.tot ?? y.nuvens) < LIMPO_ATE);
     const janelaParcial = maiorSequencia(x.horas, (y) => y.est === "sol" || y.est === "parcial");
-    const pancada = dia.find((y) => y.chuva >= 50);
+    // v19.4: hoje, a pancada que já passou não entra mais na frase (às 11h o app ainda dizia "chance de pancada às 6h")
+    const hAg = x.data === diaHoje() ? +relogio.format(new Date()).slice(0, 2) : -1;
+    const pancada = dia.find((y) => y.chuva >= 50 && y.h >= hAg);
     const nucleo = x.horas.filter((y) => y.h >= 9 && y.h <= 16);
     const n = (e) => nucleo.filter((y) => y.est === e).length;
     // chuva só à tarde depois de uma manhã de sol: não é "dia de chuva", é sol entre nuvens com chuva depois (o meio-termo)
@@ -542,51 +544,73 @@
   // Medido: mormaço em Ipanema 15/11 13h20 = textura 14; sol vai e vem em Botafogo/Flamengo 14 e 15/11 = 25 a 32. Corte em 20.
   // (5 casos conferidos com foto/relato; o robô passa a anotar a textura para confirmar.)
   const SAT_LISO = 20;
+  // v19.4: NUVENS SOLTAS (cúmulos espalhados com muito azul entre elas). O brilho médio fica no meio (115–160), igual a um céu
+  // fechado de nuvem fina, mas a imagem é manchada e a maior parte do quadrado de ~9 km é azul. Fotos que separaram:
+  // 17/11 ~11h Leme e Copacabana, "mais céu aberto que nuvem": textura 49–60 e 42–49% do quadrado com nuvem;
+  // 14/11 à tarde Botafogo, "sol vai e vem": textura 31–36 e 59–79%; 11 e 12/11 Botafogo, fechado: textura 6–14 e 72–100%.
+  const SAT_SOLTAS_TEX = 40, SAT_SOLTAS_FRAC = 50;
+  // v19.4: BURACOS NA NUVEM. Brilho acima de 160 era sempre "Nublado", mas nuvem grossa com buracos de azul (o sol aparece e some)
+  // fica manchada e não cobre tudo. Fotos: 17/11 13h Leme, sol aparecendo entre nuvens = brilho 178–189, textura 34–38, 70–77%;
+  // 14/11 tarde Botafogo, vai e vem = textura 31–36, 59–79%. Fechado de verdade: textura 6–14 (11 e 12/11) ou 93–100% coberto (17/11 12h20–12h40).
+  const SAT_BURACOS_TEX = 30, SAT_BURACOS_FRAC = 80;
+  const nuvemComBuracos = (v, tex, frac) => v >= SAT_FECHADO && tex != null && frac != null && tex >= SAT_BURACOS_TEX && frac <= SAT_BURACOS_FRAC;
+  const nuvensSoltas = (v, tex, frac) => v >= SAT_GROSSA && v < SAT_FECHADO && tex != null && frac != null && tex >= SAT_SOLTAS_TEX && frac <= SAT_SOLTAS_FRAC;
   // v17.2: histórico do robô do satélite (data/satelite.json, uma leitura a cada 10 min) para as horas que JÁ PASSARAM hoje.
   // Antes, essas horas vinham só do aeroporto, que marca "BKN" (nuvens de 5 a 7 oitavos) como céu fechado mesmo com o sol
   // passando entre os cúmulos (14/11, Botafogo à tarde: aeroporto 90%, satélite e foto = sol vai e vem).
   let satHist = { leituras: {} };
   const satPassado = (p, data, hr) => {
-    const vs = [], ts = [];
+    const vs = [], ts = [], fs = [];
     for (let m = 0; m < 60; m += 10) {
       const k = `${data}T${pad(hr)}:${pad(m)}`, r = satHist.leituras && satHist.leituras[k]; if (!r || !r[p.id]) continue;
       const el = alturaSol(p.lat, p.lon, new Date(Date.parse(k + ":00-03:00"))); if (el < 15) continue;
       const f = Math.sqrt(Math.sin(el * Math.PI / 180));
-      vs.push(r[p.id][0] / f); if (r[p.id][2] != null) ts.push(r[p.id][2] / f);
+      vs.push(r[p.id][0] / f); if (r[p.id][2] != null) ts.push(r[p.id][2] / f); if (r[p.id][3] != null) fs.push(r[p.id][3]);
     }
     if (vs.length < 2) return null;
-    vs.sort((x, y) => x - y); ts.sort((x, y) => x - y);
-    return { b: vs[Math.floor(vs.length / 2)], tex: ts.length >= 2 ? ts[Math.floor(ts.length / 2)] : null };   // medianas da hora
+    vs.sort((x, y) => x - y); ts.sort((x, y) => x - y); fs.sort((x, y) => x - y);
+    return { b: vs[Math.floor(vs.length / 2)], tex: ts.length >= 2 ? ts[Math.floor(ts.length / 2)] : null, frac: fs.length >= 2 ? fs[Math.floor(fs.length / 2)] : null };   // medianas da hora
   };
   async function carregarSatelite() {
     try {
       const agora = Date.now(), Z = 7, n = 2 ** Z;
-      for (let atras = 30; atras <= 90; atras += 10) {
-        const t0 = new Date(Math.floor((agora - atras * 60000) / 600000) * 600000);
-        if (t0.getTime() <= satel.t) return;                          // já temos essa (ou mais nova)
-        const ts = t0.toISOString().slice(0, 19) + "Z", tiles = {}, novo = {}, tex = {};
+      // lê uma imagem do satélite (horário t0) e devolve o brilho de cada praia; dá erro se a imagem ainda não saiu
+      const lerImagem = async (t0) => {
+        const ts = t0.toISOString().slice(0, 19) + "Z", tiles = {}, novo = {}, tex = {}, frac = {};
         const tile = (x, y) => tiles[x + "/" + y] || (tiles[x + "/" + y] = new Promise((ok, erro) => {
           const img = new Image(); img.crossOrigin = "anonymous";
           img.onload = () => { const c = document.createElement("canvas"); c.width = c.height = 256; const g = c.getContext("2d", { willReadFrequently: true }); g.drawImage(img, 0, 0); ok(g.getImageData(0, 0, 256, 256).data); };
           img.onerror = erro; setTimeout(() => erro(new Error("imagem demorou")), 8000);
           img.src = `https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/GOES-East_ABI_Band2_Red_Visible_1km/default/${ts}/GoogleMapsCompatible_Level7/${Z}/${y}/${x}.png`;
         }));
-        try {
-          for (const p of PRAIAS) {
-            const el = alturaSol(p.lat, p.lon, t0); if (el < 15) return;   // sol baixo: a imagem fica escura demais
-            const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
-            const d = await tile(Math.floor(xf), Math.floor(yf)), px = Math.floor((xf % 1) * 256), py = Math.floor((yf % 1) * 256);
-            let soma = 0, q = 0;
-            for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = px + dx, Y = py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; soma += d[(Y * 256 + X) * 4]; q++; }
-            const b = soma / q; if (b < 5) throw new Error("imagem vazia");   // ainda não chegou
-            novo[p.id] = Math.round(b / Math.sqrt(Math.sin(el * Math.PI / 180)));
-            // textura: quanto o brilho varia num quadrado de ~9 km (desvio-padrão de 9×9 pixels)
-            let s1 = 0, s2 = 0, qt = 0;
-            for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const X = px + dx, Y = py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; const v = d[(Y * 256 + X) * 4]; s1 += v; s2 += v * v; qt++; }
-            tex[p.id] = Math.round(Math.sqrt(Math.max(0, s2 / qt - (s1 / qt) ** 2)) / Math.sqrt(Math.sin(el * Math.PI / 180)));
-          }
-          satel = { t: t0.getTime(), praias: novo, tex }; return;
-        } catch (e) { /* essa imagem ainda não está pronta: tenta 10 min antes */ }
+        for (const p of PRAIAS) {
+          const el = alturaSol(p.lat, p.lon, t0); if (el < 15) return null;   // sol baixo: a imagem fica escura demais
+          const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
+          const d = await tile(Math.floor(xf), Math.floor(yf)), px = Math.floor((xf % 1) * 256), py = Math.floor((yf % 1) * 256);
+          let soma = 0, q = 0;
+          for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = px + dx, Y = py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; soma += d[(Y * 256 + X) * 4]; q++; }
+          const b = soma / q; if (b < 5) throw new Error("imagem vazia");   // ainda não chegou
+          novo[p.id] = Math.round(b / Math.sqrt(Math.sin(el * Math.PI / 180)));
+          // textura: quanto o brilho varia num quadrado de ~9 km (desvio-padrão de 9×9 pixels)
+          let s1 = 0, s2 = 0, qt = 0;
+          for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const X = px + dx, Y = py + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; const v = d[(Y * 256 + X) * 4]; s1 += v; s2 += v * v; qt++; }
+          tex[p.id] = Math.round(Math.sqrt(Math.max(0, s2 / qt - (s1 / qt) ** 2)) / Math.sqrt(Math.sin(el * Math.PI / 180)));
+          let nv = 0;
+          for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const X = Math.min(255, Math.max(0, px + dx)), Y = Math.min(255, Math.max(0, py + dy)); if (d[(Y * 256 + X) * 4] / Math.sqrt(Math.sin(el * Math.PI / 180)) > 130) nv++; }
+          frac[p.id] = Math.round(100 * nv / 81);
+        }
+        return { praias: novo, tex, frac };
+      };
+      for (let atras = 20; atras <= 90; atras += 10) {
+        const t0 = new Date(Math.floor((agora - atras * 60000) / 600000) * 600000);
+        if (t0.getTime() <= satel.t) return;                          // já temos essa (ou mais nova)
+        let r; try { r = await lerImagem(t0); } catch (e) { continue; }   // essa imagem ainda não está pronta: tenta 10 min antes
+        if (!r) return;
+        // v19.4: pega a imagem mais nova que já saiu (começa 20 min atrás). Teste com 14 dias de satélite: a imagem de 30 min
+        // atrás acerta o céu de agora 78% das vezes, a de 40 min 75%. Prever a "tendência" com as imagens anteriores PIOROU
+        // (75% ou menos em todas as versões testadas): a nuvem do Rio não segue o mesmo ritmo por meia hora. Por isso não tem projeção.
+        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac };
+        return;
       }
     } catch (e) { console.warn("Satélite indisponível agora", e); }
   }
@@ -943,6 +967,9 @@
         const agora = +relogio.format(new Date()).slice(0, 2);
         for (let hr = agora; hr >= agora - 3; hr--) {
           const ob = obsEm(p, data, hr); if (!ob) continue;
+          // v19.4: se a imagem do satélite é mais nova que essa observação do aeroporto, quem manda é o satélite
+          // (17/11: o aeroporto das 9h dizia 90% e continuava "nublando" as 11h e 12h com o céu já aberto)
+          if (satel.t && Date.now() - satel.t <= 100 * 60000 && satel.t >= Date.parse(`${data}T${pad(hr)}:30:00-03:00`)) return null;
           const k = h.time.indexOf(`${data}T${pad(hr)}:00`); if (k < 0) return null;
           const fN = nuvemMedia[h.time[k]] ?? (h.cloud_cover[k] || 0), fT = nuvemTotal[h.time[k]] ?? (h.cloud_cover[k] || 0);
           return { agora, n: ob.nuvens - fN, tot: (ob.total ?? ob.nuvens) - fT, t: 0 };
@@ -1012,16 +1039,20 @@
           if (sp != null) {
             const vp = sp.b;
             if (vp >= SAT_GROSSA && vp < SAT_FECHADO && sp.tex != null && sp.tex < SAT_LISO) { morm[hr] = true; return "nublado"; }
+            if (nuvensSoltas(vp, sp.tex, sp.frac)) return "sol";
+            if (nuvemComBuracos(vp, sp.tex, sp.frac)) return "parcial";
             return vp <= SAT_SOL ? "sol" : vp >= SAT_FECHADO ? "nublado" : vp >= SAT_GROSSA ? "parcial" : est;
           }
         }
         const v = satel.praias[p.id]; if (d !== 0 || v == null || Date.now() - satel.t > 100 * 60000 || est === "chuva" || est === "noite") return est;
         const hImg = +relogio.format(new Date(satel.t)).slice(0, 2), hAgora = +relogio.format(new Date()).slice(0, 2);
         // nas 2 horas seguintes, se o satélite vê sol firme agora e a previsão só dá "vai e vem", mantém o sol (o céu muda devagar)
-        if (hr > hAgora && hr <= hAgora + 2) return v <= SAT_SOL && est === "parcial" ? "sol" : est;
+        if (hr > hAgora && hr <= hAgora + 2) return (v <= SAT_SOL || nuvensSoltas(v, satel.tex && satel.tex[p.id], satel.frac && satel.frac[p.id])) && est === "parcial" ? "sol" : est;
         if (hr !== hImg && hr !== hAgora) return est;
         const tx = satel.tex && satel.tex[p.id];
         if (v >= SAT_GROSSA && v < SAT_FECHADO && tx != null && tx < SAT_LISO) { morm[hr] = true; return "nublado"; }   // véu liso = mormaço
+        if (nuvensSoltas(v, tx, satel.frac && satel.frac[p.id])) return "sol";   // v19.4: nuvens soltas, mais azul que nuvem → sol com nuvens
+        if (nuvemComBuracos(v, tx, satel.frac && satel.frac[p.id])) return "parcial";   // v19.4: nuvem grossa com buracos → vai e vem
         return v <= SAT_SOL ? "sol" : v >= SAT_FECHADO ? "nublado" : v >= SAT_GROSSA ? (est === "nublado" ? "nublado" : "parcial") : est;
       };
       const raioRadar = (d, hr) => { const r = radar.praias[p.id]; return d === 0 && !!r && r.aqui === 3 && Date.now() - radar.t <= 40 * 60000 && hr === +relogio.format(new Date()).slice(0, 2); };

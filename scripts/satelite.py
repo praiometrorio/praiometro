@@ -37,6 +37,16 @@ def tile(t, x, y, cache={}):
     cache[k] = im
     return im
 
+def altura_sol(lat, lon, t):
+    """altura do sol (graus) — conta simples da NOAA, erro de poucos décimos de grau"""
+    jd = t.timestamp() / 86400 + 2440587.5; T = (jd - 2451545) / 36525
+    L0 = (280.46646 + T * 36000.76983) % 360; M = math.radians(357.52911 + T * 35999.05029); e = 0.016708634
+    lam = math.radians(L0 + math.sin(M) * 1.914602 + math.sin(2 * M) * 0.019993); eps = math.radians(23.439)
+    dec = math.asin(math.sin(eps) * math.sin(lam)); y = math.tan(eps / 2) ** 2; L0r = math.radians(L0)
+    eq = 4 * math.degrees(y * math.sin(2 * L0r) - 2 * e * math.sin(M) + 4 * e * y * math.sin(M) * math.cos(2 * L0r))
+    ha = math.radians((t.hour * 60 + t.minute + eq + 4 * lon) / 4 - 180); la = math.radians(lat)
+    return math.degrees(math.asin(math.sin(la) * math.sin(dec) + math.cos(la) * math.cos(dec) * math.cos(ha)))
+
 def brilho(im, px, py, r):
     """média do brilho (0-255) num quadrado de (2r+1) x (2r+1) pixels (~1,1 km cada)"""
     v = [im.getpixel((min(255, max(0, px + dx)), min(255, max(0, py + dy)))) for dy in range(-r, r + 1) for dx in range(-r, r + 1)]
@@ -66,7 +76,10 @@ for atras in range(30, 81, 10):
         # textura: desvio-padrão do brilho no quadrado de ~9 km. Liso = véu uniforme (mormaço); manchado = nuvens soltas
         vs = [im.getpixel((min(255, max(0, px + dx)), min(255, max(0, py + dy)))) for dy in range(-4, 5) for dx in range(-4, 5)]
         md = sum(vs) / len(vs); tex = round((sum((v - md) ** 2 for v in vs) / len(vs)) ** 0.5, 1)
-        lido[nome] = [b1, b4, tex]            # [brilho ~3 km, brilho ~9 km, textura ~9 km]
+        # v19.4: quanto do quadrado de ~9 km é nuvem (pixel com brilho corrigido acima de 130), em %
+        el = altura_sol(la, lo, t0); f = math.sqrt(math.sin(math.radians(el))) if el > 5 else None
+        frac = round(100 * sum(v / f > 130 for v in vs) / len(vs)) if f else None
+        lido[nome] = [b1, b4, tex, frac]      # [brilho ~3 km, brilho ~9 km, textura ~9 km, % do quadrado com nuvem]
     # INFRAVERMELHO (banda 13, ~2 km): mostra a temperatura do topo da nuvem (cinza = quente/baixa; colorido = topo muito frio/alto).
     # Fase de calibração: só anota a cor do pixel [R, G, B] em cada ponto, para depois aprendermos a separar cirro fino de nuvem
     # grossa e a ver o céu com o sol baixo (quando a imagem visível não serve). Se a imagem não existir, segue sem ela.
