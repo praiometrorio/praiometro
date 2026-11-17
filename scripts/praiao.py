@@ -156,6 +156,43 @@ def praias_boas(tempo, nuvens, data, nivel):
     boas.sort(reverse=True)
     return boas
 
+def conta_do_app(dias):
+    """v19.5: abre o PRÓPRIO app (os arquivos deste repositório) num navegador sem tela e pergunta a ele quais praias dão
+    praião / praia em cada dia. Assim o robô usa exatamente a mesma conta do céu que a pessoa vê no app (conta da luz,
+    regra do cirro, 9 modelos etc.). Devolve {data: (lista_praiao, lista_praia)} no formato de praias_boas, ou None se falhar."""
+    import threading, http.server, functools, socketserver
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as e:
+        print("navegador indisponível:", e); return None
+    raiz = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    socketserver.TCPServer.allow_reuse_address = True
+    srv = socketserver.TCPServer(("127.0.0.1", 0), functools.partial(http.server.SimpleHTTPRequestHandler, directory=raiz))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with sync_playwright() as pw:
+            nav = pw.chromium.launch()
+            pg = nav.new_context(locale="pt-BR", timezone_id=FUSO, viewport={"width": 390, "height": 844}).new_page()
+            pg.add_init_script("localStorage.setItem('pm-boasvindas','1');localStorage.setItem('skipgc','t');")
+            pg.goto(f"http://127.0.0.1:{srv.server_address[1]}/", wait_until="domcontentloaded")
+            pg.wait_for_function("window.pmPraiaoDetalhe && window.pmPraiaoDetalhe(1)", timeout=180000)
+            out = {}
+            for d in dias:
+                r = pg.evaluate(f"window.pmPraiaoDetalhe({d})")
+                if not r: continue
+                fama = lambda pid: FAMA.index(pid) if pid in FAMA else len(FAMA)
+                por = {q["id"]: q for q in r["todas"]}
+                top = sorted(((por[i]["firmes"], -round(por[i]["vento"]), -fama(i), por[i]["nome"], por[i]["tipoFirme"], por[i]["temp"]) for i in r["praiao"]), reverse=True)
+                boas = sorted(((por[i]["pontos"], -round(por[i]["vento"]), -fama(i), por[i]["nome"], por[i]["tipoPraia"], por[i]["temp"]) for i in r["praia"]), reverse=True)
+                out[r["data"]] = (top, boas)
+                print(f"conta do app para {r['data']}: {len(top)} praias de praião, {len(boas)} de praia")
+            nav.close()
+            return out
+    except Exception as e:
+        print("não consegui usar a conta do app:", e); return None
+    finally:
+        srv.shutdown()
+
 def tipo_do_dia(boas):
     """o tipo de praião que mais aparece entre as praias boas (empate: o melhor)"""
     ordem = ["todo", "manha", "tarde", "maior", "nuvens"]
@@ -206,15 +243,22 @@ def main():
     try: estado = json.load(open(caminho, encoding="utf-8"))
     except Exception: estado = {}
     estado = {k: v for k, v in estado.items() if k >= (hoje - datetime.timedelta(days=3)).isoformat()}   # limpa os velhos
-    tempo, nuvens = previsao()
     mudou = False
+    # v19.5: a decisão vem da conta do app; a conta em Python só fica de reserva se o navegador falhar
+    app = conta_do_app([1, 3]) or {}
+    reserva = {}
+    def boas_de(data, nivel):
+        if data in app: return app[data][0 if nivel == "praiao" else 1]
+        print(f"(usando a conta reserva em Python para {data})")
+        if not reserva: reserva["t"], reserva["n"] = previsao()
+        return praias_boas(reserva["t"], reserva["n"], data, nivel)
 
     # 1) véspera: PRAIÃO (dia raro) ou VAI DAR PRAIA (dia bom normal); se teve pré-aviso e piorou, avisa que mudou
     amanha = (hoje + datetime.timedelta(days=1)).isoformat()
     reg = estado.get(amanha, {})
     if not reg.get("vespera"):
-        top = praias_boas(tempo, nuvens, amanha, "praiao")
-        boas = praias_boas(tempo, nuvens, amanha, "praia")
+        top = boas_de(amanha, "praiao")
+        boas = boas_de(amanha, "praia")
         dia = DIAS[(hoje + datetime.timedelta(days=1)).weekday()]
         eh_praiao, eh_praia = len(top) >= 4, len(top) < 4 and len(boas) >= 4
         lista = top if eh_praiao else boas
@@ -241,7 +285,7 @@ def main():
     # 2) três dias antes: só PRAIÃO, e com mais praias (5+), para ter menos alarme falso
     alvo_d = hoje + datetime.timedelta(days=3); alvo = alvo_d.isoformat()
     if not estado.get(alvo, {}).get("pre"):
-        top = praias_boas(tempo, nuvens, alvo, "praiao")
+        top = boas_de(alvo, "praiao")
         dia = DIAS[alvo_d.weekday()]
         vespera = DIAS[(alvo_d - datetime.timedelta(days=1)).weekday()]
         if len(top) >= 5:

@@ -1621,6 +1621,22 @@
   const SOL_PRAIAO = { todo: "solzão o dia todo", manha: "solzão de manhã", tarde: "solzão à tarde", maior: "solzão na maior parte do dia" };
   const SOL_PRAIA = { todo: "sol na maior parte do dia", manha: "sol de manhã", tarde: "sol à tarde", nuvens: "sol vai e vem", maior: "sol na maior parte do dia" };
   const ehPraiao = (d) => praiaoDia(d).nivel === "praiao";
+  // v19.5: o robô do alerta (scripts/praiao.py) abre o próprio app num navegador e pergunta isto, em vez de fazer a conta
+  // de novo em Python. Antes os dois calculavam o céu de jeitos diferentes e discordavam (16/11: o app dizia "vai dar praia"
+  // para 17/11 e o robô gravou e avisou "praião").
+  window.pmPraiaoDetalhe = (d) => {
+    if (!previsao || !datas[d]) return null;
+    const mar = PRAIAS.filter((p) => !p.baia && previsao[p.id] && previsao[p.id][d]);
+    const um = (p) => { const x = previsao[p.id][d];
+      const chuvaSol = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && y.est === "sol").map((y) => y.chuva || 0));
+      const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
+      return { id: p.id, nome: p.nome, firmes: firmes(x), pontos: pontosPraia(x), vento: x.vento, temp: x.temp, chuvaSol, chuvaBoa,
+        tipoFirme: tipoFirme(x), tipoPraia: tipoPraiao(x) }; };
+    const todas = mar.map(um);
+    return { data: datas[d], todas,
+      praiao: todas.filter((q) => q.firmes >= 5 && q.vento <= 15 && q.chuvaSol < 20).map((q) => q.id),
+      praia: todas.filter((q) => q.pontos >= 5 && q.vento <= 15 && q.chuvaBoa < 40).map((q) => q.id) };
+  };
   function praiaoDia(d) {
     const mar = PRAIAS.filter((p) => !p.baia);
     const top = mar.filter((p) => { const x = previsao[p.id][d];
@@ -1989,14 +2005,20 @@
     });
 
     let pr = praiaoDia(estado.dia);
-    // HOJE: vale o que a previsão da véspera decidiu (o aeroporto mede o que já passou, não decide praião)
+    // HOJE: o aviso nasce da previsão da VÉSPERA (o mesmo que foi para as notificações) e nunca sobe no dia.
+    // v19.4: mas ele DESCE se o dia de hoje, com o que já aconteceu (aeroporto, satélite, pluviômetro) e a previsão
+    // das horas que faltam, não fecha mais a conta. Em 17/11 a véspera cravou praião e o dia teve chuva de manhã
+    // e nuvem na Zona Sul: o app seguia dizendo "Hoje tem PRAIÃO!" a tarde toda.
     if (estado.dia === 0) {
       const rec = alertas[datas[0]];
       if (rec && (rec.praiao || rec.praia)) {
         const nm = rec.praias || [];
         // registro antigo (antes de nov/2026) não tinha "praia": tipo "nuvens" era o praião fraco, hoje "vai dar praia"
         const nivel = rec.praiao && rec.tipo !== "nuvens" ? "praiao" : "praia";
-        pr = { n: nm.length, nivel, tipo: rec.tipo || "todo", temp: rec.temp, nomes: nm.slice(0, 3).join(", ") + (nm.length > 3 ? ` e mais ${nm.length - 3}` : "") };
+        const vivo = pr;   // a conta com os dados de agora
+        if (!vivo.n) pr = { n: 0 };
+        else if (nivel === "praiao" && vivo.nivel === "praia") pr = vivo;   // virou só "vai dar praia"
+        else pr = { n: nm.length, nivel, tipo: rec.tipo || "todo", temp: rec.temp, nomes: nm.slice(0, 3).join(", ") + (nm.length > 3 ? ` e mais ${nm.length - 3}` : "") };
       } else pr = { n: 0 };
     }
     const n = pr.n;
