@@ -20,7 +20,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700&family=Figtree:wght@400;500;600;700;800&display=swap">
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
-  <link rel="stylesheet" href="css/estilo.css?v=10.3">
+  <link rel="stylesheet" href="css/estilo.css?v=10.4">
 </head>
 <body>
 <script>
@@ -220,7 +220,7 @@
           </div>
         </div>
         <div id="relogioMapa"></div>
-        <div id="mapa" role="region" aria-label="Mapa das praias"></div>
+        <div class="mapa-cx"><div id="mapa" role="region" aria-label="Mapa das praias"></div><div class="mapa-carregando" id="mapaCarregando"><span><i></i><b>Carregando o mapa…</b></span></div></div>
         <div class="mapdica">Toque numa praia para ver o caminho do sol: <b class="t-nascer">nascer</b>, <b class="t-arco">sol na areia</b>, <b class="t-sombra">sombra</b> e <b class="t-por">pôr do sol</b>. Dê zoom para ver a sombra dos prédios, postos, banheiros <svg class="ic-txt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="5" r="1.800"/><path d="M8 9v6M5.500 20.500L8 15l2.500 5.500M5.500 11h5"/><circle cx="16.500" cy="5" r="1.800"/><path d="M16.500 9v11.500M14 12h5"/></svg> e chuveiros <svg class="ic-txt" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 21V7a4 4 0 0 1 8 0M10.500 9h7M12 13v1M14 13v3M16 13v1"/></svg>.</div>
       </section>
 
@@ -243,12 +243,12 @@
 <script src="js/metro.js?v=1"></script>
 <script src="js/servicos.js?v=1"></script>
 <script src="js/ceu.js?v=5"></script>
-<script src="js/app.js?v=18.6"></script>
+<script src="js/app.js?v=18.7"></script>
 <!-- Alerta de praião (OneSignal). Troque pelo App ID do OneSignal. -->
 <script>window.ONESIGNAL_APP_ID = "926ad029-3aa7-497b-b5bc-3da3a433c3a3";</script>
 <script src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js" defer></script>
 <script src="js/alerta.js?v=7"></script>
-<script src="js/lingua.js?v=33"></script>
+<script src="js/lingua.js?v=34"></script>
 <!-- Contador de visitas (GoatCounter: sem cookies, não guarda dados pessoais) -->
 <script>
   // separa quem abriu pelo app instalado na tela de início de quem abriu pelo navegador

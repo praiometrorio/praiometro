@@ -1709,7 +1709,11 @@
     mapa.addControl(new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true } }), "top-right");
     const nomes = () => { $("#mapa").classList.toggle("mostrar-nomes", mapa.getZoom() >= 12.4); $("#mapa").classList.toggle("mostrar-postos", mapa.getZoom() >= 13.3); $("#mapa").classList.toggle("mostrar-servicos", mapa.getZoom() >= 14.2); };
     mapa.on("zoom", nomes);
+    let quadro = 0; mapa.on("move", () => { if (!quadro) quadro = requestAnimationFrame(() => { quadro = 0; arrumarPinos(); }); });
+    const avisoMapa = $("#mapaCarregando");
+    setTimeout(() => { if (avisoMapa && !mapaPronto) avisoMapa.querySelector("b").textContent = "O mapa está demorando… verifique a internet"; }, 20000);
     mapa.on("load", () => {
+      if (avisoMapa) avisoMapa.hidden = true;
       nomes();
       const vazio = { type: "FeatureCollection", features: [] };
       mapa.addSource("sol-arco", { type: "geojson", data: vazio });
@@ -1765,6 +1769,26 @@
       pinos[p.id] = { el, mk };
     });
     if (linhas.length) desenhar();
+  }
+  // v18.7: nome em todas as praias, desde que não encoste em outro pino nem em outro nome (prioridade: a selecionada,
+  // depois as favoritas, depois a ordem da lista). As praias coladas na selecionada ficam esmaecidas, para o arco do sol não embolar.
+  function arrumarPinos() {
+    if (!mapa || !Object.keys(pinos).length) return;
+    const pts = {}; PRAIAS.forEach((p) => { pts[p.id] = mapa.project([p.lon, p.lat]); });
+    const sel = estado.sel, ps = pts[sel];
+    const ocupados = PRAIAS.map((p) => ({ x0: pts[p.id].x - 19, x1: pts[p.id].x + 19, y0: pts[p.id].y - 19, y1: pts[p.id].y + 19, id: p.id }));
+    const ordem = PRAIAS.slice().sort((a, b) => (b.id === sel) - (a.id === sel) || favoritas.includes(b.id) - favoritas.includes(a.id));
+    ordem.forEach((p) => {
+      const pin = pinos[p.id]; if (!pin) return;
+      const pt = pts[p.id], larg = p.nome.length * 7.2 + 22;
+      const r = { x0: pt.x + 20, x1: pt.x + 24 + larg, y0: pt.y - 13, y1: pt.y + 13, id: p.id };
+      const bate = ocupados.some((o) => o.id !== p.id && r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0);
+      const mostra = p.id === sel || !bate;
+      pin.el.classList.toggle("com-nome", mostra);
+      if (mostra) ocupados.push(r);
+      const d = ps ? Math.hypot(pt.x - ps.x, pt.y - ps.y) : 999;
+      pin.el.classList.toggle("perto", p.id !== sel && d < 62);
+    });
   }
   function irParaRegiao(r) {
     estado.regiao = r;
@@ -1864,6 +1888,7 @@
   let praiaDaAbertura = null, mexeuNaPraia = false, esperaPraia = null;
   function desenhar() {
     notaNoite();
+    requestAnimationFrame(arrumarPinos);
     document.querySelectorAll(".dia").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.d === estado.dia));
     linhas = PRAIAS.map((p) => { const x = previsao[p.id][estado.dia]; return { p, x, a: analisar(x, p) }; });
     const atual = praiaAtual();
@@ -1956,14 +1981,15 @@
       </div>`;
     }
 
+    // v18.7: a janela virou UMA linha pequena embaixo da frase do dia (antes era uma caixa grande).
     // v18.6: MELHOR JANELA do dia = o maior trecho seguido (2 h ou mais, das 7h às 18h) com sol, sem chuva e areia com sol.
     // 1ª tentativa: sol firme e vento fraco (até 15 km/h); 2ª: sol firme, mesmo com vento; 3ª: sol vai e vem. Hoje, só as horas que ainda vêm.
     const jan = (() => {
       const hs = x.horas.filter((y) => y.h >= 7 && y.h <= 17 && !(estado.dia === 0 && y.h < horaAgora));
       const base = (y) => (y.chuva || 0) < 30 && !(somb && somb.sombraHora[y.h]);
-      const niveis = [[(y) => y.est === "sol" && base(y) && (y.v == null || y.v <= 15), "Sol firme, sem chuva, vento fraco e areia com sol."],
-        [(y) => y.est === "sol" && base(y), "Sol firme e areia com sol, mas venta."],
-        [(y) => (y.est === "sol" || y.est === "parcial") && base(y), "Sol vai e vem, sem chuva e areia com sol."]];
+      const niveis = [[(y) => y.est === "sol" && base(y) && (y.v == null || y.v <= 15), "sol firme, vento fraco"],
+        [(y) => y.est === "sol" && base(y), "sol firme, mas venta"],
+        [(y) => (y.est === "sol" || y.est === "parcial") && base(y), "sem chuva, areia com sol"]];
       for (const [ok, txt] of niveis) {
         let m = null, ini = null;
         for (let h = 7; h <= 18; h++) { const y = hs.find((q) => q.h === h);
@@ -1973,7 +1999,7 @@
       return null;
     })();
     if (jan) for (let k = 0; k < horas.length; k++) { const hh = HORA_INI + k; if (hh >= jan.ini && hh < jan.fim) horas[k] = horas[k].replace('class="hr ', 'class="hr jan '); }
-    const faixa = `<div class="faixa-dia"><p class="veredito">${a.veredito}</p>${jan ? `<p class="janela"><b>Melhor janela: ${jan.ini}h às ${jan.fim}h</b><span>${jan.txt}</span></p>` : ""}</div>`;
+    const faixa = `<div class="faixa-dia"><p class="veredito">${a.veredito}</p>${jan ? `<p class="janela"><b>Melhor janela: ${jan.ini}h às ${jan.fim}h</b><span> · ${jan.txt}</span></p>` : ""}</div>`;
     return `${navFav}
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
@@ -2007,12 +2033,20 @@
     const agoraEl = document.querySelector("#horas .agora");
     if (agoraEl) $("#horas").scrollLeft = Math.max(0, agoraEl.offsetLeft - 8);
     // controle do horário do sol: fica junto do mapa (logo acima dele)
-    $("#relogioMapa").innerHTML = `
+    // v18.7: a régua do sol fica recolhida num botão; some à noite (hoje, depois do pôr do sol) e em dia sem sol nenhum
+    const semSol = (estado.dia === 0 && solJaSePos()) || !x.horas.some((y) => y.est === "sol" || y.est === "parcial");
+    if (semSol) estado.reguaAberta = false;
+    $("#relogioMapa").innerHTML = semSol ? "" : !estado.reguaAberta
+      ? `<button class="regua-abrir" id="reguaAbrir">${IC.sol}<span>Ver o sol andando no mapa</span><i aria-hidden="true">›</i></button>`
+      : `
         <div class="relogio">
+          <button class="regua-fechar" id="reguaFechar" aria-label="Fechar a régua do sol">×</button>
           <label for="minuto"><span>${IC.relogio.replace("<svg", '<svg width="18" height="18" style="vertical-align:-4px;margin-right:4px"')}Onde está o sol às <b id="minutoTxt">${textoMin(estado.minuto)}</b></span><span id="minutoSit"></span></label>
           <input type="range" id="minuto" min="${ini - (ini % 5)}" max="${fim}" step="5" value="${estado.minuto}">
           <small>Arraste para ver o sol andando no mapa</small>
         </div>`;
+    if ($("#reguaAbrir")) $("#reguaAbrir").onclick = () => { estado.reguaAberta = true; contar("abriu-regua-sol"); desenharCartao(l); };
+    if ($("#reguaFechar")) $("#reguaFechar").onclick = () => { estado.reguaAberta = false; desenharCartao(l); };
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
     document.querySelectorAll(".fn-chave button").forEach((b) => b.onclick = () => {
@@ -2030,7 +2064,7 @@
     // atalho "Trajeto do sol": abre a câmera na praia que está no cartão (só aparece se o aparelho tiver câmera e bússola)
     const sol = $("#abrirSol"), temCeu = !!(window.CEU && CEU.suportado());
     if (sol) { sol.hidden = !temCeu; $("#atalhos").classList.toggle("so3", !temCeu); sol.onclick = () => { contar("abriu-trajeto-sol"); CEU.abrir(p); }; }
-    $("#minuto").addEventListener("input", (e) => {
+    if ($("#minuto")) $("#minuto").addEventListener("input", (e) => {
       estado.minuto = +e.target.value;
       $("#minutoTxt").textContent = textoMin(estado.minuto);
       atualizarSituacao();
@@ -2426,12 +2460,17 @@
     if (surfeVerFav) return desenharFavSurfe();
     const hL = horaLista();
     const lista = PICOS().map((p) => { const x = previsao[p.id][surfeDia]; return { p, q: x.surfe && x.surfe.find((y) => y.h === hL) }; }).filter((r) => r.q);
+    // v18.7: primeiro onde tem onda (da maior para a menor); as praias de baía ficam no fim, separadas
+    lista.sort((a, b) => (!!a.p.baia - !!b.p.baia) || swP(b.q).a - swP(a.q).a);
+    const iBaia = lista.findIndex((r) => r.p.baia);
+    const noite = surfeDia === 1 && estado.abriuAmanha && solJaSePos();
+    const horaTxt = noite ? `Já escureceu. Mostrando <b>amanhã às ${hL}h</b>` : surfeDia === 0 ? (+relogio.format(new Date()).slice(0, 2) > HORA_FIM ? `Última hora de hoje (${hL}h)` : "Agora (" + hL + "h)") : "Às " + hL + "h";
     if (!lista.length) { $("#surfeLista").innerHTML = `<div class="fav-vazio"><b>Sem previsão de ondas agora</b><span>Tente de novo daqui a pouco.</span></div>`; return; }
     $("#surfeLista").innerHTML = `<button class="btn-fav-grande surf-fav-btn" id="abrirFavSurfe"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z" fill="currentColor"/></svg>
         <span>Meus picos favoritos</span>${favSurfe.length ? `<b>${favSurfe.length}</b>` : ""}<i aria-hidden="true">›</i></button>
-      <p class="surf-hora">${surfeDia === 0 ? "Agora (" + hL + "h)" : "Às " + hL + "h"} · toque no pico para ver hora a hora</p>` + lista.map(({ p, q }) => {
+      <p class="surf-hora">${horaTxt} · da maior onda para a menor · toque no pico para ver hora a hora</p>` + lista.map(({ p, q }, k) => {
       const s = swP(q), s2 = q.sw2, tv = tipoVento(q.v, q.vd, p.mar);
-      return `<button class="surf-card" data-id="${p.id}">
+      return `${k === iBaia ? '<p class="surf-sep">Baía · sem onda pra surfar</p>' : ""}<button class="surf-card${p.baia ? " baia" : ""}" data-id="${p.id}">
         <span class="sc-meio"><b>${favSurfe.includes(p.id) ? '<i class="fav" aria-label="favorito">★</i> ' : ""}${p.nome}</b>
           <span class="sc-l">${seta(s.d)}<b>${fmt1(s.a)} m</b> · ${int(s.p)} s · ${rumo(s.d)}</span>
           <span class="sc-l">${seta(q.vd)}${rumo(q.vd)} ${int(q.v)} km/h · <i class="vt ${tv.cls}">${tv.tipo}</i></span>
@@ -3542,6 +3581,35 @@
     $("#busca").value = ""; $("#buscaRes").hidden = true; $("#busca").blur();
     selecionar(id, true, modoFav);
   }
+  // v18.7: boas-vindas (uma única vez, para quem ainda não tem favoritas): escolher as praias numa lista com rolagem
+  function boasVindas() {
+    if (guarda.ler("pm-boasvindas") || favoritas.length || !linhas.length || document.querySelector(".bv")) return;
+    const REG = [["zs", "Zona Sul"], ["zo", "Zona Oeste"], ["nit", "Niterói"]];
+    const el = document.createElement("div");
+    el.className = "bv"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Escolha as suas praias");
+    // visual "azul da marca": topo azul com onda (como a tela inicial) e as praias em etiquetas, por região, numa área com rolagem
+    el.innerHTML = `<div class="bv-cx"><div class="bv-topo"><h2>Quais são as suas praias?</h2>
+        <svg viewBox="0 0 290 22" preserveAspectRatio="none" aria-hidden="true"><path d="M0 22V10c24-12 48-12 72 0s48 12 72 0 48-12 72 0 48 12 74 0v12z" fill="#fff"/></svg></div>
+      <div class="bv-corpo"><p>Toque nas que você frequenta.</p>
+      <div class="bv-lista">${REG.map(([r, nome]) => `<h3>${nome}</h3><div class="bv-chips">` + ORLA.map((id) => PRAIAS.find((p) => p.id === id)).filter((p) => p && p.regiao === r).reverse()
+        .map((p) => `<button data-id="${p.id}" aria-pressed="false">${p.nome}</button>`).join("") + "</div>").join("")}</div>
+      <button class="bv-ok" id="bvOk">Começar</button><button class="bv-pular" id="bvPular">Pular por enquanto</button></div></div>`;
+    document.body.appendChild(el); document.body.style.overflow = "hidden";
+    const escolhidas = () => [...el.querySelectorAll('.bv-lista button[aria-pressed="true"]')].map((b) => b.dataset.id);
+    el.querySelectorAll(".bv-lista button").forEach((b) => b.onclick = () => {
+      const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on);
+      const n = escolhidas().length; $("#bvOk").textContent = n ? `Começar com ${n} praia${n > 1 ? "s" : ""}` : "Começar";
+    });
+    const fechar = () => { guarda.gravar("pm-boasvindas", true); el.remove(); document.body.style.overflow = ""; };
+    $("#bvPular").onclick = () => { contar("boasvindas-pulou"); fechar(); };
+    $("#bvOk").onclick = () => {
+      const ids = escolhidas(); fechar();
+      if (!ids.length) { contar("boasvindas-pulou"); return; }
+      contar("boasvindas-escolheu");
+      favoritas = ids; guarda.gravar("pm-favoritas", favoritas); contarFavoritas();
+      abrirPraia(listaFavoritas()[0].p.id, ids.length > 1);
+    };
+  }
   function ligarBusca() {
     const inp = $("#busca"), res = $("#buscaRes");
     if (!inp) return;
@@ -3647,7 +3715,7 @@
 
   async function iniciar() {
     controles();
-    iniciarMapa().catch((e) => console.error("Mapa indisponível", e));
+    iniciarMapa().catch((e) => { console.error("Mapa indisponível", e); const av = $("#mapaCarregando"); if (av) { av.classList.add("falhou"); av.querySelector("b").textContent = "Mapa indisponível agora"; } });
     // abre NA HORA com a última previsão guardada no celular (se for de hoje); a internet atualiza logo depois, sem a tela ficar vazia
     let jaMostrou = false;
     try {
@@ -3676,6 +3744,7 @@
       desenhar();
       desenharBotaoTreino();
       if (/[?&]treino\b/.test(location.search)) abrirTreino();
+      else setTimeout(boasVindas, 900);
       avisoPrevisao(dados);
       if (dados.offline) ultimaBusca = Date.now() - (CACHE_MIN - 1) * 60000;    // sem internet: tenta de novo em 1 minuto
     } catch (e) {
@@ -3688,9 +3757,11 @@
 
   // atualização automática: a cada 10 minutos com o app aberto, e ao voltar para o app depois de 10 minutos fora
   let ultimaBusca = Date.now(), buscando = false;
-  // v18.4: a previsão dos modelos só é baixada de novo se tem 5 min ou mais (eles mudam de hora em hora; são ~3 MB).
+  // v18.4: a previsão dos modelos só é baixada de novo se já está velha (eles mudam de hora em hora; são ~3 MB).
+  // v18.7: de 5 para 30 min. Cada carga completa pesa ~200 "chamadas" na conta do Open-Meteo (21 praias x 9 modelos),
+  // e o limite grátis é 600 por minuto / 5.000 por hora / 10.000 por dia por endereço de internet.
   // O que muda de minuto a minuto (radar, satélite, pluviômetros, aeroportos) é sempre buscado.
-  const PREV_MIN = 5;
+  const PREV_MIN = 30;
   let atualizando = null;
   function atualizarPrevisao() {
     if (atualizando) return atualizando;
