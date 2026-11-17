@@ -170,20 +170,22 @@
     const horaJa = +relogio.format(new Date()).slice(0, 2);
     const agoraUv = x.hoje ? comUv.find((y) => y.h === horaJa) : null;
     const uvTxt = (pico ? `Pico ${picoUvTxt(x.horas)}` : `UV ${uv}`) + (agoraUv ? ` · agora UV ${Math.round(agoraUv.uv)}` : "");
-    if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: `${uvTxt} · evite o sol do meio-dia` });
-    else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de bronze", s: `${uvTxt} · protetor a cada 2h` });
-    else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: `${uvTxt} · passa protetor` });
-    else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: `${uvTxt} · queima mesmo nublado` });
+    // v18.6: textos curtos, que cabem inteiros no selo (o conselho completo está no relatório do selo e no gráfico do UV)
+    const uvS = (dica) => agoraUv ? uvTxt : `${uvTxt} · ${dica}`;
+    if (uv >= 11) selos.push({ cls: "bronze", ic: IC.gota, t: "UV extremo", s: uvS("evite o meio-dia") });
+    else if (uv >= 8) selos.push({ cls: "bronze", ic: IC.gota, t: "Dia de bronze", s: uvS("use protetor") });
+    else if (uv >= 3 && horasSol >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "Sol gostoso", s: uvS("use protetor") });
+    else if (uv >= 3) selos.push({ cls: "bronze", ic: IC.gota, t: "UV moderado", s: uvS("queima mesmo nublado") });
     else selos.push({ cls: "neutro", ic: IC.gota, t: "UV baixo", s: "Pouco risco de queimar" });
 
     // ondas a partir do 4º dia: avisa que a previsão do mar ainda pode mudar bastante
-    const incerta = datas.indexOf(x.data) >= 3 ? " · previsão incerta" : "";
+    const longe = datas.indexOf(x.data) >= 3, incerta = longe ? " · pode mudar" : "";
     if (p.baia) selos.push({ cls: "mar", ic: IC.calmo, t: "Mar de baía", s: o != null ? `Calminho, ondas de até ${fmt(o)} m` : "Calminho" });
     else if (o == null) selos.push({ cls: "neutro", ic: IC.onda, t: "Mar", s: "Sem dado do mar agora" });
     else if (o < 0.6) selos.push({ cls: "mar", ic: IC.calmo, t: "Piscininha", s: `Mar liso, ondas de ${fmt(o)} m` + incerta });
-    else if (o < 1.2) selos.push({ cls: "mar", ic: IC.onda, t: "Marolinha", s: `Ondas de ${fmt(o)} m, dá pra nadar` + incerta });
+    else if (o < 1.2) selos.push({ cls: "mar", ic: IC.onda, t: "Marolinha", s: longe ? `Ondas de ${fmt(o)} m · pode mudar` : `Ondas de ${fmt(o)} m, dá pra nadar` });
     else if (o < 2) selos.push({ cls: "mexido", ic: IC.onda, t: "Mar mexido", s: `Ondas de ${fmt(o)} m` + incerta });
-    else selos.push({ cls: "ruim", ic: IC.onda, t: "Mar pesado", s: `Ondas de ${fmt(o)} m, cuidado com a correnteza` + incerta });
+    else selos.push({ cls: "ruim", ic: IC.onda, t: "Mar pesado", s: longe ? `Ondas de ${fmt(o)} m · pode mudar` : `Ondas de ${fmt(o)} m · correnteza` });
 
     if (x.agua == null) selos.push({ cls: "neutro", ic: IC.termo, t: "Água", s: "Sem dado da temperatura" });
     else if (x.agua < 19) selos.push({ cls: "frio", ic: IC.termo, t: "Água gelada", s: `~${fmt(x.agua)}°C` });
@@ -202,13 +204,13 @@
     const ventoRef = picoV ? Math.max(picoV.v, agoraV ? agoraV.v : 0) : x.vento;
     const depois = picoV && agoraV && picoV.h > horaV + 1 && picoV.v - agoraV.v >= 5;
     const quandoV = depois ? ` às ${picoV.h}h` : "";
-    const subV = agoraV ? `Agora ${agoraV.v} km/h` + (depois ? ` · chega a ${picoV.v} às ${picoV.h}h` : "")
+    const subV = agoraV ? (depois ? `${agoraV.v} agora, ${picoV.v} km/h às ${picoV.h}h` : `Agora ${agoraV.v} km/h`)
       : picoV ? `Até ${picoV.v} km/h${picoV.h ? ` (${picoV.h}h)` : ""}` : `${x.vento} km/h`;
     // faixas de vento "de praia" (nov/2026): na areia, 16 km/h já é "ventando"; a rajada vira aviso à parte
     const fv = faixaVento(ventoRef);
     const rajRef = Math.max(0, ...(frente.length ? frente : comV).map((y) => y.raj || 0));
-    const avisoRaj = rajRef >= 35 ? `⚠️ rajadas fortes de até ${rajRef} km/h` : rajRef >= 25 ? `💨 rajadas de até ${rajRef} km/h` : fv.frase;
-    selos.push({ cls: ventoRef <= 15 ? "neutro" : ventoRef <= 22 ? "mexido" : "ruim", ic: IC.vento, t: depois && ventoRef > 15 ? `${fv.n}${quandoV}` : fv.n, s: `${subV} · ${avisoRaj}` });
+    const avisoRaj = rajRef >= 35 ? `rajada forte ${rajRef}` : rajRef >= 25 ? `rajada ${rajRef}` : depois ? "" : fv.frase;
+    selos.push({ cls: ventoRef <= 15 ? "neutro" : ventoRef <= 22 ? "mexido" : "ruim", ic: IC.vento, t: depois && ventoRef > 15 ? `${fv.n}${quandoV}` : fv.n, s: avisoRaj ? `${subV} · ${avisoRaj}` : subV });
 
     // água: o último boletim do INEA como ele é (própria ou imprópria), com a data
     const dataBol = x.aguaData ? x.aguaData.slice(8, 10) + "/" + x.aguaData.slice(5, 7) : null;
@@ -1627,7 +1629,23 @@
   }
   const cenaDia = (ceu, k, pct) => `<span class="cena-dia" aria-hidden="true">${CENA_DIA[ceu](k, pct)}</span>`;
 
+  // v18.6: depois que o sol de hoje se põe (pôr do sol + 20 min), o app abre em AMANHÃ, com um aviso. Se a pessoa escolher um dia, vale a escolha dela.
+  function solJaSePos() {
+    try { const x = previsao && previsao[PRAIAS[0].id] && previsao[PRAIAS[0].id][0]; if (!x || !x.porDoSol) return false;
+      return minutosDe(relogio.format(new Date())) >= minutosDe(x.porDoSol) + 20; } catch (e) { return false; }
+  }
+  function notaNoite() {
+    const n = $("#notaNoite"); if (!n) return;
+    const mostra = solJaSePos() && estado.dia === 1 && estado.abriuAmanha;
+    n.hidden = !mostra;
+    if (mostra) n.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 14.500A8 8 0 0 1 9.500 4a8 8 0 1 0 10.500 10.500z"/></svg><span>O sol de hoje já se pôs. Mostrando <b>amanhã</b>.</span>`;
+  }
+  function abrirNoDiaCerto() {
+    if (estado.diaEscolhido || estado.abriuAmanha || estado.dia !== 0 || datas.length < 2 || !solJaSePos()) return;
+    estado.dia = 1; estado.abriuAmanha = true;
+  }
   function desenharDias() {
+    abrirNoDiaCerto();
     $("#dias").innerHTML = datas.map((data, d) => {
       const dt = new Date(data + "T12:00:00");
       const nome = d === 0 ? "Hoje" : d === 1 ? "Amanhã" : SEMANA[dt.getDay()];
@@ -1636,7 +1654,7 @@
       const hsDia = (x.horas || []).filter((y) => y.h >= 9 && y.h <= 17), pct = hsDia.length ? hsDia.reduce((s, y) => s + y.nuvens, 0) / hsDia.length : 30;
       return `<button class="dia c-${ceu}" data-d="${d}" aria-pressed="${d === estado.dia}">${cenaDia(ceu, d, pct)}${icDia(a)}<span>${nome}</span><span class="dt">${x.temp}°</span>${ehPraiao(d) ? '<i class="pr" title="Dia de praião"></i>' : ""}</button>`;
     }).join("");
-    document.querySelectorAll(".dia").forEach((b) => b.onclick = () => { estado.dia = +b.dataset.d; estado.minuto = null; desenhar(); });
+    document.querySelectorAll(".dia").forEach((b) => b.onclick = () => { estado.dia = +b.dataset.d; estado.minuto = null; estado.diaEscolhido = true; notaNoite(); desenhar(); });
   }
 
   // ---------- mapa ----------
@@ -1722,11 +1740,13 @@
       new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(mapa);   // no lugar exato do posto (no calçadão)
     });
 
-    // banheiros e chuveiros (aparecem com o mapa bem perto)
+    // banheiros e chuveiros (aparecem com o mapa bem perto); v18.6: ícones do traço do app, no lugar dos emojis
+    const IC_BANHEIRO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="5" r="1.8"/><path d="M8 9v6M5.500 20.500L8 15l2.500 5.500M5.500 11h5"/><circle cx="16.500" cy="5" r="1.800"/><path d="M16.500 9v11.500M14 12h5"/></svg>';
+    const IC_CHUVEIRO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 21V7a4 4 0 0 1 8 0M10.500 9h7M12 13v1M14 13v3M16 13v1"/></svg>';
     (window.SERVICOS || []).forEach(([tipo, lat, lon, pago]) => {
       const el = document.createElement("div");
       el.className = "servico " + tipo;
-      el.textContent = tipo === "chuveiro" ? "🚿" : "🚻";
+      el.innerHTML = tipo === "chuveiro" ? IC_CHUVEIRO : IC_BANHEIRO;
       el.title = (tipo === "chuveiro" ? "Chuveiro" : "Banheiro") + (pago === "yes" ? " (pago)" : pago === "no" ? " (grátis)" : "");
       new maplibregl.Marker({ element: el }).setLngLat([lon, lat]).addTo(mapa);
     });
@@ -1843,6 +1863,7 @@
   // ---------- desenho ----------
   let praiaDaAbertura = null, mexeuNaPraia = false, esperaPraia = null;
   function desenhar() {
+    notaNoite();
     document.querySelectorAll(".dia").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.d === estado.dia));
     linhas = PRAIAS.map((p) => { const x = previsao[p.id][estado.dia]; return { p, x, a: analisar(x, p) }; });
     const atual = praiaAtual();
@@ -1921,27 +1942,39 @@
     const sq = seqNav(p.id), favs = sq.lista;
     const iFav = favs.findIndex((q) => q.p.id === p.id);
     let navFav = "";
-    if (iFav >= 0 && favs.length > 1 && sq.modo === "orla") {
+    // v18.6: a chave Favoritas / Orla fica NO MEIO da barra das setas (uma linha só). Só aparece com 2 ou mais favoritas.
+    const nFav = listaFavoritas().length, modoF = sq.modo === "fav";
+    const meio = nFav > 1
+      ? `<span class="fn-chave" role="group" aria-label="Passar entre"><button data-modo="fav" aria-pressed="${modoF}"${modoF ? ' aria-label="Ver a lista das favoritas"' : ""}>${IC.estrelaCheia}${modoF ? `${iFav + 1} de ${favs.length}` : "Favoritas"}</button><button data-modo="orla" aria-pressed="${!modoF}">Orla</button></span>`
+      : `<span class="fn-meio">${IC.onda}<b>Orla</b></span>`;
+    if (iFav >= 0 && favs.length > 1) {
       const ant = favs[(iFav - 1 + favs.length) % favs.length].p, prox = favs[(iFav + 1) % favs.length].p;
-      navFav = `<div class="fav-nav orla-nav" aria-label="Navegar pela orla">
-        <button class="fn-btn" data-ir="${ant.id}" aria-label="Praia anterior na orla: ${ant.nome}">‹<span>${ant.nome}</span></button>
-        <span class="fn-meio">${IC.onda}<b>Orla</b></span>
-        <button class="fn-btn dir" data-ir="${prox.id}" aria-label="Próxima praia na orla: ${prox.nome}"><span>${prox.nome}</span>›</button>
-      </div>`;
-    } else if (iFav >= 0 && favs.length > 1) {
-      const ant = favs[(iFav - 1 + favs.length) % favs.length].p, prox = favs[(iFav + 1) % favs.length].p;
-      navFav = `<div class="fav-nav" aria-label="Navegar entre as favoritas">
-        <button class="fn-btn" data-ir="${ant.id}" aria-label="Favorita anterior: ${ant.nome}">‹<span>${ant.nome}</span></button>
-        <span class="fn-meio">${IC.estrelaCheia}<b>${iFav + 1} de ${favs.length}</b><i>${favs.map((q, k) => `<em${k === iFav ? ' class="on"' : ""}></em>`).join("")}</i></span>
-        <button class="fn-btn dir" data-ir="${prox.id}" aria-label="Próxima favorita: ${prox.nome}"><span>${prox.nome}</span>›</button>
+      navFav = `<div class="fav-nav${modoF ? "" : " orla-nav"}" aria-label="${modoF ? "Navegar entre as favoritas" : "Navegar pela orla"}">
+        <button class="fn-btn" data-ir="${ant.id}" aria-label="Praia anterior: ${ant.nome}">‹<span>${ant.nome}</span></button>
+        ${meio}
+        <button class="fn-btn dir" data-ir="${prox.id}" aria-label="Próxima praia: ${prox.nome}"><span>${prox.nome}</span>›</button>
       </div>`;
     }
 
-    // v18.5: chave Favoritas / Orla toda (aparece com 2 ou mais favoritas): troca por onde o arrastar anda, e volta
-    const nFav = listaFavoritas().length;
-    const chave = nFav > 1 ? `<div class="modo-nav${sq.modo === "fav" ? " fav" : ""}" role="group" aria-label="Passar entre">
-        <button data-modo="fav" aria-pressed="${sq.modo === "fav"}">${IC.estrelaCheia}Favoritas</button><button data-modo="orla" aria-pressed="${sq.modo !== "fav"}">Orla toda</button></div>` : "";
-    return `${chave}${navFav}
+    // v18.6: MELHOR JANELA do dia = o maior trecho seguido (2 h ou mais, das 7h às 18h) com sol, sem chuva e areia com sol.
+    // 1ª tentativa: sol firme e vento fraco (até 15 km/h); 2ª: sol firme, mesmo com vento; 3ª: sol vai e vem. Hoje, só as horas que ainda vêm.
+    const jan = (() => {
+      const hs = x.horas.filter((y) => y.h >= 7 && y.h <= 17 && !(estado.dia === 0 && y.h < horaAgora));
+      const base = (y) => (y.chuva || 0) < 30 && !(somb && somb.sombraHora[y.h]);
+      const niveis = [[(y) => y.est === "sol" && base(y) && (y.v == null || y.v <= 15), "Sol firme, sem chuva, vento fraco e areia com sol."],
+        [(y) => y.est === "sol" && base(y), "Sol firme e areia com sol, mas venta."],
+        [(y) => (y.est === "sol" || y.est === "parcial") && base(y), "Sol vai e vem, sem chuva e areia com sol."]];
+      for (const [ok, txt] of niveis) {
+        let m = null, ini = null;
+        for (let h = 7; h <= 18; h++) { const y = hs.find((q) => q.h === h);
+          if (y && ok(y)) { if (ini == null) ini = h; } else { if (ini != null && (!m || h - ini > m.fim - m.ini)) m = { ini, fim: h }; ini = null; } }
+        if (m && m.fim - m.ini >= 2) return { ...m, txt };
+      }
+      return null;
+    })();
+    if (jan) for (let k = 0; k < horas.length; k++) { const hh = HORA_INI + k; if (hh >= jan.ini && hh < jan.fim) horas[k] = horas[k].replace('class="hr ', 'class="hr jan '); }
+    const faixa = `<div class="faixa-dia"><p class="veredito">${a.veredito}</p>${jan ? `<p class="janela"><b>Melhor janela: ${jan.ini}h às ${jan.fim}h</b><span>${jan.txt}</span></p>` : ""}</div>`;
+    return `${navFav}
       <div class="cena${c.escura ? " escura" : ""}">${c.svg}
         <div class="tit">${melhor && a.tom !== "ruim" ? `<span class="badge">Melhor praia ${nomeDia(estado.dia)}</span>` : ""}<h2>${p.nome}</h2><span class="local">${p.local}</span></div>
         <div class="acoes na-arte">
@@ -1949,9 +1982,9 @@
           <button id="compartilhar" aria-label="Compartilhar">${IC.compartilhar}<span>Compartilhar</span></button>
         </div>
       </div>
+      ${faixa}
       <div class="horario" id="horas" role="list" aria-label="Céu hora a hora">${horas.join("")}</div>
       <div class="corpo">
-        <p class="veredito">${a.veredito}</p>
         <div class="selos">${a.selos.map((s) => `<button class="selo ${s.cls}" data-k="${s.k}" aria-label="${s.t}. ${s.s}. Toque para ver o detalhe hora a hora">${s.ic}<b>${s.t}</b><span>${s.s}</span><i class="selo-mais" aria-hidden="true">›</i></button>`).join("")}</div>
         ${graficoUv(x)}
         ${graficoMare(x)}
@@ -1982,8 +2015,8 @@
         </div>`;
     $("#favoritar").onclick = () => { alternarFavorita(p.id); desenharCartao(l); desenharLista(); };
     document.querySelectorAll(".fav-nav .fn-btn").forEach((b) => b.onclick = () => deslizarFavorita(b.classList.contains("dir") ? 1 : -1, 0));
-    document.querySelectorAll(".modo-nav button").forEach((b) => b.onclick = () => {
-      if (b.getAttribute("aria-pressed") === "true") return;
+    document.querySelectorAll(".fn-chave button").forEach((b) => b.onclick = () => {
+      if (b.getAttribute("aria-pressed") === "true") { if (b.dataset.modo === "fav") abrirFavoritas(); return; }   // tocar no "★ 2 de 5" abre a lista das favoritas
       if (b.dataset.modo === "orla") { estado.modoFav = false; desenhar(); contar("chave-orla"); return; }
       contar("chave-favoritas");
       if (favoritas.includes(p.id)) { estado.modoFav = true; desenhar(); }
@@ -3536,7 +3569,8 @@
   function controles() {
     ligarBusca();
     contarFavoritas();
-    $("#abrirFav").onclick = abrirFavoritas;
+    if ($("#abrirFav")) $("#abrirFav").onclick = abrirFavoritas;
+    if ($("#abrirMapa")) $("#abrirMapa").onclick = () => { contar("abriu-mapa"); const m = document.querySelector(".mapcard"); if (m) m.scrollIntoView({ behavior: "smooth", block: "start" }); };
     $("#abrirSurfe").onclick = abrirSurfe;
     $("#abrirTreino").onclick = abrirTreino;
     $("#fecharTreino").onclick = fecharTreino;
