@@ -1,7 +1,7 @@
 {
  "_comoFunciona": "Gerado automaticamente a partir dos 'Dados Brutos - Balneabilidade' do INEA (enterococos). nota = 0 a 10 pelas últimas 10 análises de cada ponto (as mais recentes pesam mais). propria = regra CONAMA 274 nas últimas 5 análises: true se todos os pontos estão próprios, false se nenhum, null se parte.",
  "fonte": "https://www.inea.rj.gov.br/ar-agua-e-solo/balneabilidade-das-praias/",
- "atualizadoEm": "2026-11-16",
+ "atualizadoEm": "2026-11-17",
  "praias": {
   "flamengo": {
    "ok": 2,
@@ -162,6 +162,6 @@
  "portalINEA": {
   "url": "https://seirhi.inea.rj.gov.br/publico",
   "coletasAte": null,
-  "lidoEm": "2026-11-16"
+  "lidoEm": "2026-11-17"
  }
 }
