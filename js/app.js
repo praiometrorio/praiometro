@@ -1721,7 +1721,7 @@
       fitBoundsOptions: { padding: 30 },
       attributionControl: { compact: true },
       dragRotate: false,
-      pitchWithRotate: false
+      pitchWithRotate: false, touchPitch: false, maxPitch: 0
     });
     mapa.touchZoomRotate.disableRotation();
     mapa.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
@@ -1852,7 +1852,7 @@
     $("#mapaMini").hidden = true;
     document.body.classList.add("mapa-aberto");
     try { history.pushState({ mapa: 1 }, ""); } catch (e) {}
-    requestAnimationFrame(() => { if (mapa) mapa.resize(); arrumarPinos(); });
+    requestAnimationFrame(() => { if (mapa) { mapa.resize(); if (mapa.getPitch() || mapa.getBearing()) mapa.jumpTo({ pitch: 0, bearing: 0 }); } arrumarPinos(); });
   }
   function fecharMapaCheio(peloVoltar) {
     if (!mapaCheioAberto()) return;
@@ -2465,7 +2465,7 @@
     let estilo = ESTILO_URL;
     try { estilo = estiloPraiometro(await buscarJSON(ESTILO_URL)); } catch (e) { console.warn("Estilo padrão do mapa", e); }
     mapaSurfe = new maplibregl.Map({ container: "surfeMapa", style: estilo, bounds: (() => { const c = AREAS_SURFE.find((a) => a.id === areaSurfe).caixa; return [[c[0], c[1]], [c[2], c[3]]]; })(), fitBoundsOptions: { padding: 16 },
-      attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false });
+      attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0 });
     mapaSurfe.touchZoomRotate.disableRotation();
     mapaSurfe.on("load", () => { mapaSurfePronto = true; colocarSurfe(); });
     mapaSurfe.on("move", arrumarSurfe);
@@ -3265,7 +3265,7 @@
       }
       const c = GRADES_OND[gradeOnd].caixa;
       mapaOnd = new maplibregl.Map({ container: "ondMapa", style: estilo, bounds: [[c[0], c[1]], [c[2], c[3]]], fitBoundsOptions: { padding: 4 },
-        attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, maxZoom: GRADES_OND[gradeOnd].zMax, maxBounds: limitesOnd(gradeOnd), fadeDuration: 0 });
+        attributionControl: { compact: true }, dragRotate: false, pitchWithRotate: false, touchPitch: false, maxPitch: 0, maxZoom: GRADES_OND[gradeOnd].zMax, maxBounds: limitesOnd(gradeOnd), fadeDuration: 0 });
       mapaOnd.touchZoomRotate.disableRotation();
       mapaOnd.on("zoom", mostrarEtiquetas);
       mapaOnd.on("moveend", mostrarEtiquetas);
