@@ -1083,3 +1083,94 @@ div.servico svg{width:15px;height:15px}
 .pin.nome-esq .rot{left:auto;right:calc(100% + 5px)}
 .pin.nome-baixo .rot{left:50%;top:calc(100% + 4px);transform:translateX(-50%)}
 .pin.nome-cima .rot{left:50%;top:auto;bottom:calc(100% + 4px);transform:translateX(-50%)}
+
+/* ===== v19.0: MODO ESCURO (segue o ajuste do celular) =====
+   Escurece a tela principal: cartão da praia, horas, selos, blocos de informação, mapa (moldura) e lista.
+   A arte da praia, o mapa e as telas de Surfe/Treino (que já são coloridas) ficam como estão. */
+@media (prefers-color-scheme:dark){
+  :root{color-scheme:dark}
+  body{background:#071726}
+  .cartao,.mapcard,.lista{background:#0F2433;color:#E3EDF3;box-shadow:0 10px 30px rgba(0,0,0,.45)}
+  .corpo{color:#E3EDF3}
+  /* frase do dia e melhor janela */
+  .faixa-dia{background:#0F2433;border-bottom-color:#1D3A4E}
+  .faixa-dia .veredito{color:#F2F7FA}
+  .faixa-dia .janela b{color:#F2B84B}.faixa-dia .janela span{color:#9FB4C2}
+  /* barra de navegação do cartão */
+  .fav-nav{background:#2A2413;border-bottom-color:#3A3219}.fav-nav .fn-btn{color:#F2E7C4}.fav-nav .fn-btn:active{background:#3A3219}
+  .fav-nav.orla-nav{background:#12303F;border-bottom-color:#1D4253}.fav-nav.orla-nav .fn-btn{color:#D6ECF5}
+  .fav-nav .fn-chave button{background:#3A3219;color:#E6D199}
+  .fav-nav.orla-nav .fn-chave button{background:#1D4253;color:#A9D4E6}
+  .fav-nav .fn-chave button[aria-pressed="true"]{background:#F2F7FA;color:#10283A}
+  .fav-nav .fn-meio,.orla-nav .fn-meio{color:#A9D4E6}
+  /* horas */
+  .horario{background:#0F2433;border-bottom-color:#1D3A4E}
+  .hr{background:#16303F;color:#E3EDF3}.hr .hh{color:#9FB4C2}.hr b{color:#F2F7FA}.hr small{color:#7CC0E8}
+  .hr.sol{background:#3A2E12}.hr.sol svg{color:#FFC14D}
+  .hr.parcial{background:#2E2A1B}.hr.parcial svg{color:#E8B866}
+  .hr.nublado svg{color:#9FB0BC}
+  .hr.chuva{background:#16304A}.hr.chuva svg{color:#7CB3E8}
+  .hr.noite{background:#181F33}.hr.noite svg{color:#9AA8CC}
+  .hr.agora{outline-color:#F2F7FA}.hr.agora .hh{color:#F2F7FA}
+  .horario .hr.jan{box-shadow:inset 0 0 0 2px #F2A516}.horario .hr.jan.sel,.hr.sel{box-shadow:inset 0 0 0 2px #F2F7FA}
+  .hora-res{background:#0F2433;color:#E3EDF3}.hl{background:#16303F;color:#E3EDF3}.hl-d{color:#9FB4C2}
+  /* selos */
+  .selo.sol{background:#3A2E12;color:#FFDFA0}.selo.bronze{background:#3D2318;color:#FFC9AD}
+  .selo.mar{background:#0F3540;color:#B5E7F2}.selo.mexido{background:#17323F;color:#C4DCE8}
+  .selo.quente,.selo.ok{background:#12382C;color:#BFEBD3}.selo.frio{background:#182C47;color:#C4D7F2}
+  .selo.neutro{background:#1A2F3D;color:#D3E0E8}.selo.ruim{background:#451D18;color:#FFC7BF}
+  .selo .selo-mais{background:rgba(255,255,255,.12);color:#fff}
+  /* blocos de informação */
+  .info.sombra{background:#16303F;color:#D3E0E8}.info.por{background:#33250F;color:#FFDCB0}
+  .info.mare,.info.dica{background:#0F3540;color:#B5E7F2}.info.metro{background:#251F3D;color:#D9D1F5}
+  .por-linha{border-top-color:rgba(255,255,255,.14)}
+  .mare-g text{fill:#9CC7D6}.mare-g text.t-ag{fill:#F2F7FA}.mare-g text.m-alta{fill:#7CC0E8}
+  /* mapa (moldura) */
+  .maptop{border-bottom-color:#1D3A4E}.seg{background:#16303F}.seg button{color:#9FB4C2}.seg button[aria-pressed="true"]{background:#F2F7FA;color:#10283A}
+  .legenda{color:#9FB4C2}.mapdica{color:#9FB4C2;border-top-color:#1D3A4E}
+  .relogio{background:#2A2413;color:#F2E7C4}.regua-abrir{background:#3A2E12;color:#FFDFA0}.regua-fechar{color:#E6D199}
+  .ic-txt{color:#7CC0E8}
+  /* lista de praias */
+  .lista button{color:#E3EDF3}.lista button:hover{background:#16303F}.lista button[aria-current="true"]{background:#12303F}
+  .lista .nm span{color:#9FB4C2}.lista .hs{background:#16303F;color:#E3EDF3}.lista .mini i{background:#1A2F3D}
+  .lista h3,.lista h2{color:#F2F7FA}
+  .fav-nav .fn-chave button[aria-pressed="true"],.fav-nav.orla-nav .fn-chave button[aria-pressed="true"]{background:#F2F7FA;color:#10283A}
+  /* gráfico do UV (as cores vêm escritas no próprio bloco, por isso o !important) */
+  .info.uv{background:#33200F!important;color:#FFD9C2!important}.info.uv svg{fill:#E0BFA8}.info.uv svg text{fill:#F2E3D6}
+  .info.sombra .por-linha{border-color:rgba(255,255,255,.18)!important}
+  .nota-noite{background:rgba(255,255,255,.08)}
+}
+
+/* ===== v19.1: no celular o mapa abre em tela cheia pelo botão "Mapa" (saiu da página principal). No computador nada muda. ===== */
+.mapa-x,.mapa-mini{display:none}
+@media (max-width:900px){
+  .lado{position:fixed;inset:0;z-index:900;display:block;visibility:hidden;pointer-events:none}
+  body.mapa-aberto{overflow:hidden}
+  body.mapa-aberto .lado{visibility:visible;pointer-events:auto}
+  body.mapa-aberto .atalhos4{display:none}
+  .lado .mapcard{height:100%;border-radius:0;box-shadow:none;display:flex;flex-direction:column}
+  .maptop{flex:none;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px 8px;align-items:center;
+    padding:calc(10px + env(safe-area-inset-top)) 12px 8px}
+  .maptop .seg{min-width:0;justify-self:start}
+  .mapa-x{display:grid;place-items:center;width:42px;height:42px;border:0;border-radius:50%;background:var(--ink);color:#fff;cursor:pointer;box-shadow:0 3px 10px rgba(16,40,58,.3)}
+  .mapa-x svg{width:18px;height:18px}
+  .maptop .legenda{grid-column:1 / -1;flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;scrollbar-width:none;font-size:11.5px}
+  .maptop .legenda::-webkit-scrollbar{display:none}
+  .mapa-cx{order:1;flex:1;min-height:0}
+  #mapa{height:100%;min-height:0}
+  .mapa-mini{order:2;flex:none;display:block;padding:12px 16px 4px;border-top:1px solid var(--line)}
+  .mapa-mini[hidden]{display:none}
+  .mm-n{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+  .mm-n b{font-family:var(--f-display);font-size:18px;letter-spacing:-.02em}.mm-n span{font-size:12.5px;color:var(--muted);text-align:right}
+  .mm-v{margin:5px 0 0;font-weight:700;font-size:15px;line-height:1.3}
+  .mm-j{margin:2px 0 0;font-size:13px;color:var(--muted)}.mm-j b{color:#B86E00}
+  #mmVer{display:block;width:100%;margin-top:10px;border:0;border-radius:999px;background:var(--ink);color:#fff;font:700 14px var(--f-body);padding:11px;cursor:pointer}
+  #relogioMapa{order:3;flex:none;padding-bottom:env(safe-area-inset-bottom)}
+  #relogioMapa .relogio{border-bottom:0;border-top:1px solid var(--line)}
+  .mapdica{display:none}
+}
+@media (max-width:900px) and (prefers-color-scheme:dark){
+  .mapa-x{background:#F2F7FA;color:#10283A}.mapa-mini{border-top-color:#1D3A4E}.mm-n span,.mm-j{color:#9FB4C2}.mm-j b{color:#FFC65C}
+  #mmVer{background:#F2F7FA;color:#10283A}
+}
+#relogioMapa .relogio label{padding-right:28px}   /* v19.1: o texto da direita não fica mais embaixo do X de fechar */

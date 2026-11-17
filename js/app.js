@@ -377,7 +377,8 @@
   // ---------- estado ----------
   const estado = {
     dia: 0,
-    sel: "arpoador",           // praia aberta (começa sempre no Arpoador)
+    // praia aberta: a do link (praiometrorio.com.br/ipanema chega aqui como ?praia=ipanema) ou, sem link, o Arpoador
+    sel: (() => { try { const q = new URLSearchParams(location.search).get("praia"); return q && PRAIAS.some((p) => p.id === q) ? q : "arpoador"; } catch (e) { return "arpoador"; } })(),
     modoFav: false,            // true = aberta pela tela de favoritas (arrastar passa só entre as favoritas)
     regiao: matchMedia("(max-width:640px)").matches ? "zs" : "todas",
     minuto: null               // horário escolhido no controle do sol (minutos desde 0h)
@@ -1830,8 +1831,35 @@
     const p = PRAIAS.find((x) => x.id === id);
     if (voar && mapa) mapa.flyTo({ center: [p.lon, p.lat], zoom: Math.max(mapa.getZoom(), 13.4), duration: 900 });
     desenhar();
-    if (matchMedia("(max-width:900px)").matches) $("#cartao").scrollIntoView({ behavior: "smooth", block: "start" });
+    if (mapaCheioAberto()) { $("#mapaMini").hidden = false; atualizarMini(); contar("mapa-tocou-praia"); }
+    else if (matchMedia("(max-width:900px)").matches) $("#cartao").scrollIntoView({ behavior: "smooth", block: "start" });
   }
+  // v19.1: no celular o mapa saiu da página principal. Ele abre em tela cheia pelo botão "Mapa" e fecha no X (ou no voltar do celular).
+  // No computador (tela larga) nada muda: o mapa continua ao lado do cartão.
+  const mapaCheioAberto = () => document.body.classList.contains("mapa-aberto");
+  function atualizarMini() {
+    const mini = $("#mapaMini"); if (!mini || mini.hidden) return;
+    const p = PRAIAS.find((q) => q.id === estado.sel); if (!p) return;
+    const v = document.querySelector("#cartao .veredito"), j = document.querySelector("#cartao .janela");
+    $("#mmNome").textContent = p.nome; $("#mmLocal").textContent = p.local;
+    $("#mmVeredito").textContent = v ? v.textContent : "";
+    $("#mmJanela").innerHTML = j ? j.innerHTML : ""; $("#mmJanela").hidden = !j;
+  }
+  function abrirMapaCheio() {
+    contar("abriu-mapa");
+    if (!matchMedia("(max-width:900px)").matches) { const m = document.querySelector(".mapcard"); if (m) m.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (mapaCheioAberto()) return;
+    $("#mapaMini").hidden = true;
+    document.body.classList.add("mapa-aberto");
+    try { history.pushState({ mapa: 1 }, ""); } catch (e) {}
+    requestAnimationFrame(() => { if (mapa) mapa.resize(); arrumarPinos(); });
+  }
+  function fecharMapaCheio(peloVoltar) {
+    if (!mapaCheioAberto()) return;
+    document.body.classList.remove("mapa-aberto");
+    if (!peloVoltar) { try { if (history.state && history.state.mapa) history.back(); } catch (e) {} }
+  }
+  window.addEventListener("popstate", () => fecharMapaCheio(true));
 
   // ---------- relevo e sombra ----------
   let relevoSite = null;
@@ -1913,8 +1941,10 @@
   // ---------- desenho ----------
   let praiaDaAbertura = null, mexeuNaPraia = false, esperaPraia = null;
   function desenhar() {
+    if (window.pmFecharAbertura) window.pmFecharAbertura();
     notaNoite();
     requestAnimationFrame(arrumarPinos);
+    requestAnimationFrame(atualizarMini);
     document.querySelectorAll(".dia").forEach((b) => b.setAttribute("aria-pressed", +b.dataset.d === estado.dia));
     linhas = PRAIAS.map((p) => { const x = previsao[p.id][estado.dia]; return { p, x, a: analisar(x, p) }; });
     const atual = praiaAtual();
@@ -2191,13 +2221,20 @@
 
     if (!soAgora) {
       const feats = [];
-      let atual = null;
+      let atual = null, azAnt = null;
       for (let m = ini; m <= fim; m += 10) {
         const s = SOL.posicao(quando(x.data, m), p.lat, p.lon);
         const b = SOL.bloqueio(s, hz, p.predios);
         if (b === "noite") continue;
         const sombra = b !== null;
         const c = ponto(s.az, RAIO_SOL);
+        // v19.1: arco redondo. Perto do meio-dia o sol passa quase a pino e a direção dele gira até 30° em 10 minutos;
+        // ligar esses pontos com reta deixava o arco "quadrado". Agora o trecho é preenchido acompanhando o círculo, de 3° em 3°.
+        if (atual && azAnt !== null) {
+          const giro = ((s.az - azAnt + 540) % 360) - 180, n = Math.floor(Math.abs(giro) / 3);
+          for (let i = 1; i <= n; i++) atual.geometry.coordinates.push(ponto(azAnt + giro * i / (n + 1), RAIO_SOL));
+        }
+        azAnt = s.az;
         if (!atual || atual.properties.sombra !== sombra) {
           if (atual) atual.geometry.coordinates.push(c);
           atual = { type: "Feature", properties: { sombra }, geometry: { type: "LineString", coordinates: [c] } };
@@ -3570,7 +3607,7 @@
       const blob = await gerarImagem(l);
       const nome = `praiometro-${l.p.id}.png`;
       const arq = new File([blob], nome, { type: "image/png" });
-      const texto = `${l.p.nome} ${nomeDia(estado.dia)}: ${l.a.veredito} https://praiometrorio.com.br`;
+      const texto = `${l.p.nome} ${nomeDia(estado.dia)}: ${l.a.veredito} https://praiometrorio.com.br/${l.p.id}`;   // v19.0: link direto da praia
       if (navigator.canShare && navigator.canShare({ files: [arq] })) {
         await navigator.share({ files: [arq], text: texto, title: "Praiômetro" });
         contar("compartilhou");
@@ -3666,7 +3703,9 @@
     ligarBusca();
     contarFavoritas();
     if ($("#abrirFav")) $("#abrirFav").onclick = abrirFavoritas;
-    if ($("#abrirMapa")) $("#abrirMapa").onclick = () => { contar("abriu-mapa"); const m = document.querySelector(".mapcard"); if (m) m.scrollIntoView({ behavior: "smooth", block: "start" }); };
+    if ($("#abrirMapa")) $("#abrirMapa").onclick = abrirMapaCheio;
+    if ($("#fecharMapa")) $("#fecharMapa").onclick = () => fecharMapaCheio();
+    if ($("#mmVer")) $("#mmVer").onclick = () => { fecharMapaCheio(); setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 120); };   // espera o "voltar" do histórico terminar, senão ele desfaz a rolagem
     $("#abrirSurfe").onclick = abrirSurfe;
     $("#abrirTreino").onclick = abrirTreino;
     $("#fecharTreino").onclick = fecharTreino;
@@ -3778,6 +3817,7 @@
     } catch (e) {
       console.error(e);
       if (jaMostrou) return;   // já tem a previsão guardada na tela: não troca por mensagem de erro
+      if (window.pmFecharAbertura) window.pmFecharAbertura();
       $("#cartao").innerHTML = '<div class="aviso">Não consegui carregar a previsão agora. Verifique a internet e tente de novo.<br><button id="tentar">Tentar de novo</button></div>';
       $("#tentar").onclick = () => location.reload();
     }
