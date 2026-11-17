@@ -1,0 +1,37 @@
+# Robô da previsão (v18.8): a cada 30 min baixa do Open-Meteo a previsão que o app usa e publica num arquivo só
+# (ramo "dados" do repositório, arquivo previsao.json). Os celulares leem esse arquivo em vez de cada um ir ao Open-Meteo.
+# O ramo "dados" guarda SÓ a versão mais nova (sem histórico), para o repositório não inchar: o arquivo tem ~2 MB.
+# Se este robô parar, o app percebe que o arquivo ficou velho (3 h) e volta a buscar direto, sozinho.
+# O robô dos pluviômetros (chuva.yml), que roda no computador do Praiômetro, também publica este arquivo de dia, como reforço.
+name: Previsão (arquivo único)
+
+on:
+  schedule:
+    - cron: "11,41 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: previsao
+  cancel-in-progress: false
+
+jobs:
+  previsao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/previsao.py
+      - name: Publicar no ramo "dados" (só a versão mais nova)
+        run: |
+          git config user.name "robo-praiometro"
+          git config user.email "robo-praiometro@users.noreply.github.com"
+          blob=$(git hash-object -w saida/previsao.json)
+          tree=$(printf '100644 blob %s\tprevisao.json\n' "$blob" | git mktree)
+          commit=$(git commit-tree "$tree" -m "Previsão")
+          git push -f origin "$commit:refs/heads/dados"

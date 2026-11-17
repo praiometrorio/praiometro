@@ -1,36 +1,56 @@
-# Robô dos pluviômetros (Alerta Rio): a cada 15 minutos, das 5h às 19h, guarda a chuva medida no chão em data/chuva.json.
-# Roda no computador do Praiômetro (runner próprio, Windows), porque o site da Prefeitura só responde para máquinas no Brasil.
-# Com o computador desligado, o app segue só com o radar (não quebra nada).
+# Robô dos pluviômetros (Alerta Rio) + placar da chuva. Roda no computador do Praiômetro (runner próprio, Windows),
+# porque o site da Prefeitura só responde para máquinas no Brasil.
+# v18.3: o GitHub atrasa e PULA agendamentos curtos (o "a cada 15 min" rodou só 2 vezes em 16/11). Agora cada rodada
+# fica viva por até ~2h50, lendo os pluviômetros a cada 5 min e salvando a cada 15 min. O agendamento é de hora em hora:
+# enquanto uma rodada está viva, a próxima espera na fila e começa assim que ela termina, sem buraco.
+# Só trabalha das 5h às 20h. Com o computador desligado, o app segue só com o radar (não quebra nada).
 name: Pluviômetros (Alerta Rio)
 
 on:
   schedule:
-    - cron: "*/15 8-22 * * *"
+    - cron: "7 8-22 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
 
 concurrency:
-  group: chuva                # se várias rodadas acumularem (computador desligado), fica só a mais nova na fila
+  group: chuva
   cancel-in-progress: false
 
 jobs:
   chuva:
     runs-on: [self-hosted, Windows]
-    timeout-minutes: 10
+    timeout-minutes: 190
     env:
       PYTHONUTF8: "1"
     steps:
       - uses: actions/checkout@v4
-      - run: python scripts/chuva.py
-      - name: Salvar no site
+      - run: python -m pip install --quiet --disable-pip-version-check pillow
+      - name: Ler a cada 5 min e salvar a cada 15 min
         shell: bash
         run: |
           git config user.name "robo-praiometro"
           git config user.email "robo-praiometro@users.noreply.github.com"
-          git add data/chuva.json
-          git diff --cached --quiet && exit 0
-          git commit -m "Pluviômetros"
-          for i in 1 2 3 4; do git pull --rebase -X theirs && git push && exit 0; sleep 15; done
-          exit 1
+          for i in $(seq 0 33); do
+            python -c "import datetime as d; h=d.datetime.now(d.timezone(d.timedelta(hours=-3))).hour; raise SystemExit(0 if 5 <= h < 20 else 1)" || break
+            python scripts/chuva.py || true
+            if [ $((i % 3)) -eq 0 ]; then
+              python scripts/placar_chuva.py || true
+              git add data/chuva.json data/placar_chuva.json
+              if ! git diff --cached --quiet; then
+                git commit -q -m "Pluviômetros"
+                for t in 1 2 3 4; do git pull -q --rebase -X theirs && git push -q && break; sleep 15; done
+              fi
+            fi
+            # v18.8: a cada 30 min, publica também a previsão dos modelos no ramo "dados" (reforço do robô previsao.yml)
+            if [ $((i % 6)) -eq 0 ]; then
+              if python scripts/previsao.py; then
+                blob=$(git hash-object -w saida/previsao.json)
+                tree=$(printf '100644 blob %s\tprevisao.json\n' "$blob" | git mktree)
+                commit=$(git commit-tree "$tree" -m "Previsão")
+                git push -q -f origin "$commit:refs/heads/dados" || true
+              fi
+            fi
+            sleep 300
+          done
