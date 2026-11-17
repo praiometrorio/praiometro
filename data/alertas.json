@@ -37,5 +37,13 @@
     ],
     "temp": 27,
     "vespera": true
+  },
+  "2026-11-18": {
+    "praiao": false,
+    "praia": false,
+    "tipo": null,
+    "praias": [],
+    "ids": [],
+    "temp": null
   }
 }
