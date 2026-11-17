@@ -2610,9 +2610,89 @@
   },
   "2026-11-17": {
    "SBRJ": {
-    "previsto": null,
-    "visto": {},
-    "previstoAs": "05:59"
+    "previsto": {
+     "06": {
+      "nuvens": 37,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "07": {
+      "nuvens": 44,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "08": {
+      "nuvens": 52,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "09": {
+      "nuvens": 54,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "10": {
+      "nuvens": 51,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "11": {
+      "nuvens": 46,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "12": {
+      "nuvens": 43,
+      "chuva": 11,
+      "est": "parcial"
+     },
+     "13": {
+      "nuvens": 33,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "14": {
+      "nuvens": 40,
+      "chuva": 0,
+      "est": "parcial"
+     },
+     "15": {
+      "nuvens": 28,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "16": {
+      "nuvens": 32,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "17": {
+      "nuvens": 23,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "18": {
+      "nuvens": 24,
+      "chuva": 0,
+      "est": "sol"
+     },
+     "19": {
+      "nuvens": 22,
+      "chuva": 0,
+      "est": "sol"
+     }
+    },
+    "visto": {
+     "07": {
+      "nuvens": 95,
+      "est": "nublado"
+     },
+     "06": {
+      "nuvens": 95,
+      "est": "chuva"
+     }
+    },
+    "previstoAs": "07:02"
    },
    "SBJR": {
     "previsto": {
@@ -2694,19 +2774,19 @@
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 154,
-   "acertoExato": 27,
-   "acertoSolOuNao": 50,
-   "viesNuvens": 9,
+   "horas": 156,
+   "acertoExato": 26,
+   "acertoSolOuNao": 49,
+   "viesNuvens": 8,
    "leitura": "previsão pessimista (mais nuvem que o real)"
   },
   "ultimos30dias": {
-   "horas": 262,
+   "horas": 264,
    "acertoExato": 44,
-   "acertoSolOuNao": 68,
+   "acertoSolOuNao": 67,
    "viesNuvens": 1,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-17T05:59"
+ "atualizadoEm": "2026-11-17T07:02"
 }
