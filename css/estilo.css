@@ -1176,3 +1176,6 @@ div.servico svg{width:15px;height:15px}
   #mmVer{background:#F2F7FA;color:#10283A}
 }
 #relogioMapa .relogio label{padding-right:28px}   /* v19.1: o texto da direita não fica mais embaixo do X de fechar */
+
+/* v19.10: "Maintenant" (francês) não cabia no cartão da hora de agora */
+#horas .hh-ag{white-space:nowrap}

@@ -250,7 +250,9 @@
     // frase curta: o céu, a chuva e só o que for muito importante (o resto está nos selos)
     const fecho = tom === "bom" ? " Dia de praia raiz!" : "";
     const chuvaTxt = ceu !== "chuva" && !chuvaTarde && pancada ? `, com chance de pancada de chuva às ${pancada.h}h` : "";
-    const alerta = x.propria === false ? " Água imprópria hoje." : ventoRef > 30 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : ventoRef > 22 ? (depois ? ` Ventando muito a partir das ${picoV.h}h.` : " Ventando muito.") : "";
+    // v19.10: a água imprópria não entra mais na frase do dia (em Ipanema e outras é quase sempre, e o pessoal vai mesmo assim);
+    // ela continua no selo do INEA logo abaixo
+    const alerta = ventoRef > 30 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : ventoRef > 22 ? (depois ? ` Ventando muito a partir das ${picoV.h}h.` : " Ventando muito.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
     const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Sol vai e vem" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
@@ -989,13 +991,26 @@
   let arrToque = null;
   const arrMin = (svg, ev) => { const d = arrDados(svg), r = svg.getBoundingClientRect(); return d.ini + (ev.clientX - r.left) / r.width * (d.fim - d.ini); };
   const arrTodos = (svg, min) => { const c = svg.closest(".corpo") || svg.parentElement; c.querySelectorAll("svg.arrasta").forEach((s) => arrPor(s, min)); };
-  document.addEventListener("pointerdown", (ev) => { const svg = ev.target.closest && ev.target.closest("svg.arrasta"); if (!svg) return;
-    arrToque = { svg, x0: ev.clientX, y0: ev.clientY, mov: ev.pointerType === "mouse" }; if (arrToque.mov) arrTodos(svg, arrMin(svg, ev)); });
-  document.addEventListener("pointermove", (ev) => { const t = arrToque; if (!t) return;
-    if (!t.mov) { const dx = ev.clientX - t.x0, dy = ev.clientY - t.y0; if (Math.abs(dx) > 4 && Math.abs(dx) > Math.abs(dy)) { t.mov = true; try { t.svg.setPointerCapture(ev.pointerId); } catch (e) {} } else if (Math.abs(dy) > 6) { arrToque = null; return; } }
-    if (t.mov) arrTodos(t.svg, arrMin(t.svg, ev)); });
-  document.addEventListener("pointerup", (ev) => { const t = arrToque; arrToque = null; if (t && !t.mov && Math.abs(ev.clientX - t.x0) < 6 && Math.abs(ev.clientY - t.y0) < 6) arrTodos(t.svg, arrMin(t.svg, ev)); });
-  document.addEventListener("pointercancel", () => { arrToque = null; });
+  // v19.10: no dedo (touch), o gesto decide a direção nos primeiros pixels e trava: de lado mexe só a régua (a página não rola
+  // nem um pouco); para cima/baixo rola só a página (a régua não se mexe). Antes os dois brigavam e a régua "travava".
+  document.addEventListener("touchstart", (ev) => { const svg = ev.target.closest && ev.target.closest("svg.arrasta");
+    if (!svg || ev.touches.length !== 1) { arrToque = null; return; }
+    arrToque = { svg, x0: ev.touches[0].clientX, y0: ev.touches[0].clientY, modo: null }; }, { passive: true });
+  document.addEventListener("touchmove", (ev) => { const t = arrToque; if (!t) return;
+    const p = ev.touches[0], dx = p.clientX - t.x0, dy = p.clientY - t.y0;
+    if (!t.modo) { if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return; t.modo = Math.abs(dx) >= Math.abs(dy) ? "h" : "v"; }
+    if (t.modo !== "h") return;
+    if (ev.cancelable) ev.preventDefault();
+    arrTodos(t.svg, arrMin(t.svg, p)); }, { passive: false });
+  document.addEventListener("touchend", (ev) => { const t = arrToque; arrToque = null;
+    if (t && !t.modo && ev.changedTouches[0]) arrTodos(t.svg, arrMin(t.svg, ev.changedTouches[0])); });   // toque rápido: pula para ali
+  document.addEventListener("touchcancel", () => { arrToque = null; });
+  // no mouse (computador): segurar e arrastar
+  let arrMouse = null;
+  document.addEventListener("pointerdown", (ev) => { if (ev.pointerType !== "mouse") return; const svg = ev.target.closest && ev.target.closest("svg.arrasta"); if (!svg) return;
+    arrMouse = svg; arrTodos(svg, arrMin(svg, ev)); });
+  document.addEventListener("pointermove", (ev) => { if (arrMouse && ev.pointerType === "mouse") arrTodos(arrMouse, arrMin(arrMouse, ev)); });
+  document.addEventListener("pointerup", () => { arrMouse = null; });
 
   function textoMare(mares) {
     if (!mares || mares.length < 2) return null;
@@ -1703,6 +1718,10 @@
     return t >= 8 ? "todo" : m >= 4 && ta <= 1 ? "manha" : ta >= 3 && m <= 1 ? "tarde" : "maior"; };
   const SOL_PRAIAO = { todo: "solzão o dia todo", manha: "solzão de manhã", tarde: "solzão à tarde", maior: "solzão na maior parte do dia" };
   const SOL_PRAIA = { todo: "sol na maior parte do dia", manha: "sol de manhã", tarde: "sol à tarde", nuvens: "sol vai e vem", maior: "sol na maior parte do dia" };
+  // v19.10: PRAIÃO é dia de sol firme espalhado pela cidade, não só num canto. Além das 4+ praias com 5+ horas de sol firme,
+  // pelo menos 2 delas têm de ser da Zona Sul (onde vai a maior parte do pessoal). Em 17/11 a Zona Sul ficou nublada e só
+  // Barra + 3 de Niterói tinham sol firme à tarde: o app dizia "Hoje tem PRAIÃO!"; agora fica "Hoje vai dar praia".
+  const praiaoValido = (lista) => lista.length >= 4 && lista.filter((p) => (p.p || p).regiao === "zs").length >= 2;
   const ehPraiao = (d) => praiaoDia(d).nivel === "praiao";
   // v19.5: o robô do alerta (scripts/praiao.py) abre o próprio app num navegador e pergunta isto, em vez de fazer a conta
   // de novo em Python. Antes os dois calculavam o céu de jeitos diferentes e discordavam (16/11: o app dizia "vai dar praia"
@@ -1717,7 +1736,8 @@
         tipoFirme: tipoFirme(x), tipoPraia: tipoPraiao(x) }; };
     const todas = mar.map(um);
     return { data: datas[d], todas,
-      praiao: todas.filter((q) => q.firmes >= 5 && q.vento <= 15 && q.chuvaSol < 20).map((q) => q.id),
+      praiao: (() => { const t = todas.filter((q) => q.firmes >= 5 && q.vento <= 15 && q.chuvaSol < 20);
+        return praiaoValido(t.map((q) => PRAIAS.find((p) => p.id === q.id))) ? t.map((q) => q.id) : []; })(),
       praia: todas.filter((q) => q.pontos >= 5 && q.vento <= 15 && q.chuvaBoa < 40).map((q) => q.id) };
   };
   function praiaoDia(d) {
@@ -1728,7 +1748,7 @@
     const boas = mar.filter((p) => { const x = previsao[p.id][d]; // chuva: só nas horas boas (sol ou entre nuvens, 9h às 17h)
       const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
       return pontosPraia(x) >= 5 && x.vento <= 15 && chuvaBoa < 40; });
-    const nivel = top.length >= 4 ? "praiao" : boas.length >= 4 ? "praia" : null;
+    const nivel = praiaoValido(top) ? "praiao" : boas.length >= 4 ? "praia" : null;
     if (!nivel) return { n: 0 };
     const lista = nivel === "praiao" ? top : boas, tp = nivel === "praiao" ? tipoFirme : tipoPraiao;
     const conta = {}; lista.forEach((p) => { const t = tp(previsao[p.id][d]); conta[t] = (conta[t] || 0) + 1; });
@@ -2152,7 +2172,7 @@
       if (!y) continue;
       const passou = estado.dia === 0 && horaAgora <= HORA_FIM && h < horaAgora; // à noite mostra o dia inteiro normal
       horas.push(`<div class="hr ${y.est}${passou ? " passou" : ""}${estado.dia === 0 && h === horaAgora ? " agora" : ""}${somb && somb.sombraHora[h] ? " sombra" : ""}" data-h="${h}" title="${h}h: ${y.raio ? "Tempestade" : icHora(y) === IC.poucas ? "Sol com nuvens" : NOME_EST[y.est]}">
-        <span class="hh">${estado.dia === 0 && h === horaAgora ? "Agora" : h + "h"}</span>${icHora(y)}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
+        <span class="hh${estado.dia === 0 && h === horaAgora ? " hh-ag" : ""}">${estado.dia === 0 && h === horaAgora ? "Agora\u200B" : h + "h"}</span>${icHora(y)}<b>${y.t}°</b><small>${y.chuva >= 30 ? y.chuva + "%" : "&nbsp;"}</small></div>`);
     }
 
     // passar para o lado entre as favoritas (só quando a praia aberta é uma favorita e há 2 ou mais)
@@ -4059,7 +4079,7 @@
     };
     document.addEventListener("touchstart", (e) => {
       if (ocupado || e.touches.length !== 1 || window.scrollY > 0 || telaAberta()) { y0 = null; return; }
-      if (e.target.closest(".maplibregl-map, input")) { y0 = null; return; }
+      if (e.target.closest(".maplibregl-map, input, .arrasta")) { y0 = null; return; }
       y0 = e.touches[0].clientY; x0 = e.touches[0].clientX; puxando = false; dist = 0;
     }, { passive: true });
     document.addEventListener("touchmove", (e) => {

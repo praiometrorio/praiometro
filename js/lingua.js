@@ -321,7 +321,15 @@
     ["Nenhum pico favorito ainda", "No favorite spots yet", "Aún no hay picos favoritos", "Aucun spot favori pour l'instant"],
     ["Agora (#h)", "Now (#h)", "Ahora (#h)", "Maintenant (#h)"], ["toque no pico para ver hora a hora", "tap a spot to see hour by hour", "toca el pico para ver hora a hora", "touchez un spot pour voir heure par heure"],
     ["· toque no pico para ver hora a hora", "· tap a spot to see hour by hour", "· toca el pico para ver hora a hora", "· touchez un spot pour voir heure par heure"],
-    ["Agora", "Now", "Ahora", "Maintenant"], ["AGORA", "NOW", "AHORA", "MAINTENANT"], ["Condições ›", "Conditions ›", "Condiciones ›", "Conditions ›"],
+    ["Agora", "Now", "Ahora", "Maintenant"], ["Agora\u200B", "Now", "Ahora", "Maint."],   // só no cartão da hora (espaço estreito), como no app de clima do iPhone ["agora", "now", "ahora", "maintenant"],
+    ["Subindo", "Rising", "Subiendo", "Montante"], ["Baixando", "Falling", "Bajando", "Descendante"],
+    ["falta # h # min", "# h # min to go", "faltan # h # min", "dans # h # min"], ["falta # min", "# min to go", "faltan # min", "dans # min"],
+    ["horários aprox.", "approx. times", "horarios aprox.", "horaires approx."],
+    ["solzão o dia todo", "full sun all day", "solazo todo el día", "grand soleil toute la journée"], ["solzão de manhã", "full sun in the morning", "solazo por la mañana", "grand soleil le matin"],
+    ["solzão à tarde", "full sun in the afternoon", "solazo por la tarde", "grand soleil l'après-midi"], ["solzão na maior parte do dia", "full sun most of the day", "solazo casi todo el día", "grand soleil presque toute la journée"],
+    ["sol na maior parte do dia", "sun most of the day", "sol casi todo el día", "soleil presque toute la journée"], ["sol de manhã", "sun in the morning", "sol por la mañana", "soleil le matin"],
+    ["sol à tarde", "sun in the afternoon", "sol por la tarde", "soleil l'après-midi"], ["sol", "sun", "sol", "soleil"], ["solzão", "full sun", "solazo", "grand soleil"],
+    ["#° e vento fraco", "#° and light wind", "#° y poco viento", "#° et vent faible"], ["AGORA", "NOW", "AHORA", "MAINTENANT"], ["Condições ›", "Conditions ›", "Condiciones ›", "Conditions ›"],
     ["arraste a linha amarela", "drag the yellow line", "arrastra la línea amarilla", "faites glisser la ligne jaune"],
     // ---- água e balneabilidade
     ["Temperatura da água", "Water temperature", "Temperatura del agua", "Température de l'eau"],
@@ -548,6 +556,8 @@
     // "Por causa de X e Y" e "X e Y": traduz cada lado
     const pc = base.match(/^Por causa de (.+)$/);
     if (pc) { const r2 = traduzE(pc[1]); if (r2 != null) return { en: "Because of ", es: "Por ", fr: "À cause de " }[lingua] + r2 + fim; }
+    const em = base.match(/^(.+) e mais (\d+)$/);   // "Recreio e mais 5": nome da praia fica, "e mais 5" é traduzido
+    if (em) return em[1] + { en: " and " + em[2] + " more", es: " y " + em[2] + " más", fr: " et " + em[2] + " autres" }[lingua] + fim;
     if (/ e /.test(base)) { const r3 = traduzE(base); if (r3 != null) return r3 + fim; }
     // "Seg 6h", "Amanhã 7h": traduz a palavra e mantém o horário
     const ph = / · /.test(base) ? null : base.match(/^(\S+) (\d+h.*)$/);   // com " · " no meio, cada pedaço é traduzido separado
