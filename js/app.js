@@ -1502,14 +1502,13 @@
   }
   function abrirTreino() {
     contar("abriu-treino");
-    // v19.10: com treino salvo, abre direto no detalhe do próximo treino (antes abria a lista e precisava de mais um toque).
-    // A lista "Meus treinos" continua na seta de voltar. Exceção: se tem treino de hoje esperando a avaliação, abre a lista.
+    // v19.10: a lista "Meus treinos" continua na seta de voltar. Se tem treino de hoje esperando a avaliação, abre a lista.
     const agora = horaAgora(), hojeData = datas[0], hojeSem = diaSemana(hojeData);
+    // um treino só: abre direto no detalhe; dois ou mais: abre na lista "Meus treinos" (tocando, vai pro detalhe)
     const pendFb = treinos.some((t) => t.dias.includes(hojeSem) && agora.h >= t.hora + 1 && t.criado !== hojeData && !guarda.ler(`pm-fb-${hojeData}-${t.id}`));
-    const prox = treinos.map((t) => ({ t, s: proximaSessao(t) })).filter((z) => z.s).sort((a, b2) => a.s.d - b2.s.d || a.t.hora - b2.t.hora)[0];
     trTela = !treinos.length ? { modo: "escolher", id: null, rascunho: null }
-      : pendFb ? { modo: "lista", id: null, rascunho: null }
-      : { modo: "detalhe", id: (prox ? prox.t : treinos[0]).id, rascunho: null };
+      : treinos.length === 1 && !pendFb ? { modo: "detalhe", id: treinos[0].id, rascunho: null }
+      : { modo: "lista", id: null, rascunho: null };
     desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden";
   }
   function fecharTreino() { $("#treinoTela").hidden = true; document.body.style.overflow = ""; desenharBotaoTreino(); }
@@ -1521,7 +1520,7 @@
     return `<div class="tr-faixa${mini ? " mini" : ""}">${(x.cedo || []).filter((y) => y.h >= 5 && y.h <= 10).map((y) => { const nt = notaTreino(y, t.esp);
       const v = corrida ? Math.round(y.t) + "°" : nada ? (y.o != null ? fmt1(y.o) : "–") : (y.v ?? "–");
       const u = corrida ? (y.chuva >= 30 ? y.chuva + "% 🌧" : "") : nada ? "m" : "km/h";
-      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${v}</span>${mini ? "" : `<span class="u">${u}</span>`}</div>`; }).join("")}</div>`;
+      return `<div class="tr-h ${cls[nt.n]}${y.h === t.hora ? " meu" : ""}"><span class="hr">${y.h}h</span><span class="v">${v}</span>${mini ? (corrida ? "" : `<span class="u">${u}</span>`) : `<span class="u">${u}</span>`}</div>`; }).join("")}</div>`;   // v19.10: a lista também mostra a unidade (km/h, m)
   }
   const CEU_TREINO = '<span class="tr-disco"></span><span class="tr-mar"></span><span class="tr-reflexo"></span>';
   const NOTA_RODAPE = '<p class="tr-nota">* Os limites de vento são estimativas e estão sujeitos a mudanças. Contamos também com o seu feedback para melhorar cada vez mais a nossa precisão.</p>';
@@ -1669,7 +1668,7 @@
         return `<button class="tr-card tr-item" data-abrir="${t.id}">
           <div class="tr-item-topo"><span class="tr-item-ic">${E.ic}</span><div><b>${E.nome}</b><small>${textoDias(t.dias)} · ${t.hora}h · ${nomePraia(t.praia)}${t.esp === "corrida" ? " · " + (t.piso === "areia" ? "areia" : "orla") : ""}</small></div>
             ${s ? `<span class="tr-selo n${s.nota.n}">${NOTA_CURTA[s.nota.n]}</span>` : ""}</div>
-          ${s ? `<p class="tr-item-quando">${nomeDiaTreino(s.d)}, ${t.hora}h${s.nota.n ? " · " + s.nota.motivos.join(" e ") : ""}</p>${faixaTreino(t, s.x, true)}` : '<p class="tr-item-quando">Sem previsão nos próximos dias</p>'}
+          ${s ? `<p class="tr-item-quando">${nomeDiaTreino(s.d)}, ${t.hora}h${s.nota.n ? " · " + s.nota.motivos.join(" e ") : ""} <span class="tr-oque">${t.esp === "corrida" ? "temperatura" : t.esp === "natacao" ? "ondas" : "vento"}</span></p>${faixaTreino(t, s.x, true)}` : '<p class="tr-item-quando">Sem previsão nos próximos dias</p>'}
         </button>`; }).join("")}
       <div class="tr-add-linha">
         ${treinos.length < MAX_TREINOS ? '<button class="tr-add" id="trAdd">+ Adicionar treino da semana</button>' : ""}
