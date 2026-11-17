@@ -1502,7 +1502,14 @@
   }
   function abrirTreino() {
     contar("abriu-treino");
-    trTela = { modo: treinos.length ? "lista" : "escolher", id: null, rascunho: null };
+    // v19.10: com treino salvo, abre direto no detalhe do próximo treino (antes abria a lista e precisava de mais um toque).
+    // A lista "Meus treinos" continua na seta de voltar. Exceção: se tem treino de hoje esperando a avaliação, abre a lista.
+    const agora = horaAgora(), hojeData = datas[0], hojeSem = diaSemana(hojeData);
+    const pendFb = treinos.some((t) => t.dias.includes(hojeSem) && agora.h >= t.hora + 1 && t.criado !== hojeData && !guarda.ler(`pm-fb-${hojeData}-${t.id}`));
+    const prox = treinos.map((t) => ({ t, s: proximaSessao(t) })).filter((z) => z.s).sort((a, b2) => a.s.d - b2.s.d || a.t.hora - b2.t.hora)[0];
+    trTela = !treinos.length ? { modo: "escolher", id: null, rascunho: null }
+      : pendFb ? { modo: "lista", id: null, rascunho: null }
+      : { modo: "detalhe", id: (prox ? prox.t : treinos[0]).id, rascunho: null };
     desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden";
   }
   function fecharTreino() { $("#treinoTela").hidden = true; document.body.style.overflow = ""; desenharBotaoTreino(); }
@@ -1636,7 +1643,14 @@
         ${av ? `<button class="tr-editar" id="trEditar">Mudar dia, horário ou praia</button>
                ${treinos.length < MAX_TREINOS ? `<button class="tr-editar claro" id="trVirarFixo">Faço toda ${SEMANA_CURTA[diaSemana(datas[av.d]) - 1].toLowerCase()}: salvar como treino da semana</button>` : ""}`
              : '<button class="tr-editar" id="trEditar">Editar dias, horário e praia</button>'}
+        ${!av && !avisoTreino ? `<div class="tr-card tr-aviso">
+          <p class="tr-rot">🔔 Aviso na véspera, às 20h30</p>
+          <p class="tr-aviso-txt">Na noite anterior a cada treino, a gente avisa como vai estar no seu horário.</p>
+          <button class="tr-ligar" id="trLigar">Ligar aviso</button>
+          <p class="tr-aviso-msg" id="trAvisoMsg"></p>
+        </div>` : ""}
         ${NOTA_RODAPE}`;
+      const lg = $("#trLigar"); if (lg) lg.onclick = () => ligarAvisoTreino(() => desenharTreino());   // v19.10: ligar o aviso direto daqui
       $("#trEditar").onclick = () => irTreino("form", { rascunho: av ? { ...av } : { ...t, dias: t.dias.slice() } });
       const vf = $("#trVirarFixo");
       if (vf) vf.onclick = () => irTreino("form", { rascunho: { ...av, tipo: "fixo", dias: [diaSemana(datas[av.d])] } });
