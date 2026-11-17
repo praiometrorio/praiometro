@@ -420,6 +420,7 @@
   // leitura do pluviômetro da praia, se for recente (até 25 min). null = sem estação perto ou leitura velha.
   const pluvEm = (p) => { const g = pluv.praias[p.id]; return g && Date.now() - g.t <= 25 * 60000 ? g : null; };
   window.pmPluv = () => pluv;
+  window.pmFonte = () => { const c = guarda.ler(CACHE_CHAVE) || {}; return c.robo ? "robô, gerado às " + hm(new Date(c.robo)) : "direto do Open-Meteo"; };
   // v18.3: chuva MEDIDA numa hora que já fechou (mm), no pluviômetro da praia (até 3 km). null = sem dado.
   // É o que manda nas horas que já passaram: aeroporto marcando chuva (às vezes garoa só lá) não vale se o pluviômetro ficou seco.
   const pluvHora = (p, data, hr) => { const g = pluv.praias[p.id], H = pluv.horas[`${data}T${pad(hr)}`];
@@ -675,12 +676,29 @@
     if (!r.ok) throw new Error("HTTP " + r.status);
     return r.json();
   }
+  // v18.8: a previsão dos modelos vem de UM arquivo que o robô (scripts/previsao.py) baixa do Open-Meteo e publica a cada 30 min,
+  // em vez de cada celular pedir ao Open-Meteo (que limita os pedidos por endereço de internet). O arquivo só vale se:
+  // tem menos de 3 h, é do dia de hoje e foi pedido com os MESMOS endereços que este app pediria (mesmas praias e variáveis).
+  // Se não valer (robô parado, app mais novo que o robô, sem o arquivo), busca direto no Open-Meteo, como sempre foi.
+  const ARQ_PREV = window.PM_PREVISAO_URL || "https://raw.githubusercontent.com/praiometrorio/praiometro/dados/previsao.json";
+  const PREV_MAX_H = 3;
+  async function previsaoDoRobo() {
+    const r = await buscarJSON(ARQ_PREV + "?t=" + Math.floor(Date.now() / 3e5), 12000);
+    if (!r || !r.urls || !Array.isArray(r.tempo) || !Array.isArray(r.nuvens)) throw new Error("arquivo incompleto");
+    if (!(Date.now() - r.geradoEm < PREV_MAX_H * 3600000)) throw new Error("arquivo velho");
+    if (r.urls.tempo !== urlPrevisao() || r.urls.nuvens !== urlNuvens()) throw new Error("arquivo de outra versão do app");
+    if (!r.tempo[0] || !r.tempo[0].daily || r.tempo[0].daily.time[0] !== diaHoje()) throw new Error("arquivo de outro dia");
+    const mar = Array.isArray(r.mar) && r.urls.mar === urlMar() ? r.mar : await buscarJSON(urlMar(), 15000).catch(() => null);
+    return { tempo: r.tempo, mar, nuvens: r.nuvens, robo: r.geradoEm };
+  }
   async function carregar(forcar) {
     const cache = guarda.ler(CACHE_CHAVE);
     if (!forcar && cache && Date.now() - cache.t < CACHE_MIN * 60000) return cache;
     try {
-      const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao(), 15000), buscarJSON(urlMar(), 15000).catch(() => null), buscarJSON(urlNuvens(), 15000).catch(() => null)]);
-      const novo = { t: Date.now(), tempo, mar, nuvens };
+      let lido = null;
+      try { lido = await previsaoDoRobo(); } catch (e) { console.info("Previsão do robô indisponível (" + e.message + "); buscando direto no Open-Meteo"); }
+      if (!lido) { const [tempo, mar, nuvens] = await Promise.all([buscarJSON(urlPrevisao(), 15000), buscarJSON(urlMar(), 15000).catch(() => null), buscarJSON(urlNuvens(), 15000).catch(() => null)]); lido = { tempo, mar, nuvens }; }
+      const novo = { t: Date.now(), ...lido };
       guarda.gravar(CACHE_CHAVE, novo);
       return novo;
     } catch (e) {
@@ -1778,14 +1796,22 @@
     const sel = estado.sel, ps = pts[sel];
     const ocupados = PRAIAS.map((p) => ({ x0: pts[p.id].x - 19, x1: pts[p.id].x + 19, y0: pts[p.id].y - 19, y1: pts[p.id].y + 19, id: p.id }));
     const ordem = PRAIAS.slice().sort((a, b) => (b.id === sel) - (a.id === sel) || favoritas.includes(b.id) - favoritas.includes(a.id));
+    // v18.8: o nome tenta 4 lugares (à direita, à esquerda, embaixo, em cima) e fica no primeiro que não encosta em nada.
+    // Assim praias coladas (Arpoador e Praia do Diabo) mostram os dois nomes sem precisar de muito zoom.
+    const LADOS = ["dir", "esq", "baixo", "cima"];
     ordem.forEach((p) => {
       const pin = pinos[p.id]; if (!pin) return;
       const pt = pts[p.id], larg = p.nome.length * 7.2 + 22;
-      const r = { x0: pt.x + 20, x1: pt.x + 24 + larg, y0: pt.y - 13, y1: pt.y + 13, id: p.id };
-      const bate = ocupados.some((o) => o.id !== p.id && r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0);
-      const mostra = p.id === sel || !bate;
-      pin.el.classList.toggle("com-nome", mostra);
-      if (mostra) ocupados.push(r);
+      const caixa = (lado) => lado === "dir" ? { x0: pt.x + 20, x1: pt.x + 24 + larg, y0: pt.y - 13, y1: pt.y + 13 }
+        : lado === "esq" ? { x0: pt.x - 24 - larg, x1: pt.x - 20, y0: pt.y - 13, y1: pt.y + 13 }
+        : lado === "baixo" ? { x0: pt.x - larg / 2, x1: pt.x + larg / 2, y0: pt.y + 21, y1: pt.y + 46 }
+        : { x0: pt.x - larg / 2, x1: pt.x + larg / 2, y0: pt.y - 46, y1: pt.y - 21 };
+      const livre = (r) => !ocupados.some((o) => o.id !== p.id && r.x0 < o.x1 && r.x1 > o.x0 && r.y0 < o.y1 && r.y1 > o.y0);
+      let lado = LADOS.find((l) => livre(caixa(l)));
+      if (!lado && p.id === sel) lado = "dir";                      // a selecionada sempre mostra o nome
+      pin.el.classList.toggle("com-nome", !!lado);
+      LADOS.forEach((l) => pin.el.classList.toggle("nome-" + l, l === lado));
+      if (lado) ocupados.push({ ...caixa(lado), id: p.id });
       const d = ps ? Math.hypot(pt.x - ps.x, pt.y - ps.y) : 999;
       pin.el.classList.toggle("perto", p.id !== sel && d < 62);
     });
@@ -3584,6 +3610,8 @@
   // v18.7: boas-vindas (uma única vez, para quem ainda não tem favoritas): escolher as praias numa lista com rolagem
   function boasVindas() {
     if (guarda.ler("pm-boasvindas") || favoritas.length || !linhas.length || document.querySelector(".bv")) return;
+    // v18.8: uma tela por vez. Se o convite de instalar (ou outra tela) está aberto, espera fechar e só então aparece.
+    if (document.querySelector(".convite:not([hidden]), .fav-tela:not([hidden]), .rel-tela:not([hidden]), #treinoTela:not([hidden]), #surfeTela:not([hidden])")) { setTimeout(boasVindas, 700); return; }
     const REG = [["zs", "Zona Sul"], ["zo", "Zona Oeste"], ["nit", "Niterói"]];
     const el = document.createElement("div");
     el.className = "bv"; el.setAttribute("role", "dialog"); el.setAttribute("aria-label", "Escolha as suas praias");
@@ -3682,7 +3710,7 @@
       if (dentroDeApp) prepararNavegador();
       else if (!ios && !pedidoAndroid) return;                              // Android sem o pedido do Chrome: não dá pra ajudar direito
       if (pedidoAndroid && !dentroDeApp) { $("#instPassos").hidden = true; $("#instSim").textContent = "Instalar agora"; }
-      if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), .convite:not([hidden])")) return;
+      if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), .convite:not([hidden]), .bv")) return;
       conv.hidden = false; document.body.style.overflow = "hidden";
       (window.pmEventos = window.pmEventos || []).push("viu-instalar");
     };
@@ -3744,7 +3772,7 @@
       desenhar();
       desenharBotaoTreino();
       if (/[?&]treino\b/.test(location.search)) abrirTreino();
-      else setTimeout(boasVindas, 900);
+      else setTimeout(boasVindas, 2500);       // depois do convite de instalar (que abre antes); a boas-vindas espera ele fechar
       avisoPrevisao(dados);
       if (dados.offline) ultimaBusca = Date.now() - (CACHE_MIN - 1) * 60000;    // sem internet: tenta de novo em 1 minuto
     } catch (e) {

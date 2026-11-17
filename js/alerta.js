@@ -81,7 +81,16 @@
     const c = ler("pm-convite");
     if (c && (c.r === "sim" || Date.now() - c.t < DIAS_DE_NOVO * 864e5)) return;
     // espera o app aparecer e não atropela outra tela aberta
-    setTimeout(() => { if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), #treinoTela:not([hidden])")) return; abrirConvite(false); }, 1500);
+    // v18.8: o convite do alerta é o ÚLTIMO da primeira visita: 1º instalar, 2º escolher as praias, 3º este.
+    // Espera a tela de escolher as praias aparecer e fechar (no máximo 20 s de espera por ela), sem atropelar outra tela aberta.
+    const t0 = Date.now();
+    const tentar = () => {
+      const faltaEscolher = !ler("pm-boasvindas") && !(ler("pm-favoritas") || []).length && Date.now() - t0 < 20000;
+      if (document.querySelector(".bv, .convite:not([hidden])") || faltaEscolher) return setTimeout(tentar, 800);
+      if (document.querySelector(".fav-tela:not([hidden]), .rel-tela:not([hidden]), #treinoTela:not([hidden])")) return;
+      abrirConvite(false);
+    };
+    setTimeout(tentar, 1500);
   }
 
   $("#ativarAlerta").onclick = ativar;

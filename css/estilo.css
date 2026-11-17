@@ -1076,3 +1076,10 @@ div.servico svg{width:15px;height:15px}
 .bv-lista .bv-chips button[aria-pressed="true"]::before{content:"★";margin-right:5px}
 .bv-ok{margin-top:8px;background:#0E4C7A;color:#fff}
 .bv-pular{color:#5A6B78;opacity:1}
+
+/* v18.8: nome da praia no mapa em 4 posições (direita, esquerda, embaixo, em cima) */
+.pin{position:relative}
+.pin .rot{position:absolute;left:calc(100% + 5px);top:50%;transform:translateY(-50%)}
+.pin.nome-esq .rot{left:auto;right:calc(100% + 5px)}
+.pin.nome-baixo .rot{left:50%;top:calc(100% + 4px);transform:translateX(-50%)}
+.pin.nome-cima .rot{left:50%;top:auto;bottom:calc(100% + 4px);transform:translateX(-50%)}
