@@ -108,6 +108,8 @@ def analisar_dia(t, n, data):
         if not escuro and c < 50 and nv < 40: sol += 1
         if 9 <= hr <= 17:
             estados[hr] = "chuva" if c >= 50 else "nublado" if nv >= 70 else "parcial" if nv >= 40 else "sol"
+            # v19.13 (igual ao app): hora com vento acima de 15 km/h não conta como hora boa de praia
+            if v is not None and round(v) > 15 and estados[hr] in ("sol", "parcial"): estados[hr] = "ventando"
             if estados[hr] == "sol": chuva_sol = max(chuva_sol, c)   # chuva nas horas de sol firme (vale pro praião)
             tp = (h.get("temperature_2m") or [None] * len(h["time"]))[k]
             if tp is not None: temp = max(temp if temp is not None else -99, tp)
@@ -137,8 +139,10 @@ def tipo_praiao(estados):
     if tarde >= 3.5 and manha <= 2: return "tarde"
     return "nuvens"
 
-# PRAIÃO (dia raro): 5+ horas de SOL FIRME entre 9h e 17h, chuva < 20% nessas horas e vento até 15 km/h
-# VAI DAR PRAIA (dia bom normal): 5+ pontos de sol (sol vai e vem vale meio), chuva < 40% e vento até 15 km/h
+# PRAIÃO (dia raro): 5+ horas de SOL FIRME com vento até 15 km/h entre 9h e 17h, chuva < 20% nessas horas
+# VAI DAR PRAIA (dia bom normal): 5+ pontos de sol com vento até 15 km/h (sol vai e vem vale meio), chuva < 40%
+# v19.13: o vento é olhado HORA A HORA (antes, o pico do dia cortava o dia inteiro). Esta é a conta reserva; a principal
+# é a do próprio app (conta_do_app), que inclui também as praias da baía.
 HORAS_PRAIAO = 5
 
 def praias_boas(tempo, nuvens, data, nivel):
@@ -147,11 +151,11 @@ def praias_boas(tempo, nuvens, data, nivel):
         estados, vento, chuva, chuva_sol, temp = analisar_dia(tempo[i], nuvens[i] if nuvens else None, data)
         if nivel == "praiao":
             firme = horas_firmes(estados)
-            if firme >= HORAS_PRAIAO and vento <= 15 and chuva_sol < 20:
+            if firme >= HORAS_PRAIAO and chuva_sol < 20:
                 boas.append((firme, -vento, -FAMA.index(pid), nome, tipo_firme(estados), temp))
         else:
             pts = pontos(estados)
-            if pts >= 5 and vento <= 15 and chuva < 40:
+            if pts >= 5 and chuva < 40:
                 boas.append((pts, -vento, -FAMA.index(pid), nome, tipo_praiao(estados), temp))
     boas.sort(reverse=True)
     return boas

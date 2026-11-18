@@ -1780,15 +1780,20 @@
 
   // ---------- dias ----------
   // praião: só o horário de praia (9h às 17h); hora de sol = 1 ponto, entre nuvens = meio ponto (igual ao robô scripts/praiao.py)
-  const pontosPraia = (x, de = 9, ate = 17) => x.horas.filter((y) => y.h >= de && y.h <= ate).reduce((s, y) => s + (y.est === "sol" ? 1 : y.est === "parcial" ? 0.5 : 0), 0);
+  // v19.13: a hora só conta se o vento DAQUELA hora está bom (até 15 km/h). Antes valia o pico do dia: em 18/11 todas as praias
+  // tiveram 5 a 7 horas de sol firme, mas ventou 16-20 km/h só à tarde e o dia inteiro foi cortado (sem aviso nenhum).
+  const VENTO_PRAIA = 15;
+  const ventoOk = (y) => (y.v ?? 0) <= VENTO_PRAIA;
+  const pontosPraia = (x, de = 9, ate = 17) => x.horas.filter((y) => y.h >= de && y.h <= ate && ventoOk(y)).reduce((s, y) => s + (y.est === "sol" ? 1 : y.est === "parcial" ? 0.5 : 0), 0);
   const tipoPraiao = (x) => {
     const tot = pontosPraia(x), manha = pontosPraia(x, 9, 13), tarde = pontosPraia(x, 14, 17);
     return tot >= 8 ? "todo" : manha >= 4 && tarde <= 1.5 ? "manha" : tarde >= 3.5 && manha <= 2 ? "tarde" : "nuvens";
   };
   const JEITO_PRAIAO = { todo: "praião o dia todo", manha: "praião, mais pela manhã", tarde: "praião, mais à tarde", nuvens: "praião com visitas de algumas nuvens" };
-  // PRAIÃO (dia raro): 4+ praias com 5+ horas de SOL FIRME (9h às 17h), chuva < 20% nessas horas e vento até 15 km/h
-  // VAI DAR PRAIA (dia bom normal): 4+ praias com 5+ pontos de sol (sol vai e vem = meio), chuva < 40%, vento até 15 (igual ao robô)
-  const firmes = (x, de = 9, ate = 17) => x.horas.filter((y) => y.h >= de && y.h <= ate && y.est === "sol").length;
+  // PRAIÃO (dia raro): 4+ praias com 5+ horas de SOL FIRME com vento até 15 km/h (9h às 17h), chuva < 20% nessas horas
+  // VAI DAR PRAIA (dia bom normal): 4+ praias com 5+ pontos de sol com vento até 15 (sol vai e vem = meio), chuva < 40%
+  // v19.13: entram também as praias da baía (Flamengo, Botafogo, Urca, Icaraí...)
+  const firmes = (x, de = 9, ate = 17) => x.horas.filter((y) => y.h >= de && y.h <= ate && y.est === "sol" && ventoOk(y)).length;
   const tipoFirme = (x) => { const t = firmes(x), m = firmes(x, 9, 13), ta = firmes(x, 14, 17);
     return t >= 8 ? "todo" : m >= 4 && ta <= 1 ? "manha" : ta >= 3 && m <= 1 ? "tarde" : "maior"; };
   const SOL_PRAIAO = { todo: "solzão o dia todo", manha: "solzão de manhã", tarde: "solzão à tarde", maior: "solzão na maior parte do dia" };
@@ -1803,7 +1808,7 @@
   // para 17/11 e o robô gravou e avisou "praião").
   window.pmPraiaoDetalhe = (d) => {
     if (!previsao || !datas[d]) return null;
-    const mar = PRAIAS.filter((p) => !p.baia && previsao[p.id] && previsao[p.id][d]);
+    const mar = PRAIAS.filter((p) => previsao[p.id] && previsao[p.id][d]);
     const um = (p) => { const x = previsao[p.id][d];
       const chuvaSol = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && y.est === "sol").map((y) => y.chuva || 0));
       const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
@@ -1811,18 +1816,18 @@
         tipoFirme: tipoFirme(x), tipoPraia: tipoPraiao(x) }; };
     const todas = mar.map(um);
     return { data: datas[d], todas,
-      praiao: (() => { const t = todas.filter((q) => q.firmes >= 5 && q.vento <= 15 && q.chuvaSol < 20);
+      praiao: (() => { const t = todas.filter((q) => q.firmes >= 5 && q.chuvaSol < 20);
         return praiaoValido(t.map((q) => PRAIAS.find((p) => p.id === q.id))) ? t.map((q) => q.id) : []; })(),
-      praia: todas.filter((q) => q.pontos >= 5 && q.vento <= 15 && q.chuvaBoa < 40).map((q) => q.id) };
+      praia: todas.filter((q) => q.pontos >= 5 && q.chuvaBoa < 40).map((q) => q.id) };
   };
   function praiaoDia(d) {
-    const mar = PRAIAS.filter((p) => !p.baia);
+    const mar = PRAIAS.filter((p) => previsao[p.id] && previsao[p.id][d]);
     const top = mar.filter((p) => { const x = previsao[p.id][d];
       const chuvaSol = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && y.est === "sol").map((y) => y.chuva || 0));
-      return firmes(x) >= 5 && x.vento <= 15 && chuvaSol < 20; });
+      return firmes(x) >= 5 && chuvaSol < 20; });
     const boas = mar.filter((p) => { const x = previsao[p.id][d]; // chuva: só nas horas boas (sol ou entre nuvens, 9h às 17h)
       const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
-      return pontosPraia(x) >= 5 && x.vento <= 15 && chuvaBoa < 40; });
+      return pontosPraia(x) >= 5 && chuvaBoa < 40; });
     const nivel = praiaoValido(top) ? "praiao" : boas.length >= 4 ? "praia" : null;
     if (!nivel) return { n: 0 };
     const lista = nivel === "praiao" ? top : boas, tp = nivel === "praiao" ? tipoFirme : tipoPraiao;
