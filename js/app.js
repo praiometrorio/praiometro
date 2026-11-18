@@ -2207,21 +2207,30 @@
     }
 
     // v18.7: a janela virou UMA linha pequena embaixo da frase do dia (antes era uma caixa grande).
-    // v18.6: MELHOR JANELA do dia = o maior trecho seguido (2 h ou mais, das 7h às 18h) com sol, sem chuva e areia com sol.
-    // 1ª tentativa: sol firme e vento fraco (até 15 km/h); 2ª: sol firme, mesmo com vento; 3ª: sol vai e vem. Hoje, só as horas que ainda vêm.
+    // v19.11: MELHOR JANELA do dia = o maior trecho seguido (2 h ou mais, das 7h às 18h) com sol firme, sem chuva e areia com sol.
+    // O vento não corta mais a janela: ele só entra no texto ("venta mais a partir das 13h"). Antes, 8h–13h de vento fraco
+    // escondia uma tarde inteira de sol (8h–17h). Sem sol firme: tenta "sol vai e vem". Hoje, só as horas que ainda vêm.
     const jan = (() => {
       const hs = x.horas.filter((y) => y.h >= 7 && y.h <= 17 && !(estado.dia === 0 && y.h < horaAgora));
       const base = (y) => (y.chuva || 0) < 30 && !(somb && somb.sombraHora[y.h]);
-      const niveis = [[(y) => y.est === "sol" && base(y) && (y.v == null || y.v <= 15), "sol firme, vento fraco"],
-        [(y) => y.est === "sol" && base(y), "sol firme, mas venta"],
-        [(y) => (y.est === "sol" || y.est === "parcial") && base(y), "sem chuva, areia com sol"]];
-      for (const [ok, txt] of niveis) {
-        let m = null, ini = null;
+      const maior = (ok) => { let m = null, ini = null;
         for (let h = 7; h <= 18; h++) { const y = hs.find((q) => q.h === h);
           if (y && ok(y)) { if (ini == null) ini = h; } else { if (ini != null && (!m || h - ini > m.fim - m.ini)) m = { ini, fim: h }; ini = null; } }
-        if (m && m.fim - m.ini >= 2) return { ...m, txt };
+        return m && m.fim - m.ini >= 2 ? m : null; };
+      const firme = maior((y) => y.est === "sol" && base(y));
+      if (firme) {
+        const hrs = hs.filter((y) => y.h >= firme.ini && y.h < firme.fim);
+        const forte = (y) => y.v != null && y.v > 15;
+        const i1 = hrs.findIndex(forte);
+        let txt;
+        if (i1 < 0) txt = "sol firme, vento fraco";
+        else if (i1 === 0) { const calma = hrs.findIndex((y) => !forte(y));
+          txt = calma > 0 && hrs.slice(calma).every((y) => !forte(y)) ? `sol firme, vento fraco a partir das ${hrs[calma].h}h` : "sol firme, mas venta"; }
+        else txt = `sol firme, venta mais a partir das ${hrs[i1].h}h`;
+        return { ...firme, txt };
       }
-      return null;
+      const parcial = maior((y) => (y.est === "sol" || y.est === "parcial") && base(y));
+      return parcial ? { ...parcial, txt: "sem chuva, areia com sol" } : null;
     })();
     if (jan) for (let k = 0; k < horas.length; k++) { const hh = HORA_INI + k; if (hh >= jan.ini && hh < jan.fim) horas[k] = horas[k].replace('class="hr ', 'class="hr jan '); }
     const faixa = `<div class="faixa-dia"><p class="veredito">${a.veredito}</p>${jan ? `<p class="janela"><b>Melhor janela: ${jan.ini}h às ${jan.fim}h</b><span> · ${jan.txt}</span></p>` : ""}</div>`;
