@@ -679,12 +679,12 @@
     }
     return melhor;
   };
-  // vento medido no aeroporto perto da praia: na hora de agora, a observação mais nova (até 75 min); nas horas que já passaram, a daquela hora
+  // vento medido no aeroporto perto da praia: na hora de agora, a observação mais nova (até 100 min: METAR de hora em hora + robô a cada 30 min, que às vezes atrasa); nas horas que já passaram, a daquela hora
   const ventoAeroporto = (p, data, hr, agora) => {
     const a = aeroportoVento(p); if (!a) return null;
     if (hr === agora) {
       const u = observado.ultimo && observado.ultimo[a.e];
-      return u && u.v != null && Date.now() - u.ts * 1000 <= 75 * 60000 ? { ...u, fonte: a.e } : null;
+      return u && u.v != null && Date.now() - u.ts * 1000 <= 100 * 60000 ? { ...u, fonte: a.e } : null;
     }
     const o = (observado.estacoes[a.e] || {})[`${data}T${pad(hr)}`];
     return o && o.v != null ? { ...o, fonte: a.e } : null;
