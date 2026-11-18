@@ -664,9 +664,34 @@
   let alertas = {};
   // regras: temperatura e umidade valem até 7 km (baía e mar aberto variam pouco, 0 a 2°);
   // o VENTO só até 3 km e nunca em praia de baía (vento muda muito de uma praia pra outra)
+  // v19.12 VENTO MEDIDO: o vento de AGORA (e das horas que já passaram) vem da estação que mede vento a até 2,5 km da praia.
+  // Vento muda muito de um ponto pro outro (morro, prédio, baía), por isso só vale bem perto. Hoje: aeroporto Santos Dumont
+  // (METAR) → Flamengo (2,5 km do ponto da praia; a metade norte da praia fica a menos de 2 km); INMET Forte de Copacabana →
+  // Copacabana, Arpoador, Diabo e Ipanema (quando o INMET libera os dados). As outras praias e as próximas horas: previsão.
+  const VENTO_KM = 2.6;
+  const NOME_ESTACAO = { SBRJ: "no Santos Dumont", SBGL: "no Galeão", SBJR: "em Jacarepaguá", INMET: "no Forte de Copacabana" };
+  const AEROPORTOS_VENTO = { SBRJ: [-22.9105, -43.1631], SBGL: [-22.8090, -43.2506], SBJR: [-22.9875, -43.3700] };
+  const aeroportoVento = (p) => {
+    let melhor = null;
+    for (const [e, [la, lo]] of Object.entries(AEROPORTOS_VENTO)) {
+      const km = Math.hypot((p.lat - la) * 111.32, (p.lon - lo) * 111.32 * Math.cos(p.lat * Math.PI / 180));
+      if (km <= VENTO_KM && (!melhor || km < melhor.km)) melhor = { e, km };
+    }
+    return melhor;
+  };
+  // vento medido no aeroporto perto da praia: na hora de agora, a observação mais nova (até 75 min); nas horas que já passaram, a daquela hora
+  const ventoAeroporto = (p, data, hr, agora) => {
+    const a = aeroportoVento(p); if (!a) return null;
+    if (hr === agora) {
+      const u = observado.ultimo && observado.ultimo[a.e];
+      return u && u.v != null && Date.now() - u.ts * 1000 <= 75 * 60000 ? { ...u, fonte: a.e } : null;
+    }
+    const o = (observado.estacoes[a.e] || {})[`${data}T${pad(hr)}`];
+    return o && o.v != null ? { ...o, fonte: a.e } : null;
+  };
   const inmetEm = (p, data, hr, oque) => {
     const c = inmet.praias && inmet.praias[p.id]; if (!c) return null;
-    const cod = c.e || c, km = c.km ?? 99; if (oque === "vento" && (km > 3 || p.baia)) return null;
+    const cod = c.e || c, km = c.km ?? 99; if (oque === "vento" && km > VENTO_KM) return null;   // v19.12: vento só da estação a até ~2,5 km
     const e = inmet.estacoes[cod]; return (e && e.horas[`${data}T${pad(hr)}`]) || null;
   };
   const ESTACAO = (p) => p.regiao === "zo" ? ["SBJR", "SBRJ", "SBGL"] : ["SBRJ", "SBGL", "SBJR"];
@@ -1119,8 +1144,10 @@
       const ventoHoje = (d, data, hr, k, vEm, dEm, rEm) => {
         const base = { v: vEm(k), vd: dEm(k), raj: rEm(k) };
         if (d !== 0) return base;
-        const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr, "vento") : null;
-        if (io && io.v != null) return { v: Math.round(io.v), vd: io.vd ?? base.vd, raj: io.raj != null ? Math.round(io.raj) : base.raj };
+        const hAg = +relogio.format(new Date()).slice(0, 2);
+        const io = hr <= hAg ? (inmetEm(p, data, hr, "vento") || ventoAeroporto(p, data, hr, hAg)) : null;
+        // rajada: se a estação não registrou rajada, o vento estava constante (METAR só anota rajada quando ela existe)
+        if (io && io.v != null) return { v: Math.round(io.v), vd: io.vd ?? base.vd, raj: io.raj != null ? Math.round(io.raj) : Math.round(io.v), medido: io.fonte || "INMET" };
         const vi = viesInmet(data, vEm); if (!vi || hr <= vi.agora || hr > vi.agora + 4 || base.v == null) return base;
         return { ...base, v: Math.max(0, Math.round(base.v + vi.v * (1 - (hr - vi.agora) / 5))) };
       };
@@ -1413,7 +1440,7 @@
             const est = escuro ? (chuva >= 50 ? "chuva" : "noite") : ceuSatelite(d, hr, estadoHora(chuva, nuvens, sol));
             const vt = ventoHoje(d, data, hr, k, ventoEm, dirEm, rajEm);
             return { h: hr, t: Math.round(tC), chuva, nuvens, tot, sol, est, uv: uvEm(k, nuvemDoUV(est, nuvens)), v: vt.v,
-              vd: vt.vd, raj: vt.raj, raio: raioRadar(d, hr), mormaco: d === 0 && !!morm[hr] };
+              vd: vt.vd, raj: vt.raj, medido: vt.medido, raio: raioRadar(d, hr), mormaco: d === 0 && !!morm[hr] };
           })
         };
       });
@@ -3531,9 +3558,9 @@
       return { titulo: "Temperatura da água", unid: "°C", min: Math.floor(lo - 1), max: Math.ceil(hi + 1), tipo: "linha", pts, barraNome: "Água °C",
         texto: (q) => `<b>${fmt1(q.v)} °C · ${aguaCat(q.v)}</b><span>Estimada perto da areia</span>`,
         resumo: () => pts.length ? [`Entre ${fmt1(lo)} e ${fmt1(hi)} °C no dia`] : ["Sem dado da temperatura"], leg: [] }; }
-    if (k === "vento") { const pts = hs.filter((y) => y.v != null).map((y) => ({ h: y.h, v: y.v, cor: ventoCat(y.v).c, d: y.vd, raj: y.raj }));
+    if (k === "vento") { const pts = hs.filter((y) => y.v != null).map((y) => ({ h: y.h, v: y.v, cor: ventoCat(y.v).c, d: y.vd, raj: y.raj, medido: y.medido }));
       return { titulo: "Vento hora a hora", unid: "km/h", max: Math.max(25, ...pts.map((q) => q.v)), tipo: "barra", pts, barraNome: "Vento (km/h)", setas: true, setaVento: true,
-        texto: (q) => `<b>${q.v} km/h · ${ventoCat(q.v).n}</b><span>${q.d != null ? "De " + rumo(q.d) : ""}${q.raj ? " · rajadas de " + q.raj + " km/h" : ""}</span>`,
+        texto: (q) => `<b>${q.v} km/h · ${ventoCat(q.v).n}</b><span>${q.d != null ? "De " + rumo(q.d) : ""}${q.raj && q.raj > q.v ? " · rajadas de " + q.raj + " km/h" : ""}${q.medido ? ` · medido ${NOME_ESTACAO[q.medido] || q.medido}` : ""}</span>`,
         resumo: () => { if (!pts.length) return ["Sem dado do vento"]; const mx = pts.reduce((a, b) => (b.v > a.v ? b : a)), calmo = pts.filter((q) => q.v <= 10);
           const j = maiorSequencia(hs, (y) => y.v != null && y.v <= 10);
           return [`Mais forte às ${mx.h}h: ${mx.v} km/h`, calmo.length && j ? `Vento fraco ${faixaH(j)}` : "Sem horário de vento fraco"]; },

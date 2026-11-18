@@ -44,7 +44,7 @@ for tentativa in range(3):   # o site dos aeroportos às vezes demora ou cai: te
 if not dados:
     print("Sem resposta dos aeroportos agora; fica o arquivo de antes (sem erro)."); sys.exit(0)
 
-saida = {"_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo.",
+saida = {"_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo; v/raj = vento e rajada medidos (km/h), vd = direção (graus); ultimo = observação mais nova de cada aeroporto.",
          "atualizadoEm": datetime.datetime.now(BR).strftime("%Y-%m-%dT%H:%M"), "estacoes": {}}
 for m in dados if isinstance(dados, list) else []:
   try:   # uma observação estranha não derruba o robô: pula ela
@@ -61,8 +61,15 @@ for m in dados if isinstance(dados, list) else []:
       else: n = None
       saida["estacoes"].setdefault(est, {})
       # guarda a observação mais próxima da hora cheia
+      # v19.12: vento MEDIDO (nós → km/h). Direção "VRB" (variável) fica sem direção.
+      kt = lambda x: round(float(x) * 1.852) if isinstance(x, (int, float)) else None
+      vento = {"v": kt(m.get("wspd")), "raj": kt(m.get("wgst")), "vd": m.get("wdir") if isinstance(m.get("wdir"), (int, float)) else None}
       if chave not in saida["estacoes"][est] or t.minute <= 15:
-          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": chove(wx), "temp": m.get("temp")}
+          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": chove(wx), "temp": m.get("temp"), **vento}
+      # a observação MAIS NOVA de cada aeroporto (inclusive as extras do meio da hora), para o vento de agora
+      ult = saida.setdefault("ultimo", {}).get(est)
+      if vento["v"] is not None and (not ult or m["obsTime"] > ult["ts"]):
+          saida["ultimo"][est] = {"ts": m["obsTime"], "em": t.strftime("%Y-%m-%dT%H:%M"), **vento}
   except Exception as e:
     print("pulei uma observação:", e)
 if not saida["estacoes"]:

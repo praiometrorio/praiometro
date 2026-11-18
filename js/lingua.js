@@ -323,6 +323,7 @@
     ["· toque no pico para ver hora a hora", "· tap a spot to see hour by hour", "· toca el pico para ver hora a hora", "· touchez un spot pour voir heure par heure"],
     ["Agora", "Now", "Ahora", "Maintenant"], ["Agora\u200B", "Now", "Ahora", "Maint."],   // só no cartão da hora (espaço estreito), como no app de clima do iPhone ["agora", "now", "ahora", "maintenant"],
     ["vento", "wind", "viento", "vent"], ["ondas", "waves", "olas", "vagues"],
+    ["medido no Santos Dumont", "measured at Santos Dumont", "medido en Santos Dumont", "mesuré à Santos Dumont"], ["medido no Forte de Copacabana", "measured at Copacabana Fort", "medido en el Fuerte de Copacabana", "mesuré au Fort de Copacabana"],
     ["Subindo", "Rising", "Subiendo", "Montante"], ["Baixando", "Falling", "Bajando", "Descendante"],
     ["falta # h # min", "# h # min to go", "faltan # h # min", "dans # h # min"], ["falta # min", "# min to go", "faltan # min", "dans # min"],
     ["horários aprox.", "approx. times", "horarios aprox.", "horaires approx."],
