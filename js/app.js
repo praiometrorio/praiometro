@@ -446,7 +446,8 @@
       const m = await buscarJSON("https://api.rainviewer.com/public/weather-maps.json");
       const q = m.radar && m.radar.past && m.radar.past[m.radar.past.length - 1]; if (!q) return;
       if (Date.now() - q.time * 1000 > 40 * 60000) return;          // imagem velha demais: não usa
-      if (radar.t === q.time * 1000) return;                          // já é essa
+      if (satelEmCurso) await satelEmCurso.catch(() => {});        // v19.11: confere a chuva com a nuvem do satélite
+      if (radar.t === q.time * 1000 && radar.sat === satel.t) return;   // já é essa (e com o mesmo satélite)
       const Z = 7, n = 2 ** Z, tiles = {}, novo = {};
       const pos = (p) => { const xf = (p.lon + 180) / 360 * n, lr = p.lat * Math.PI / 180, yf = (1 - Math.log(Math.tan(lr) + 1 / Math.cos(lr)) / Math.PI) / 2 * n;
         return { x: Math.floor(xf), y: Math.floor(yf), px: Math.floor((xf - Math.floor(xf)) * 256), py: Math.floor((yf - Math.floor(yf)) * 256) }; };
@@ -460,7 +461,11 @@
       // força da chuva pela cor: transparente = nada; meio transparente = garoa; azul = chuva; amarelo/laranja/vermelho = forte
       // v16.6: eco fraco (meio transparente) NÃO conta — perto dos morros (Pão de Açúcar, Tijuca) é quase sempre eco do próprio morro
       // ("clutter") ou chuva que evapora no ar. Só conta chuva de verdade (azul) e forte (amarelo/laranja/vermelho).
-      const forca = (d, i) => { const a = d[i + 3]; if (a < 200) return 0; return d[i] >= 200 ? 3 : 2; };
+      const forca0 = (d, i) => { const a = d[i + 3]; if (a < 200) return 0; return d[i] >= 200 ? 3 : 2; };
+      // v19.11: eco onde o satélite vê céu limpo (num raio de ~7 km) não é chuva. A máscara é do quadrado da praia (mesmo recorte
+      // do radar e do satélite: zoom 7, 256×256); todas as praias caem no mesmo quadrado.
+      const masc = mascaraSat(pos(PRAIAS[0]).x, pos(PRAIAS[0]).y);
+      const forca = (d, i) => masc && !masc[i >> 2] ? 0 : forca0(d, i);
       // v17.6 MOVIMENTO DA CHUVA (extrapolação do radar, o método dos serviços de "chuva na próxima hora"):
       // compara as 3 últimas imagens e acha o deslocamento (em pixels por 10 min) que melhor encaixa uma na seguinte.
       // Teste com o radar real de 16/11 (10h20–10h50): acerto (CSI) de 0,30 em +10 min e 0,25 em +20 min, contra 0,12 e 0,01
@@ -533,7 +538,7 @@
         }
         novo[p.id] = { aqui, perto, longe, mov: !!mov, chega: aqui ? null : chega, para: aqui ? para : null };
       }));
-      radar = { t: q.time * 1000, praias: novo, mov };
+      radar = { t: q.time * 1000, praias: novo, mov, sat: satel.t, filtrado: !!masc };
     } catch (e) { console.warn("Radar indisponível agora", e); }
   }
   // SATÉLITE (v16.7): imagem visível do GOES-19 (NASA GIBS, ~1 km, nova a cada 10 min, chega com ~35 min de atraso).
@@ -573,7 +578,34 @@
     vs.sort((x, y) => x - y); ts.sort((x, y) => x - y); fs.sort((x, y) => x - y);
     return { b: vs[Math.floor(vs.length / 2)], tex: ts.length >= 2 ? ts[Math.floor(ts.length / 2)] : null, frac: fs.length >= 2 ? fs[Math.floor(fs.length / 2)] : null };   // medianas da hora
   };
-  async function carregarSatelite() {
+  // o radar espera o satélite terminar (para conferir a nuvem); os dois são pedidos juntos
+  let satelEmCurso = null;
+  function carregarSatelite() { return (satelEmCurso = carregarSatelite0()); }
+  // v19.11 RADAR x SATÉLITE: chuva de verdade precisa de nuvem grossa em cima. 18/11 12h30, Flamengo: o radar mostrava
+  // "chuva" a ~8 km a oeste (morros do Sumaré/Tijuca) e a conta do movimento trazia ela pra praia em 20 min → app marcou
+  // chuva 70% agora e 60% às 13h. As fotos mostraram céu azul com fiapos de cirro, e o satélite nesses pontos dava 72–90
+  // (corrigido), brilho de céu limpo. Era eco do morro ("clutter"). Regra: um eco do radar só conta se, num raio de ~7 km,
+  // o satélite (imagem de até 60 min) vê algo mais que céu limpo (brilho corrigido acima de 105). Sem satélite (noite,
+  // sol baixo, imagem velha), o radar segue como antes.
+  const RAIO_MASC = 6;
+  function mascaraSat(tx, ty) {
+    if (!satel.grade || Date.now() - satel.t > 60 * 60000 || !(satel.el >= 15)) return null;
+    const k = tx + "/" + ty; if (satel.mascara[k] !== undefined) return satel.mascara[k];
+    const d = satel.grade[k]; if (!d) return (satel.mascara[k] = null);
+    const f = Math.sqrt(Math.sin(satel.el * Math.PI / 180)), nuvem = new Uint8Array(65536), m = new Uint8Array(65536);
+    // nuvem = média de 3×3 pixels acima de 105 (um pixel brilhante sozinho é reflexo de areia, prédio ou pedra, não nuvem)
+    for (let Y = 1; Y < 255; Y++) for (let X = 1; X < 255; X++) {
+      let sm = 0; for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) sm += d[((Y + dy) * 256 + X + dx) * 4];
+      nuvem[Y * 256 + X] = sm / 9 / f > SAT_SOL ? 1 : 0; }
+    for (let Y = 0; Y < 256; Y++) for (let X = 0; X < 256; X++) {
+      if (!nuvem[Y * 256 + X]) continue;
+      for (let dy = -RAIO_MASC; dy <= RAIO_MASC; dy++) for (let dx = -RAIO_MASC; dx <= RAIO_MASC; dx++) {
+        const X2 = X + dx, Y2 = Y + dy; if (X2 < 0 || Y2 < 0 || X2 > 255 || Y2 > 255 || dx * dx + dy * dy > RAIO_MASC * RAIO_MASC) continue; m[Y2 * 256 + X2] = 1; }
+    }
+    return (satel.mascara[k] = m);
+  }
+  window.pmMascara = mascaraSat;
+  async function carregarSatelite0() {
     try {
       const agora = Date.now(), Z = 7, n = 2 ** Z;
       // lê uma imagem do satélite (horário t0) e devolve o brilho de cada praia; dá erro se a imagem ainda não saiu
@@ -610,7 +642,10 @@
             for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const X = px2 + dx, Y = py2 + dy; if (X < 0 || Y < 0 || X > 255 || Y > 255) continue; sr += d2[(Y * 256 + X) * 4]; qr++; } }
           if (qr) raio[p.id] = Math.round(sr / qr / Math.sqrt(Math.sin(el * Math.PI / 180)));
         }
-        return { praias: novo, tex, frac, raio };
+        // v19.11: guarda a imagem inteira (cada quadrado de 256×256) para o radar conferir se tem nuvem onde ele vê "chuva"
+        const grade = {}; for (const [k, pr] of Object.entries(tiles)) { try { grade[k] = await pr; } catch (e) {} }
+        const el0 = alturaSol(PRAIAS[0].lat, PRAIAS[0].lon, t0);
+        return { praias: novo, tex, frac, raio, grade, el: el0 };
       };
       for (let atras = 20; atras <= 90; atras += 10) {
         const t0 = new Date(Math.floor((agora - atras * 60000) / 600000) * 600000);
@@ -620,7 +655,7 @@
         // v19.4: pega a imagem mais nova que já saiu (começa 20 min atrás). Teste com 14 dias de satélite: a imagem de 30 min
         // atrás acerta o céu de agora 78% das vezes, a de 40 min 75%. Prever a "tendência" com as imagens anteriores PIOROU
         // (75% ou menos em todas as versões testadas): a nuvem do Rio não segue o mesmo ritmo por meia hora. Por isso não tem projeção.
-        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac, raio: r.raio };
+        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac, raio: r.raio, grade: r.grade, el: r.el, mascara: {} };
         return;
       }
     } catch (e) { console.warn("Satélite indisponível agora", e); }
@@ -2207,30 +2242,21 @@
     }
 
     // v18.7: a janela virou UMA linha pequena embaixo da frase do dia (antes era uma caixa grande).
-    // v19.11: MELHOR JANELA do dia = o maior trecho seguido (2 h ou mais, das 7h às 18h) com sol firme, sem chuva e areia com sol.
-    // O vento não corta mais a janela: ele só entra no texto ("venta mais a partir das 13h"). Antes, 8h–13h de vento fraco
-    // escondia uma tarde inteira de sol (8h–17h). Sem sol firme: tenta "sol vai e vem". Hoje, só as horas que ainda vêm.
+    // v18.6: MELHOR JANELA do dia = o maior trecho seguido (2 h ou mais, das 7h às 18h) com sol, sem chuva e areia com sol.
+    // 1ª tentativa: sol firme e vento fraco (até 15 km/h); 2ª: sol firme, mesmo com vento; 3ª: sol vai e vem. Hoje, só as horas que ainda vêm.
     const jan = (() => {
       const hs = x.horas.filter((y) => y.h >= 7 && y.h <= 17 && !(estado.dia === 0 && y.h < horaAgora));
       const base = (y) => (y.chuva || 0) < 30 && !(somb && somb.sombraHora[y.h]);
-      const maior = (ok) => { let m = null, ini = null;
+      const niveis = [[(y) => y.est === "sol" && base(y) && (y.v == null || y.v <= 15), "sol firme, vento fraco"],
+        [(y) => y.est === "sol" && base(y), "sol firme, mas venta"],
+        [(y) => (y.est === "sol" || y.est === "parcial") && base(y), "sem chuva, areia com sol"]];
+      for (const [ok, txt] of niveis) {
+        let m = null, ini = null;
         for (let h = 7; h <= 18; h++) { const y = hs.find((q) => q.h === h);
           if (y && ok(y)) { if (ini == null) ini = h; } else { if (ini != null && (!m || h - ini > m.fim - m.ini)) m = { ini, fim: h }; ini = null; } }
-        return m && m.fim - m.ini >= 2 ? m : null; };
-      const firme = maior((y) => y.est === "sol" && base(y));
-      if (firme) {
-        const hrs = hs.filter((y) => y.h >= firme.ini && y.h < firme.fim);
-        const forte = (y) => y.v != null && y.v > 15;
-        const i1 = hrs.findIndex(forte);
-        let txt;
-        if (i1 < 0) txt = "sol firme, vento fraco";
-        else if (i1 === 0) { const calma = hrs.findIndex((y) => !forte(y));
-          txt = calma > 0 && hrs.slice(calma).every((y) => !forte(y)) ? `sol firme, vento fraco a partir das ${hrs[calma].h}h` : "sol firme, mas venta"; }
-        else txt = `sol firme, venta mais a partir das ${hrs[i1].h}h`;
-        return { ...firme, txt };
+        if (m && m.fim - m.ini >= 2) return { ...m, txt };
       }
-      const parcial = maior((y) => (y.est === "sol" || y.est === "parcial") && base(y));
-      return parcial ? { ...parcial, txt: "sem chuva, areia com sol" } : null;
+      return null;
     })();
     if (jan) for (let k = 0; k < horas.length; k++) { const hh = HORA_INI + k; if (hh >= jan.ini && hh < jan.fim) horas[k] = horas[k].replace('class="hr ', 'class="hr jan '); }
     const faixa = `<div class="faixa-dia"><p class="veredito">${a.veredito}</p>${jan ? `<p class="janela"><b>Melhor janela: ${jan.ini}h às ${jan.fim}h</b><span> · ${jan.txt}</span></p>` : ""}</div>`;

@@ -30,9 +30,13 @@ jobs:
       - name: Ler a cada 5 min e salvar a cada 15 min
         shell: bash
         run: |
+          # v19.10: um erro numa volta (ex.: o envio pro GitHub brigar com outro robô) não derruba mais a rodada inteira.
+          # Antes, um comando falhando matava as ~3 horas de leitura (17/11: "All jobs have failed" depois de 2h10).
+          set +e
           git config user.name "robo-praiometro"
           git config user.email "robo-praiometro@users.noreply.github.com"
           for i in $(seq 0 33); do
+            git rebase --abort >/dev/null 2>&1   # se um envio anterior ficou pela metade, desfaz antes de seguir
             python -c "import datetime as d; h=d.datetime.now(d.timezone(d.timedelta(hours=-3))).hour; raise SystemExit(0 if 5 <= h < 20 else 1)" || break
             python scripts/chuva.py || true
             if [ $((i % 3)) -eq 0 ]; then
