@@ -4010,6 +4010,21 @@
     if ($("#mmVer")) $("#mmVer").onclick = () => { fecharMapaCheio(); setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 120); };   // espera o "voltar" do histórico terminar, senão ele desfaz a rolagem
     $("#abrirSurfe").onclick = abrirSurfe;
     $("#abrirTreino").onclick = abrirTreino;
+    // v19.14: barra de baixo no estilo do Instagram. Ela fica por cima das telas Favoritas, Surfe e Treino; a aberta fica
+    // marcada. Tocar em outra troca de tela; tocar de novo na marcada volta para a página principal.
+    const ABAS = [["favTela", "abrirFav", fecharFavoritas], ["surfeTela", "abrirSurfe", fecharSurfe], ["treinoTela", "abrirTreino", fecharTreino]];
+    const marcarAba = () => {
+      let alguma = false;
+      ABAS.forEach(([t, b]) => { const on = !!$("#" + t) && !$("#" + t).hidden; alguma = alguma || on; const bt = $("#" + b); if (bt) bt.classList.toggle("sel", on); });
+      document.body.classList.toggle("aba-aberta", alguma);
+    };
+    ABAS.forEach(([t]) => { const el = $("#" + t); if (el) new MutationObserver(marcarAba).observe(el, { attributes: true, attributeFilter: ["hidden"] }); });
+    $("#atalhos").addEventListener("click", (e) => {
+      const bt = e.target.closest("button"); if (!bt) return;
+      const minha = ABAS.find(([, b]) => b === bt.id);
+      if (minha && bt.classList.contains("sel")) { e.stopImmediatePropagation(); minha[2](); return; }   // tocou de novo: fecha
+      ABAS.forEach(([t, b, fechar]) => { if (b !== bt.id && $("#" + t) && !$("#" + t).hidden) fechar(); });   // fecha a outra aba aberta
+    }, true);
     $("#fecharTreino").onclick = fecharTreino;
     $("#treinoVoltar").onclick = () => irTreino(treinos.length ? "lista" : "escolher");
     $("#fecharRel").onclick = fecharRelatorio;

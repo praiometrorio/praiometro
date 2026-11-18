@@ -893,22 +893,26 @@ html,body{overscroll-behavior-y:none}
 .praiao svg{width:18px;height:18px;color:#FFB627}
 .praiao small{display:inline;color:#FFE7B3;font-weight:500;opacity:.85;margin-left:4px}
 .praiao.praia{background:rgba(120,200,235,.14);color:#9FDCF5}.praiao.praia svg{color:#7CC8EA}.praiao.praia small{color:#CFEFFC}
-/* barra de baixo */
-.atalhos4{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(4,1fr);gap:0;background:#0A2840;
-  border-radius:26px 26px 0 0;padding:0 8px calc(10px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(0,10,25,.35)}
-.atalhos4.so3{grid-template-columns:repeat(3,1fr)}
-.atalhos4>button,.atalhos4.so3 #abrirTreino{grid-column:auto;position:relative;flex-direction:column;height:auto;min-height:0;margin:-18px 0 0;padding:0;
-  background:none;box-shadow:none;gap:5px;align-items:center;justify-content:flex-start;border-radius:0;color:#BFD6E6;text-align:center}
-.atalhos4>button svg{width:22px;height:22px;box-sizing:content-box;padding:10px;border-radius:50%;border:4px solid #0A2840;filter:none}
-.atalhos4 #abrirFav svg{background:linear-gradient(120deg,#FFD36B,#FFB627);color:#fff}
+/* barra de baixo — v19.14: flutuante e arredondada (estilo Instagram), 5 botões com os círculos coloridos; a tela aberta fica marcada */
+.atalhos4{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:800;display:grid;grid-template-columns:repeat(5,1fr);gap:0;
+  background:#0B2233;border:1px solid rgba(255,255,255,.12);border-radius:32px;padding:6px 4px;box-shadow:0 8px 26px rgba(0,10,25,.45)}
+.atalhos4.so3{grid-template-columns:repeat(4,1fr)}
+body.aba-aberta .atalhos4{z-index:950}
+.atalhos4>button,.atalhos4.so3 #abrirTreino{grid-column:auto;position:relative;flex-direction:column;height:auto;min-height:0;margin:0;padding:6px 0 5px;
+  background:none;box-shadow:none;gap:4px;align-items:center;justify-content:flex-start;border-radius:26px;color:#fff;text-align:center;transition:background .15s}
+.atalhos4>button.sel{background:rgba(255,255,255,.14)}
+.atalhos4>button svg{width:20px;height:20px;box-sizing:content-box;padding:10px;border-radius:50%;border:0;filter:none}
+.atalhos4 #abrirFav svg{background:linear-gradient(120deg,#FFD36B,#F2B21B);color:#5a3a00}
 .atalhos4 #abrirSurfe svg{background:linear-gradient(120deg,#16A3C9,#0B6FA8);color:#fff}
 .atalhos4 #abrirTreino svg{background:linear-gradient(120deg,#2B2F6B 0%,#B0457A 55%,#FF9A5A 100%)}
 .atalhos4 #abrirSol svg{background:linear-gradient(120deg,#FF8A3D 0%,#FFB627 60%,#FFD36B 100%);color:#fff}
-.atalhos4>button span{display:block;flex:none;font-size:11px;font-weight:700;letter-spacing:.01em}
+.atalhos4>button span{display:block;flex:none;font-size:10.5px;font-weight:700;letter-spacing:.01em;white-space:nowrap}
 .atalhos4>button small{display:none}
-.atalhos4 #favQtd{position:absolute;top:0;right:calc(50% - 28px);min-width:18px;height:18px;font-size:10px;padding:0 4px;background:#fff;color:#10283A;border-radius:999px;display:grid;place-items:center}
+.atalhos4 #favQtd{position:absolute;top:2px;right:calc(50% - 26px);min-width:17px;height:17px;font-size:10px;padding:0 4px;background:#fff;color:#10283A;border-radius:999px;display:grid;place-items:center}
 .atalhos4 #favQtd:empty{display:none}
-.atalhos4 .btn-sol em{top:-6px;right:calc(50% - 34px);font-size:7.5px;padding:3px 5px}
+.atalhos4 .btn-sol em{top:-7px;right:calc(50% - 32px);font-size:7.5px;padding:3px 5px}
+body.aba-aberta .fav-tela{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
+@media (max-width:360px){.atalhos4>button span{font-size:9.5px}}
 .wrap{padding-bottom:calc(110px + env(safe-area-inset-bottom,0px))}
 @media (min-width:700px){.atalhos4{left:50%;right:auto;width:440px;transform:translateX(-50%)}}
 
