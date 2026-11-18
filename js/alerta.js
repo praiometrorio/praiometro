@@ -108,10 +108,30 @@
       serviceWorkerParam: { scope: BASE + "push/onesignal/" }
     });
     OS = OneSignal;
-    OneSignal.User.PushSubscription.addEventListener("change", mostrar);
+    OneSignal.User.PushSubscription.addEventListener("change", () => { mostrar(); sincAvisos(); });
     mostrar();
+    sincAvisos();
     talvezConvidar();
   });
+
+  // v19.14 AVISOS DE PRAIA: cada praia escolhida (até 4) vira a etiqueta a_<praia> = "1" no OneSignal.
+  // O robô (scripts/praiao.py) manda o aviso só para quem tem alguma praia boa e monta o texto com as praias de cada um.
+  function idsAviso() {
+    if (window.pmAvisoPraias) return window.pmAvisoPraias();
+    const g = ler("pm-aviso-praias"); return Array.isArray(g) ? g : (ler("pm-favoritas") || []).slice(0, 4);
+  }
+  async function sincAvisos(ids) {
+    if (!OS || !OS.User.PushSubscription.optedIn) return false;
+    try {
+      ids = ids || idsAviso();
+      let atuais = {}; try { atuais = (OS.User.getTags && OS.User.getTags()) || {}; } catch (e) {}
+      const tirar = Object.keys(atuais).filter((k) => /^a_/.test(k) && !ids.includes(k.slice(2)));
+      if (tirar.length) await OS.User.removeTags(tirar);
+      const por = {}; ids.forEach((id) => { if (atuais["a_" + id] !== "1") por["a_" + id] = "1"; });
+      if (Object.keys(por).length) await OS.User.addTags(por);
+      return true;
+    } catch (e) { return false; }
+  }
 
   // usado pelo Treino cedo: liga a notificação e guarda os treinos como etiquetas no OneSignal (tr_esporte_praia_hora = dias)
   window.pmPush = {
@@ -123,6 +143,8 @@
       if (OS.User.PushSubscription.optedIn) { mostrar(); return "ok"; }
       return window.Notification && Notification.permission === "denied" ? "bloqueado" : "erro";
     },
+    ligado() { return !!(OS && OS.User.PushSubscription.optedIn); },
+    avisos(ids) { return sincAvisos(ids); },
     async etiquetas(novas) {
       if (!OS) return false;
       try {

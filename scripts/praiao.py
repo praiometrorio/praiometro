@@ -186,9 +186,9 @@ def conta_do_app(dias):
                 if not r: continue
                 fama = lambda pid: FAMA.index(pid) if pid in FAMA else len(FAMA)
                 por = {q["id"]: q for q in r["todas"]}
-                top = sorted(((por[i]["firmes"], -round(por[i]["vento"]), -fama(i), por[i]["nome"], por[i]["tipoFirme"], por[i]["temp"]) for i in r["praiao"]), reverse=True)
-                boas = sorted(((por[i]["pontos"], -round(por[i]["vento"]), -fama(i), por[i]["nome"], por[i]["tipoPraia"], por[i]["temp"]) for i in r["praia"]), reverse=True)
-                out[r["data"]] = (top, boas)
+                top = sorted(((por[i]["firmes"], -round(por[i]["vento"]), -fama(i), por[i]["nome"], por[i]["tipoFirme"], por[i]["temp"], i) for i in r["praiao"]), reverse=True)
+                boas = sorted(((por[i]["pontos"], -round(por[i]["vento"]), -fama(i), por[i]["nome"], por[i]["tipoPraia"], por[i]["temp"], i) for i in r["praia"]), reverse=True)
+                out[r["data"]] = (top, boas, por)
                 print(f"conta do app para {r['data']}: {len(top)} praias de praião, {len(boas)} de praia")
             nav.close()
             return out
@@ -196,6 +196,10 @@ def conta_do_app(dias):
         print("não consegui usar a conta do app:", e); return None
     finally:
         srv.shutdown()
+
+def pid_de(b):
+    """id da praia de uma linha (a conta do app guarda o id no fim; a reserva em Python usa a ordem de fama)"""
+    return b[6] if len(b) > 6 else FAMA[-b[2]]
 
 def tipo_do_dia(boas):
     """o tipo de praião que mais aparece entre as praias boas (empate: o melhor)"""
@@ -237,6 +241,90 @@ def enviar(titulo, texto, chave_envio):
             if "segment" not in erro.lower(): break
     return False
 
+# ---------- v19.14: aviso PERSONALIZADO (só das praias que a pessoa escolheu, até 4) ----------
+# No app, cada praia escolhida vira a etiqueta a_<praia> = "1" no OneSignal. Aqui:
+#  - o aviso vai só para quem tem a etiqueta de alguma praia boa (filtros "existe a_x" com OU);
+#  - o título e o texto se montam para cada pessoa com Liquid (o OneSignal troca pelas praias dela).
+def texto_vento(ventos):
+    """vento numa palavra + quando aperta (9h às 17h): fraco / moderado / forte"""
+    if not ventos: return "vento fraco"
+    mx = max(v for _, v in ventos)
+    if mx <= 15: return "vento fraco"
+    h1 = min(h for h, v in ventos if v > 15)
+    forca = "moderado" if mx < 25 else "forte"
+    return f"vento {forca} o dia todo" if h1 <= 10 else f"vento {forca} depois das {h1}h"
+
+def detalhe(q, nivel):
+    """linha de baixo da notificação, ex.: 'Solzão das 9h às 16h · 31° · vento forte depois das 14h'"""
+    hs = q.get("firmesH" if nivel == "praiao" else "boasH") or []
+    if hs:
+        janela = f"das {min(hs)}h às {max(hs) + 1}h"
+        sol = f"Solzão {janela}" if nivel == "praiao" else (f"Sol vai e vem {janela}" if q.get("tipoPraia") == "nuvens" else f"Sol {janela}")
+    else:
+        sol = SOL_PRAIAO.get(q.get("tipoFirme"), "Solzão") if nivel == "praiao" else SOL_PRAIA.get(q.get("tipoPraia"), "Sol")
+    partes = [sol]
+    if q.get("temp") is not None: partes.append(f"{round(q['temp'])}°")
+    if q.get("ventos") is not None: partes.append(texto_vento(q["ventos"]))
+    return " · ".join(partes)
+
+def praias_do_dia(app, reserva_fn, data):
+    """lista [(id, nome, nivel, detalhe)] de CADA praia boa (sem exigir 4 praias): praião primeiro, depois praia"""
+    itens = []
+    if data in app and len(app[data]) > 2:
+        por = app[data][2]
+        fama = lambda pid: FAMA.index(pid) if pid in FAMA else len(FAMA)
+        for q in sorted(por.values(), key=lambda q: fama(q["id"])):
+            if q["firmes"] >= 5 and q["chuvaSol"] < 20: itens.append((q["id"], q["nome"], "praiao", detalhe(q, "praiao")))
+        for q in sorted(por.values(), key=lambda q: fama(q["id"])):
+            if q["id"] not in [i[0] for i in itens] and q["pontos"] >= 5 and q["chuvaBoa"] < 40:
+                itens.append((q["id"], q["nome"], "praia", detalhe(q, "praia")))
+        return itens
+    # reserva (o navegador falhou): conta em Python, sem as praias da baía e com texto mais simples
+    top, boas = reserva_fn(data, "praiao"), reserva_fn(data, "praia")
+    for b in top: itens.append((pid_de(b), b[3], "praiao", f"{SOL_PRAIAO[b[4]]}{graus([b])}".replace(", ", " · ")))
+    for b in boas:
+        if pid_de(b) not in [i[0] for i in itens]: itens.append((pid_de(b), b[3], "praia", f"{SOL_PRAIA[b[4]]}{graus([b])}".replace(", ", " · ")))
+    return itens
+
+LISTA = lambda v: '{% for n in ' + v + ' %}{{ n }}{% if forloop.rindex == 2 %} e {% elsif forloop.last == false %}, {% endif %}{% endfor %}'
+def liquid_base(itens):
+    """monta, para cada pessoa, pr = praias dela com PRAIÃO, pa = praias dela com praia, det = detalhe da melhor"""
+    q = lambda t: t.replace('"', "'")
+    s = '{% assign pr = "" %}{% assign pa = "" %}{% assign det = "" %}'
+    for pid, nome, nivel, det in itens:
+        v = "pr" if nivel == "praiao" else "pa"
+        s += (f'{{% if user.tags.a_{pid} %}}{{% assign {v} = {v} | append: "|{q(nome)}" %}}'
+              f'{{% if det == "" %}}{{% assign det = "{q(det)}" %}}{{% endif %}}{{% endif %}}')
+    return s + '{% assign prl = pr | remove_first: "|" | split: "|" %}{% assign pal = pa | remove_first: "|" | split: "|" %}'
+
+def filtros_tem(ids):
+    """quem tem a etiqueta de pelo menos uma dessas praias"""
+    f = []
+    for pid in ids:
+        if f: f.append({"operator": "OR"})
+        f.append({"field": "tag", "key": f"a_{pid}", "relation": "exists"})
+    return f
+
+def enviar_pessoal(titulo, texto, filtros, chave_envio, resumo):
+    app, key = os.environ.get("ONESIGNAL_APP_ID"), os.environ.get("ONESIGNAL_KEY")
+    print(f"→ (personalizado) {resumo}")
+    if not filtros: return False
+    if not app or not key:
+        print("  (sem as chaves do OneSignal: só testei, não mandei)"); return False
+    corpo = {"app_id": app, "target_channel": "push", "filters": filtros,
+             "headings": {"en": titulo, "pt": titulo}, "contents": {"en": texto, "pt": texto}, "url": SITE,
+             "chrome_web_icon": SITE + "icons/icon-192.png", "firefox_icon": SITE + "icons/icon-192.png",
+             "chrome_web_badge": SITE + "icons/icon-192.png"}
+    req = urllib.request.Request("https://api.onesignal.com/notifications?c=push", data=json.dumps(corpo).encode(),
+        headers={"Content-Type": "application/json", "Authorization": "Key " + key, "idempotency_key": chave_envio[:64]}, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as r:
+            print("  enviado:", r.read().decode()[:200]); return True
+    except urllib.error.HTTPError as e:
+        erro = e.read().decode()[:300]; print("  erro do OneSignal:", e.code, erro)
+        # ninguém com essas praias escolhidas: não é erro
+        return "not subscribed" in erro.lower() or "no recipients" in erro.lower()
+
 def main():
     hoje = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).date()
     teste = os.environ.get("TESTE") == "sim"
@@ -268,35 +356,60 @@ def main():
         lista = top if eh_praiao else boas
         # guarda a DECISÃO da véspera (o app mostra a faixa de hoje só se a previsão da véspera cravou)
         dec = {"praiao": eh_praiao, "praia": eh_praia, "tipo": tipo_do_dia(lista) if lista else None,
-               "praias": [b[3] for b in lista][:8], "ids": [FAMA[-b[2]] for b in lista][:8],
+               "praias": [b[3] for b in lista][:8], "ids": [pid_de(b) for b in lista][:8],
                "temp": round(lista[0][5]) if lista and lista[0][5] is not None else None}
         if any(reg.get(k) != v for k, v in dec.items()): reg.update(dec); mudou = True
-        ok, chave = None, None
-        if eh_praiao:
-            pre = "Confirmado: amanhã é" if reg.get("pre") else "Amanhã é"
-            ok = enviar(f"☀️ {pre} dia de PRAIÃO!", f"{SOL_PRAIAO[tipo_do_dia(top)]}{graus(top)} e vento fraco em {nomes(top)}. Dia raro: aproveita!", f"conf-{amanha}" if reg.get("pre") else f"vesp-{amanha}")
-        elif eh_praia and reg.get("pre"):
-            ok = enviar(f"😕 Mudou: {dia} não vai ter praião", f"Mas ainda vai dar praia: {SOL_PRAIA[tipo_do_dia(boas)].lower()}{graus(boas)} em {nomes(boas)}. Toca pra ver.", f"canc-{amanha}")
-        elif eh_praia:
-            ok = enviar("🏖️ Amanhã vai dar praia", f"{SOL_PRAIA[tipo_do_dia(boas)]}{graus(boas)} em {nomes(boas)}. Leva o protetor.", f"praia-{amanha}")
-        elif reg.get("pre"):
-            ok = enviar(f"😕 Mudou: {dia} não vai ter praião", "A previsão piorou e vai ter mais nuvem que o esperado. Toca pra ver como ficou.", f"canc-{amanha}")
+        # v19.14: o aviso é PERSONALIZADO, só das praias que cada pessoa escolheu (a decisão acima continua valendo para a faixa do app)
+        itens = praias_do_dia(app, boas_de, amanha)
+        base = liquid_base(itens)
+        titulo = base + ('{% if prl.size > 0 and pal.size > 0 %}☀️ Amanhã: PRAIÃO em ' + LISTA("prl") + ' · praia em ' + LISTA("pal") +
+                         '{% elsif prl.size > 0 %}☀️ Amanhã é PRAIÃO em ' + LISTA("prl") + '{% else %}🏖️ Amanhã vai dar praia em ' + LISTA("pal") + '{% endif %}')
+        texto = base + '{{ det }}'
+        ok = None
+        if itens:
+            ok = enviar_pessoal(titulo, texto, filtros_tem([i[0] for i in itens]), f"vesp2-{amanha}",
+                                "; ".join(f"{n} ({'PRAIÃO' if nv == 'praiao' else 'praia'}: {d})" for _, n, nv, d in itens))
         else:
-            print(f"Amanhã ({amanha}): {len(top)} praias de praião e {len(boas)} boas, sem aviso.")
+            print(f"Amanhã ({amanha}): nenhuma praia boa, sem aviso.")
+        # transição: quem ainda não abriu a versão nova do app não tem etiqueta a_<praia> nenhuma.
+        # Esses recebem o aviso geral de antes (só quando o dia é bom na cidade). Ao abrir o app, as etiquetas entram sozinhas.
+        todas_ids = sorted(set(FAMA) | set((app.get(amanha) or ((), (), {}))[2].keys()))
+        sem_tag = [{"field": "tag", "key": f"a_{pid}", "relation": "not_exists"} for pid in todas_ids]
+        if eh_praiao:
+            enviar_pessoal(f"☀️ Amanhã é dia de PRAIÃO!", f"{SOL_PRAIAO[tipo_do_dia(top)]}{graus(top)} em {nomes(top)}.", sem_tag, f"vespg-{amanha}", "geral (sem praias escolhidas)")
+        elif eh_praia:
+            enviar_pessoal("🏖️ Amanhã vai dar praia", f"{SOL_PRAIA[tipo_do_dia(boas)]}{graus(boas)} em {nomes(boas)}.", sem_tag, f"praiag-{amanha}", "geral (sem praias escolhidas)")
+        # quem recebeu o pré-aviso e agora não tem nenhuma praia boa: avisa que mudou
+        pre_ids = reg.get("pre_ids") or []
+        boas_ids = [i[0] for i in itens]
+        if pre_ids and any(p not in boas_ids for p in pre_ids):
+            filtros = []
+            for p in pre_ids:
+                if filtros: filtros.append({"operator": "OR"})
+                filtros.append({"field": "tag", "key": f"a_{p}", "relation": "exists"})
+                filtros += [{"field": "tag", "key": f"a_{g}", "relation": "not_exists"} for g in boas_ids]
+            if len(filtros) <= 190:
+                enviar_pessoal(f"😕 Mudou: {dia} não vai ter praião", "A previsão piorou nas suas praias. Toca pra ver como ficou.",
+                               filtros, f"canc2-{amanha}", "cancelamento do pré-aviso")
+            else:
+                print("cancelamento: filtros demais, pulei")
         if ok: reg["vespera"] = True; mudou = True
         if reg: estado[amanha] = reg
 
-    # 2) três dias antes: só PRAIÃO, e com mais praias (5+), para ter menos alarme falso
+    # 2) três dias antes: só PRAIÃO, personalizado (as praias de cada pessoa)
     alvo_d = hoje + datetime.timedelta(days=3); alvo = alvo_d.isoformat()
     if not estado.get(alvo, {}).get("pre"):
-        top = boas_de(alvo, "praiao")
         dia = DIAS[alvo_d.weekday()]
         vespera = DIAS[(alvo_d - datetime.timedelta(days=1)).weekday()]
-        if len(top) >= 5:
-            if enviar(f"👀 {dia.capitalize()} pode ser dia de PRAIÃO", f"A previsão está com {SOL_PRAIAO[tipo_do_dia(top)].lower()}{graus(top)} e vento fraco em {nomes(top)}. A gente confirma na {vespera} à noite.", f"pre-{alvo}"):
-                estado.setdefault(alvo, {})["pre"] = True; mudou = True
+        top = [i for i in praias_do_dia(app, boas_de, alvo) if i[2] == "praiao"]
+        if top:
+            base = liquid_base(top)
+            if enviar_pessoal(base + f"👀 {dia.capitalize()} pode ser PRAIÃO em " + LISTA("prl"),
+                              base + f"{{{{ det }}}}. A gente confirma na {vespera} à noite.",
+                              filtros_tem([i[0] for i in top]), f"pre2-{alvo}", f"pré-aviso: {', '.join(n for _, n, _, _ in top)}"):
+                estado.setdefault(alvo, {}).update({"pre": True, "pre_ids": [i[0] for i in top]}); mudou = True
         else:
-            print(f"Daqui a 3 dias ({alvo}): só {len(top)} praias de praião, sem pré-aviso.")
+            print(f"Daqui a 3 dias ({alvo}): nenhuma praia de praião, sem pré-aviso.")
 
     if mudou:
         os.makedirs("data", exist_ok=True)

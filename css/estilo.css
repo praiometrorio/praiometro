@@ -1183,3 +1183,19 @@ div.servico svg{width:15px;height:15px}
 /* v19.10: o que a faixa do treino mostra (vento, temperatura, ondas) e unidade na faixa pequena */
 .tr-oque{display:inline-block;margin-left:4px;font-size:11px;font-weight:700;background:#E7EEF3;color:#3a4b58;border-radius:6px;padding:1px 6px;vertical-align:1px}
 .tr-faixa.mini .tr-h .u{font-size:9.5px}
+
+/* v19.14: avisos de praia (até 4 praias) na tela das favoritas */
+.fav-avisos{max-width:720px;margin:22px auto 0;color:#fff}
+.fav-avisos h3{margin:0 0 2px;font-size:18px}
+.fav-av-sub{font-size:13px;color:rgba(255,255,255,.78);margin:0 0 10px}
+.fav-av-cont{font-size:13px;font-weight:700;color:#FFC23D;margin:2px 0 8px}
+.fav-av-lin{display:flex;align-items:center;justify-content:space-between;width:100%;background:#fff;border:0;border-radius:14px;padding:11px 13px;margin:0 0 7px;font:inherit;color:var(--ink);text-align:left;cursor:pointer}
+.fav-av-lin b{display:block;font-size:15px}
+.fav-av-lin small{display:block;font-size:11.5px;color:#7a8a96}
+.fav-av-lin.cinza{opacity:.45;cursor:default}
+.fav-sw{width:42px;height:24px;border-radius:12px;background:#d6dde3;position:relative;flex:none;transition:background .15s}
+.fav-sw.on{background:#1FA868}
+.fav-sw i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.fav-sw.on i{left:21px}
+.fav-av-ligar{width:100%;border:0;border-radius:14px;background:#FFC23D;color:#3a2600;font:inherit;font-weight:700;padding:12px;margin:0 0 6px;cursor:pointer}
+.fav-av-msg{font-size:13px;color:#FFE3A0;margin:0 0 8px}

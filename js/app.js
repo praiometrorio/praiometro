@@ -1812,8 +1812,13 @@
     const um = (p) => { const x = previsao[p.id][d];
       const chuvaSol = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && y.est === "sol").map((y) => y.chuva || 0));
       const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
+      const hs = x.horas.filter((y) => y.h >= 9 && y.h <= 17);
       return { id: p.id, nome: p.nome, firmes: firmes(x), pontos: pontosPraia(x), vento: x.vento, temp: x.temp, chuvaSol, chuvaBoa,
-        tipoFirme: tipoFirme(x), tipoPraia: tipoPraiao(x) }; };
+        tipoFirme: tipoFirme(x), tipoPraia: tipoPraiao(x),
+        // v19.14: para o aviso personalizado (só das praias escolhidas): horas boas e o vento de cada hora
+        firmesH: hs.filter((y) => y.est === "sol" && ventoOk(y)).map((y) => y.h),
+        boasH: hs.filter((y) => (y.est === "sol" || y.est === "parcial") && ventoOk(y)).map((y) => y.h),
+        ventos: hs.map((y) => [y.h, Math.round(y.v ?? 0)]) }; };
     const todas = mar.map(um);
     return { data: datas[d], todas,
       praiao: (() => { const t = todas.filter((q) => q.firmes >= 5 && q.chuvaSol < 20);
@@ -2522,7 +2527,51 @@
     favoritas = ehFavorita(id) ? favoritas.filter((f) => f !== id) : favoritas.concat(id);
     guarda.gravar("pm-favoritas", favoritas);
     contarFavoritas();
+    // v19.14: a praia que sai das favoritas sai dos avisos; a que entra, entra nos avisos se ainda cabe (até 4)
+    let av = avisoPraias();
+    av = ehFavorita(id) ? (av.length < AVISO_MAX && !av.includes(id) ? av.concat(id) : av) : av.filter((f) => f !== id);
+    gravarAvisos(av);
   }
+  // ---------- avisos de praia: até 4 praias (as etiquetas a_<praia> no OneSignal; o robô manda só para quem tem a praia boa) ----------
+  const AVISO_MAX = 4;
+  function avisoPraias() {
+    const g = guarda.ler("pm-aviso-praias");
+    return (Array.isArray(g) ? g : favoritas.slice(0, AVISO_MAX)).filter((id) => PRAIAS.some((p) => p.id === id)).slice(0, AVISO_MAX);
+  }
+  function gravarAvisos(ids) {
+    guarda.gravar("pm-aviso-praias", ids);
+    if (window.pmPush && window.pmPush.avisos) window.pmPush.avisos(ids);
+  }
+  function desenharAvisos() {
+    const box = $("#favAvisos"); if (!box) return;
+    const favs = favoritas.map((id) => PRAIAS.find((p) => p.id === id)).filter(Boolean);
+    if (!favs.length) { box.innerHTML = ""; return; }
+    const av = avisoPraias(), ligado = !!(window.pmPush && window.pmPush.ligado && window.pmPush.ligado());
+    const reg = (p) => (p.local || "").replace("Baía de Guanabara", "Baía");
+    box.innerHTML = `<h3>Avisos de praia</h3>
+      <p class="fav-av-sub">Escolha até ${AVISO_MAX} praias. Na véspera, às 18h40, a gente avisa se vai dar praia nelas.</p>
+      ${ligado ? "" : `<button class="fav-av-ligar" id="favAvLigar">🔔 Ligar os avisos</button><p class="fav-av-msg" id="favAvMsg"></p>`}
+      <p class="fav-av-cont">${av.length} de ${AVISO_MAX} escolhidas</p>
+      ${favs.map((p) => { const on = av.includes(p.id), cheio = !on && av.length >= AVISO_MAX;
+        return `<button class="fav-av-lin${cheio ? " cinza" : ""}" data-av="${p.id}" role="switch" aria-checked="${on}"${cheio ? " disabled" : ""}>
+          <span><b>${p.nome}</b><small>${reg(p)}</small></span><i class="fav-sw${on ? " on" : ""}"><i></i></i></button>`; }).join("")}
+      <p class="fav-av-sub">${av.length >= AVISO_MAX ? "Chegou em 4: para trocar, desligue uma." : "Só aparecem aqui as suas favoritas."}</p>`;
+    box.querySelectorAll("[data-av]").forEach((b) => b.onclick = () => {
+      const id = b.dataset.av, atual = avisoPraias();
+      const novo = atual.includes(id) ? atual.filter((x) => x !== id) : atual.length < AVISO_MAX ? atual.concat(id) : atual;
+      contar(atual.includes(id) ? "aviso-tirou" : "aviso-pos"); gravarAvisos(novo); desenharAvisos();
+    });
+    const lg = $("#favAvLigar");
+    if (lg) lg.onclick = async () => {
+      const r = window.pmPush ? await window.pmPush.ligar() : "carregando";
+      const m = $("#favAvMsg");
+      if (r === "ok") { gravarAvisos(avisoPraias()); return desenharAvisos(); }
+      if (m) m.innerHTML = { instalar: "No iPhone, primeiro instale o app: toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b>.",
+        carregando: "Carregando… tenta de novo em alguns segundos.", "nao-suporta": "Esse navegador não aceita notificações.",
+        bloqueado: "As notificações estão bloqueadas. Libere nas configurações do celular." }[r] || "Não deu certo agora. Tenta de novo daqui a pouco.";
+    };
+  }
+  window.pmAvisoPraias = avisoPraias;
   function contarFavoritas() { const q = $("#favQtd"); if (q) q.textContent = favoritas.length ? favoritas.length : ""; }
 
   // ---------- tela das favoritas: previsão resumida de cada uma; tocando, abre a completa ----------
@@ -2646,6 +2695,7 @@
         <span class="fav-abrir">Previsão completa ›</span>
       </button>`).join("");
     document.querySelectorAll(".fav-card").forEach((b) => b.onclick = () => { fecharFavoritas(); abrirPraia(b.dataset.id, true); });
+    desenharAvisos();
   }
   function abrirFavoritas() { contar("abriu-favoritas"); desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
   function fecharFavoritas() { $("#favTela").hidden = true; document.body.style.overflow = ""; }
