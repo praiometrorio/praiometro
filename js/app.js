@@ -2542,20 +2542,35 @@
     guarda.gravar("pm-aviso-praias", ids);
     if (window.pmPush && window.pmPush.avisos) window.pmPush.avisos(ids);
   }
+  // preferências do aviso: dias (0 = semana inteira, 1 = fim de semana e feriados, 2 = só fim de semana) e tipo (0 = praião e praia, 1 = só praião).
+  // Vão juntas numa etiqueta só (a_pref = tipo × 3 + dias), para caber no limite de etiquetas do plano grátis.
+  const avisoPref = () => Object.assign({ dias: 0, tipo: 0 }, guarda.ler("pm-aviso-pref") || {});
   function desenharAvisos() {
     const box = $("#favAvisos"); if (!box) return;
     const favs = favoritas.map((id) => PRAIAS.find((p) => p.id === id)).filter(Boolean);
     if (!favs.length) { box.innerHTML = ""; return; }
     const av = avisoPraias(), ligado = !!(window.pmPush && window.pmPush.ligado && window.pmPush.ligado());
     const reg = (p) => (p.local || "").replace("Baía de Guanabara", "Baía");
+    const pf = avisoPref();
+    const op = (grupo, v, txt) => `<button class="fav-av-op" data-${grupo}="${v}" role="radio" aria-checked="${pf[grupo] === v}"><i class="fav-radio${pf[grupo] === v ? " on" : ""}"></i>${txt}</button>`;
     box.innerHTML = `<h3>Avisos de praia</h3>
-      <p class="fav-av-sub">Escolha até ${AVISO_MAX} praias. Na véspera, às 18h40, a gente avisa se vai dar praia nelas.</p>
+      <p class="fav-av-sub">Na véspera, às 18h40, a gente olha a previsão das praias que você escolheu e avisa se vale a pena ir.</p>
       ${ligado ? "" : `<button class="fav-av-ligar" id="favAvLigar">🔔 Ligar os avisos</button><p class="fav-av-msg" id="favAvMsg"></p>`}
-      <p class="fav-av-cont">${av.length} de ${AVISO_MAX} escolhidas</p>
+      <div class="fav-av-bloco"><b>☀️ PRAIÃO</b><span>Dia raro: 5 horas ou mais de sol firme entre 9h e 17h, com pouca chance de chuva. Se for ventar, o aviso diz quando ("vento forte depois das 14h").</span></div>
+      <div class="fav-av-bloco"><b>🏖️ Vai dar praia</b><span>Dia bom normal: sol na maior parte do dia, mesmo com umas nuvens passando. Chance de chuva baixa.</span></div>
+      <p class="fav-av-tit">Quais avisos você quer?</p>
+      ${op("tipo", 0, "Praião e dia de praia")}${op("tipo", 1, "Só praião (dia raro)")}
+      <p class="fav-av-tit">Em que dias?</p>
+      ${op("dias", 0, "A semana inteira")}${op("dias", 1, "Fim de semana e feriados")}${op("dias", 2, "Só fim de semana")}
+      <p class="fav-av-tit">Praias (até ${AVISO_MAX}) · ${av.length} de ${AVISO_MAX}</p>
       ${favs.map((p) => { const on = av.includes(p.id), cheio = !on && av.length >= AVISO_MAX;
         return `<button class="fav-av-lin${cheio ? " cinza" : ""}" data-av="${p.id}" role="switch" aria-checked="${on}"${cheio ? " disabled" : ""}>
           <span><b>${p.nome}</b><small>${reg(p)}</small></span><i class="fav-sw${on ? " on" : ""}"><i></i></i></button>`; }).join("")}
       <p class="fav-av-sub">${av.length >= AVISO_MAX ? "Chegou em 4: para trocar, desligue uma." : "Só aparecem aqui as suas favoritas."}</p>`;
+    box.querySelectorAll("[data-tipo],[data-dias]").forEach((b) => b.onclick = () => {
+      const novo = avisoPref(); if (b.dataset.tipo != null) novo.tipo = +b.dataset.tipo; else novo.dias = +b.dataset.dias;
+      guarda.gravar("pm-aviso-pref", novo); contar("aviso-pref"); gravarAvisos(avisoPraias()); desenharAvisos();
+    });
     box.querySelectorAll("[data-av]").forEach((b) => b.onclick = () => {
       const id = b.dataset.av, atual = avisoPraias();
       const novo = atual.includes(id) ? atual.filter((x) => x !== id) : atual.length < AVISO_MAX ? atual.concat(id) : atual;

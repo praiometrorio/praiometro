@@ -286,14 +286,50 @@ def praias_do_dia(app, reserva_fn, data):
         if pid_de(b) not in [i[0] for i in itens]: itens.append((pid_de(b), b[3], "praia", f"{SOL_PRAIA[b[4]]}{graus([b])}".replace(", ", " · ")))
     return itens
 
+# ---------- v19.14: dias e tipo de aviso que cada pessoa escolheu (etiqueta a_pref = tipo × 3 + dias) ----------
+# dias: 0 = semana inteira, 1 = fim de semana e feriados, 2 = só fim de semana · tipo: 0 = praião e praia, 1 = só praião
+# Feriados no Rio (nacionais, estaduais e municipais) até o fim de 2027
+FERIADOS = {"2026-11-20", "2026-12-25", "2027-01-01", "2027-01-20", "2027-02-08", "2027-02-09", "2027-03-26", "2027-04-21",
+            "2027-04-23", "2027-05-01", "2027-05-27", "2027-09-07", "2027-10-12", "2027-11-02", "2027-11-15", "2027-11-20", "2027-12-25"}
+def k_do_dia(data):
+    """até que 'dias' a pessoa aceita aviso para essa data: dia útil = 0; feriado em dia útil = 1; sábado/domingo = 2"""
+    d = datetime.date.fromisoformat(data)
+    return 2 if d.weekday() >= 5 else 1 if data in FERIADOS else 0
+
+def filtros_pessoais(itens, k):
+    """quem tem a praia escolhida E aceita aviso nesse dia/tipo. O OneSignal aceita até 200 itens de filtro:
+    no fim de semana (k = 2) toda preferência aceita praião, então nem precisa olhar a_pref."""
+    def monta(lista):
+        f = []
+        for pid, nome, nivel, det in lista:
+            tem = {"field": "tag", "key": f"a_{pid}", "relation": "exists"}
+            if nivel == "praiao" and k == 2: alts = [[]]
+            else:
+                alts = [[{"field": "tag", "key": "a_pref", "relation": "<", "value": str(k + 1)}]]          # praião e praia, dias até k
+                if nivel == "praiao":
+                    alts.append([{"field": "tag", "key": "a_pref", "relation": ">", "value": "2"},       # só praião, dias até k
+                                 {"field": "tag", "key": "a_pref", "relation": "<", "value": str(4 + k)}])
+            for alt in alts:
+                if f: f.append({"operator": "OR"})
+                f += [tem] + alt
+        return f
+    lista = list(itens)
+    f = monta(lista)
+    while len(f) > 195 and lista:      # segurança: tira a praia menos conhecida até caber
+        lista.pop(); f = monta(lista)
+    return f
+
 LISTA = lambda v: '{% for n in ' + v + ' %}{{ n }}{% if forloop.rindex == 2 %} e {% elsif forloop.last == false %}, {% endif %}{% endfor %}'
 def liquid_base(itens):
     """monta, para cada pessoa, pr = praias dela com PRAIÃO, pa = praias dela com praia, det = detalhe da melhor"""
     q = lambda t: t.replace('"', "'")
-    s = '{% assign pr = "" %}{% assign pa = "" %}{% assign det = "" %}'
+    s = '{% assign pr = "" %}{% assign pa = "" %}{% assign det = "" %}{% assign sp = false %}'
+    # quem escolheu "só praião" (a_pref 3, 4 ou 5) não vê as praias que só têm "vai dar praia"
+    s += '{% if user.tags.a_pref == "3" or user.tags.a_pref == "4" or user.tags.a_pref == "5" %}{% assign sp = true %}{% endif %}'
     for pid, nome, nivel, det in itens:
         v = "pr" if nivel == "praiao" else "pa"
-        s += (f'{{% if user.tags.a_{pid} %}}{{% assign {v} = {v} | append: "|{q(nome)}" %}}'
+        cond = f"user.tags.a_{pid}" if nivel == "praiao" else f"user.tags.a_{pid} and sp == false"
+        s += (f'{{% if {cond} %}}{{% assign {v} = {v} | append: "|{q(nome)}" %}}'
               f'{{% if det == "" %}}{{% assign det = "{q(det)}" %}}{{% endif %}}{{% endif %}}')
     return s + '{% assign prl = pr | remove_first: "|" | split: "|" %}{% assign pal = pa | remove_first: "|" | split: "|" %}'
 
@@ -367,7 +403,7 @@ def main():
         texto = base + '{{ det }}'
         ok = None
         if itens:
-            ok = enviar_pessoal(titulo, texto, filtros_tem([i[0] for i in itens]), f"vesp2-{amanha}",
+            ok = enviar_pessoal(titulo, texto, filtros_pessoais(itens, k_do_dia(amanha)), f"vesp2-{amanha}",
                                 "; ".join(f"{n} ({'PRAIÃO' if nv == 'praiao' else 'praia'}: {d})" for _, n, nv, d in itens))
         else:
             print(f"Amanhã ({amanha}): nenhuma praia boa, sem aviso.")
@@ -406,7 +442,7 @@ def main():
             base = liquid_base(top)
             if enviar_pessoal(base + f"👀 {dia.capitalize()} pode ser PRAIÃO em " + LISTA("prl"),
                               base + f"{{{{ det }}}}. A gente confirma na {vespera} à noite.",
-                              filtros_tem([i[0] for i in top]), f"pre2-{alvo}", f"pré-aviso: {', '.join(n for _, n, _, _ in top)}"):
+                              filtros_pessoais(top, k_do_dia(alvo)), f"pre2-{alvo}", f"pré-aviso: {', '.join(n for _, n, _, _ in top)}"):
                 estado.setdefault(alvo, {}).update({"pre": True, "pre_ids": [i[0] for i in top]}); mudou = True
         else:
             print(f"Daqui a 3 dias ({alvo}): nenhuma praia de praião, sem pré-aviso.")

@@ -125,9 +125,12 @@
     try {
       ids = ids || idsAviso();
       let atuais = {}; try { atuais = (OS.User.getTags && OS.User.getTags()) || {}; } catch (e) {}
-      const tirar = Object.keys(atuais).filter((k) => /^a_/.test(k) && !ids.includes(k.slice(2)));
+      const tirar = Object.keys(atuais).filter((k) => /^a_/.test(k) && k !== "a_pref" && !ids.includes(k.slice(2)));
       if (tirar.length) await OS.User.removeTags(tirar);
       const por = {}; ids.forEach((id) => { if (atuais["a_" + id] !== "1") por["a_" + id] = "1"; });
+      // preferências numa etiqueta só: a_pref = tipo × 3 + dias (ver scripts/praiao.py)
+      const pf = Object.assign({ dias: 0, tipo: 0 }, ler("pm-aviso-pref") || {}), pv = String(pf.tipo * 3 + pf.dias);
+      if (ids.length && atuais.a_pref !== pv) por.a_pref = pv;
       if (Object.keys(por).length) await OS.User.addTags(por);
       return true;
     } catch (e) { return false; }
