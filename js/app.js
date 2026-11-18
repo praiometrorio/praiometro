@@ -1841,6 +1841,21 @@
     const nomes = lista.slice(0, 3).map((p) => p.nome).join(", ") + (lista.length > 3 ? ` e mais ${lista.length - 3}` : "");
     return { n: lista.length, nivel, tipo, nomes, temp: previsao[lista[0].id][d].temp };
   }
+  // v19.20: a faixa do topo olha SÓ as favoritas (quem tem favoritas). Cada praia é avaliada sozinha, como no aviso:
+  // praião = 5h+ de sol firme com vento ok e pouca chuva; dia de praia = 5+ pontos de sol com vento ok, chuva < 40%.
+  function praiaoFav(d) {
+    const minhas = favoritas.map((id) => PRAIAS.find((p) => p.id === id)).filter((p) => p && previsao[p.id] && previsao[p.id][d]);
+    const pr = [], pa = [];
+    minhas.forEach((p) => { const x = previsao[p.id][d];
+      const chuvaSol = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && y.est === "sol").map((y) => y.chuva || 0));
+      const chuvaBoa = Math.max(0, ...x.horas.filter((y) => y.h >= 9 && y.h <= 17 && (y.est === "sol" || y.est === "parcial")).map((y) => y.chuva || 0));
+      if (firmes(x) >= 5 && chuvaSol < 20) pr.push(p); else if (pontosPraia(x) >= 5 && chuvaBoa < 40) pa.push(p); });
+    if (!pr.length && !pa.length) return { n: 0 };
+    const lista = (ps) => ps.map((p) => p.nome).join(", ").replace(/, ([^,]*)$/, " e $1");
+    const nivel = pr.length ? "praiao" : "praia", base = (pr.length ? pr : pa)[0], x = previsao[base.id][d];
+    const nomes = pr.length && pa.length ? `${lista(pr)} · praia em ${lista(pa)}` : lista(pr.length ? pr : pa);
+    return { n: pr.length + pa.length, nivel, tipo: (nivel === "praiao" ? tipoFirme : tipoPraiao)(x), nomes, temp: x.temp, fav: true };
+  }
   const nomeDia = (d) => d === 0 ? "hoje" : d === 1 ? "amanhã" : SEMANA_LONGA[new Date(datas[d] + "T12:00:00").getDay()];
 
   // céu animado no fundo de cada aba de dia: sol com passarinhos, nuvens andando, chuva caindo
@@ -2193,11 +2208,12 @@
     });
 
     let pr = praiaoDia(estado.dia);
+    if (favoritas.length) pr = praiaoFav(estado.dia);   // v19.20: com favoritas, a faixa fala só delas
     // HOJE: o aviso nasce da previsão da VÉSPERA (o mesmo que foi para as notificações) e nunca sobe no dia.
     // v19.4: mas ele DESCE se o dia de hoje, com o que já aconteceu (aeroporto, satélite, pluviômetro) e a previsão
     // das horas que faltam, não fecha mais a conta. Em 17/11 a véspera cravou praião e o dia teve chuva de manhã
     // e nuvem na Zona Sul: o app seguia dizendo "Hoje tem PRAIÃO!" a tarde toda.
-    if (estado.dia === 0) {
+    if (estado.dia === 0 && !favoritas.length) {
       const rec = alertas[datas[0]];
       if (rec && (rec.praiao || rec.praia)) {
         const nm = rec.praias || [];
@@ -2217,8 +2233,8 @@
       const sol = (pr.nivel === "praiao" ? SOL_PRAIAO : SOL_PRAIA)[pr.tipo] || (pr.nivel === "praiao" ? "solzão" : "sol");
       const extra = `${sol}${pr.temp != null ? `, ${pr.temp}°` : ""}${pr.nivel === "praiao" ? " e vento fraco" : ""}`;
       banner.innerHTML = pr.nivel === "praiao"
-        ? `${IC.sol}<div>${D} tem PRAIÃO!<small>${pr.nomes} · ${extra}</small></div>`
-        : `${IC.poucas || IC.sol}<div>${D} vai dar praia<small>${pr.nomes} · ${extra}</small></div>`; }
+        ? `${IC.sol}<div>${D} tem PRAIÃO${pr.fav ? " nas suas praias" : ""}!<small>${pr.nomes} · ${extra}</small></div>`
+        : `${IC.poucas || IC.sol}<div>${D} vai dar praia${pr.fav ? " nas suas praias" : ""}<small>${pr.nomes} · ${extra}</small></div>`; }
     // foto do topo (abas dos dias + faixa do praião) para a próxima abertura já mostrar tudo na hora, sem "pular"
     if (estado.dia === 0) guarda.gravar("pm-topo-foto", { data: datas[0], dias: $("#dias").innerHTML, praiao: n ? banner.innerHTML : "" });
 
