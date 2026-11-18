@@ -1,8 +1,17 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo; v/raj = vento e rajada medidos (km/h), vd = direção (graus); ultimo = observação mais nova de cada aeroporto.",
- "atualizadoEm": "2026-11-18T16:33",
+ "atualizadoEm": "2026-11-18T17:29",
  "estacoes": {
   "SBGL": {
+   "2026-11-18T17": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 27,
+    "v": 19,
+    "raj": null,
+    "vd": 150
+   },
    "2026-11-18T16": {
     "nuvens": 25,
     "total": 25,
@@ -119,18 +128,18 @@
     "v": 6,
     "raj": null,
     "vd": 60
-   },
-   "2026-11-18T03": {
-    "nuvens": 81,
-    "total": 81,
-    "chuva": false,
-    "temp": 23,
-    "v": 4,
-    "raj": null,
-    "vd": null
    }
   },
   "SBJR": {
+   "2026-11-18T17": {
+    "nuvens": null,
+    "total": null,
+    "chuva": false,
+    "temp": 29,
+    "v": 7,
+    "raj": null,
+    "vd": 170
+   },
    "2026-11-18T16": {
     "nuvens": null,
     "total": null,
@@ -223,6 +232,15 @@
    }
   },
   "SBRJ": {
+   "2026-11-18T17": {
+    "nuvens": 68,
+    "total": 68,
+    "chuva": false,
+    "temp": 26,
+    "v": 24,
+    "raj": null,
+    "vd": 170
+   },
    "2026-11-18T16": {
     "nuvens": 68,
     "total": 68,
@@ -339,39 +357,30 @@
     "v": 4,
     "raj": null,
     "vd": 180
-   },
-   "2026-11-18T03": {
-    "nuvens": 75,
-    "total": 75,
-    "chuva": false,
-    "temp": 23,
-    "v": 7,
-    "raj": null,
-    "vd": 160
    }
   }
  },
  "ultimo": {
   "SBGL": {
-   "ts": 1795028400,
-   "em": "2026-11-18T16:00",
+   "ts": 1795032000,
+   "em": "2026-11-18T17:00",
    "v": 19,
    "raj": null,
-   "vd": 160
+   "vd": 150
   },
   "SBJR": {
-   "ts": 1795028400,
-   "em": "2026-11-18T16:00",
+   "ts": 1795032000,
+   "em": "2026-11-18T17:00",
    "v": 7,
    "raj": null,
-   "vd": 240
+   "vd": 170
   },
   "SBRJ": {
-   "ts": 1795028400,
-   "em": "2026-11-18T16:00",
-   "v": 28,
+   "ts": 1795032000,
+   "em": "2026-11-18T17:00",
+   "v": 24,
    "raj": null,
-   "vd": 180
+   "vd": 170
   }
  }
 }
