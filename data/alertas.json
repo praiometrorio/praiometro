@@ -1,10 +1,4 @@
 {
-  "2026-11-14": {
-    "praiao": false,
-    "tipo": null,
-    "praias": [],
-    "ids": []
-  },
   "2026-11-16": {
     "praiao": false,
     "tipo": null,
@@ -45,5 +39,38 @@
     "praias": [],
     "ids": [],
     "temp": null
+  },
+  "2026-11-19": {
+    "praiao": false,
+    "praia": true,
+    "tipo": "todo",
+    "praias": [
+      "Grumari",
+      "Icaraí",
+      "Recreio",
+      "Prainha",
+      "Joatinga",
+      "Piratininga",
+      "Reserva",
+      "Barra da Tijuca"
+    ],
+    "ids": [
+      "grumari",
+      "icarai",
+      "recreio",
+      "prainha",
+      "joatinga",
+      "piratininga",
+      "reserva",
+      "barra"
+    ],
+    "temp": 33,
+    "vespera": true
+  },
+  "2026-11-21": {
+    "pre": true,
+    "pre_ids": [
+      "reserva"
+    ]
   }
 }
