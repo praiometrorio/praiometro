@@ -1,8 +1,17 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo; v/raj = vento e rajada medidos (km/h), vd = direção (graus); ultimo = observação mais nova de cada aeroporto.",
- "atualizadoEm": "2026-11-18T13:35",
+ "atualizadoEm": "2026-11-18T14:34",
  "estacoes": {
   "SBGL": {
+   "2026-11-18T14": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 31,
+    "v": 19,
+    "raj": null,
+    "vd": 160
+   },
    "2026-11-18T13": {
     "nuvens": 25,
     "total": 25,
@@ -119,18 +128,18 @@
     "v": 6,
     "raj": null,
     "vd": 130
-   },
-   "2026-11-18T00": {
-    "nuvens": 81,
-    "total": 81,
-    "chuva": false,
-    "temp": 23,
-    "v": 6,
-    "raj": null,
-    "vd": 110
    }
   },
   "SBJR": {
+   "2026-11-18T14": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 32,
+    "v": 19,
+    "raj": null,
+    "vd": 150
+   },
    "2026-11-18T13": {
     "nuvens": 25,
     "total": 25,
@@ -196,6 +205,15 @@
    }
   },
   "SBRJ": {
+   "2026-11-18T14": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 27,
+    "v": 31,
+    "raj": null,
+    "vd": 160
+   },
    "2026-11-18T13": {
     "nuvens": 25,
     "total": 25,
@@ -312,39 +330,30 @@
     "v": 0,
     "raj": null,
     "vd": 0
-   },
-   "2026-11-18T00": {
-    "nuvens": 25,
-    "total": 25,
-    "chuva": false,
-    "temp": 24,
-    "v": 6,
-    "raj": null,
-    "vd": 100
    }
   }
  },
  "ultimo": {
   "SBGL": {
-   "ts": 1795017600,
-   "em": "2026-11-18T13:00",
-   "v": 17,
+   "ts": 1795021200,
+   "em": "2026-11-18T14:00",
+   "v": 19,
    "raj": null,
    "vd": 160
   },
   "SBJR": {
-   "ts": 1795017600,
-   "em": "2026-11-18T13:00",
+   "ts": 1795021200,
+   "em": "2026-11-18T14:00",
    "v": 19,
    "raj": null,
    "vd": 150
   },
   "SBRJ": {
-   "ts": 1795017600,
-   "em": "2026-11-18T13:00",
-   "v": 30,
+   "ts": 1795021200,
+   "em": "2026-11-18T14:00",
+   "v": 31,
    "raj": null,
-   "vd": 170
+   "vd": 160
   }
  }
 }
