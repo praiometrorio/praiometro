@@ -894,8 +894,9 @@ html,body{overscroll-behavior-y:none}
 .praiao small{display:inline;color:#FFE7B3;font-weight:500;opacity:.85;margin-left:4px}
 .praiao.praia{background:rgba(120,200,235,.14);color:#9FDCF5}.praiao.praia svg{color:#7CC8EA}.praiao.praia small{color:#CFEFFC}
 /* barra de baixo — v19.14: flutuante e arredondada (estilo Instagram), 5 botões com os círculos coloridos; a tela aberta fica marcada */
-.atalhos4{position:fixed;left:10px;right:10px;bottom:calc(10px + env(safe-area-inset-bottom,0px));z-index:800;display:grid;grid-template-columns:repeat(5,1fr);gap:0;
-  background:#0B2233;border:1px solid rgba(255,255,255,.12);border-radius:32px;padding:6px 4px;box-shadow:0 8px 26px rgba(0,10,25,.45)}
+/* v19.18: presa embaixo, de ponta a ponta (flutuando, o fundo aparecia passando por baixo) */
+.atalhos4{position:fixed;left:0;right:0;bottom:0;z-index:800;display:grid;grid-template-columns:repeat(5,1fr);gap:0;
+  background:#0B2233;border-top:1px solid rgba(255,255,255,.10);border-radius:26px 26px 0 0;padding:8px 6px calc(8px + env(safe-area-inset-bottom,0px));box-shadow:0 -6px 20px rgba(0,10,25,.35)}
 .atalhos4.so3{grid-template-columns:repeat(4,1fr)}
 body.aba-aberta .atalhos4{z-index:950}
 .atalhos4>button,.atalhos4.so3 #abrirTreino{grid-column:auto;position:relative;flex-direction:column;height:auto;min-height:0;margin:0;padding:6px 0 5px;
