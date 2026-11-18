@@ -2552,21 +2552,23 @@
     const av = avisoPraias(), ligado = !!(window.pmPush && window.pmPush.ligado && window.pmPush.ligado());
     const reg = (p) => (p.local || "").replace("Baía de Guanabara", "Baía");
     const pf = avisoPref();
-    const op = (grupo, v, txt) => `<button class="fav-av-op" data-${grupo}="${v}" role="radio" aria-checked="${pf[grupo] === v}"><i class="fav-radio${pf[grupo] === v ? " on" : ""}"></i>${txt}</button>`;
+    // v19.17: design 3 (escolhido pelo Antônio): cartões dos dois avisos, bolinhas dos dias e praias em pílulas
+    const DIAS_L = ["S", "T", "Q", "Q", "S", "S", "D"], fds = pf.dias !== 0;
     box.innerHTML = `<h3>Avisos de praia</h3>
-      <p class="fav-av-sub">Na véspera, às 18h40, a gente olha a previsão das praias que você escolheu e avisa se vale a pena ir.</p>
+      <p class="fav-av-sub">Na véspera, às 18h40, a gente olha a previsão das suas praias e avisa se vale a pena ir.</p>
       ${ligado ? "" : `<button class="fav-av-ligar" id="favAvLigar">🔔 Ligar os avisos</button><p class="fav-av-msg" id="favAvMsg"></p>`}
-      <div class="fav-av-bloco"><b>☀️ PRAIÃO</b><span>Dia raro: 5 horas ou mais de sol firme entre 9h e 17h, com pouca chance de chuva. Se for ventar, o aviso diz quando ("vento forte depois das 14h").</span></div>
-      <div class="fav-av-bloco"><b>🏖️ Vai dar praia</b><span>Dia bom normal: sol na maior parte do dia, mesmo com umas nuvens passando. Chance de chuva baixa.</span></div>
-      <p class="fav-av-tit">Quais avisos você quer?</p>
-      ${op("tipo", 0, "Praião e dia de praia")}${op("tipo", 1, "Só praião (dia raro)")}
+      <div class="fav-av-cards">
+        <div class="fav-av-cd on"><b>☀️ Praião</b><small>Dia raro: 5h ou mais de sol firme, pouca chuva. Se for ventar, o aviso diz quando.</small><em>Sempre avisa</em></div>
+        <button class="fav-av-cd${pf.tipo === 0 ? " on" : ""}" data-tipo="${pf.tipo === 0 ? 1 : 0}" aria-pressed="${pf.tipo === 0}"><b>🏖️ Dia de praia</b><small>Dia bom normal: sol na maior parte do dia, umas nuvens passando.</small><em>${pf.tipo === 0 ? "Ligado" : "Desligado"}</em></button>
+      </div>
       <p class="fav-av-tit">Em que dias?</p>
-      ${op("dias", 0, "A semana inteira")}${op("dias", 1, "Fim de semana e feriados")}${op("dias", 2, "Só fim de semana")}
-      <p class="fav-av-tit">Praias (até ${AVISO_MAX}) · ${av.length} de ${AVISO_MAX}</p>
-      ${favs.map((p) => { const on = av.includes(p.id), cheio = !on && av.length >= AVISO_MAX;
-        return `<button class="fav-av-lin${cheio ? " cinza" : ""}" data-av="${p.id}" role="switch" aria-checked="${on}"${cheio ? " disabled" : ""}>
-          <span><b>${p.nome}</b><small>${reg(p)}</small></span><i class="fav-sw${on ? " on" : ""}"><i></i></i></button>`; }).join("")}
-      <p class="fav-av-sub">${av.length >= AVISO_MAX ? "Chegou em 4: para trocar, desligue uma." : "Só aparecem aqui as suas favoritas."}</p>`;
+      <div class="fav-av-dias">${DIAS_L.map((d, i) => `<span class="${!fds || i >= 5 ? "on" : ""}">${d}</span>`).join("")}</div>
+      <div class="fav-av-seg"><button data-dias="0" class="${!fds ? "on" : ""}">Semana inteira</button><button data-dias="${pf.dias === 0 ? 1 : pf.dias}" class="${fds ? "on" : ""}">Fim de semana</button></div>
+      ${fds ? `<button class="fav-av-check" data-dias="${pf.dias === 1 ? 2 : 1}" role="checkbox" aria-checked="${pf.dias === 1}"><i class="${pf.dias === 1 ? "on" : ""}">${pf.dias === 1 ? "✓" : ""}</i>Incluir feriados do Rio</button>` : ""}
+      <p class="fav-av-tit">Praias · ${av.length} de ${AVISO_MAX}</p>
+      <div class="fav-av-pilulas">${favs.map((p) => { const on = av.includes(p.id), cheio = !on && av.length >= AVISO_MAX;
+        return `<button class="fav-av-pil${on ? " on" : ""}${cheio ? " cinza" : ""}" data-av="${p.id}" aria-pressed="${on}"${cheio ? " disabled" : ""}>${on ? "✓ " : "+ "}${p.nome}</button>`; }).join("")}</div>
+      <p class="fav-av-sub">${av.length >= AVISO_MAX ? "Chegou em 4: para trocar, toque numa verde para tirar." : "Aparecem aqui as suas favoritas. Toque para ligar ou desligar."}</p>`;
     box.querySelectorAll("[data-tipo],[data-dias]").forEach((b) => b.onclick = () => {
       const novo = avisoPref(); if (b.dataset.tipo != null) novo.tipo = +b.dataset.tipo; else novo.dias = +b.dataset.dias;
       guarda.gravar("pm-aviso-pref", novo); contar("aviso-pref"); gravarAvisos(avisoPraias()); desenharAvisos();
