@@ -67,6 +67,32 @@
     "temp": 33,
     "vespera": true
   },
+  "2026-11-20": {
+    "praiao": true,
+    "praia": false,
+    "tipo": "todo",
+    "praias": [
+      "Ipanema",
+      "Copacabana",
+      "Barra da Tijuca",
+      "Arpoador",
+      "Leme",
+      "Reserva",
+      "Praia Vermelha",
+      "Joatinga"
+    ],
+    "ids": [
+      "ipanema",
+      "copacabana",
+      "barra",
+      "arpoador",
+      "leme",
+      "reserva",
+      "vermelha",
+      "joatinga"
+    ],
+    "temp": 33
+  },
   "2026-11-21": {
     "pre": true,
     "pre_ids": [
