@@ -382,7 +382,7 @@
   const estado = {
     dia: 0,
     // praia aberta: a do link (praiometrorio.com.br/ipanema chega aqui como ?praia=ipanema) ou, sem link, o Arpoador
-    sel: (() => { try { const q = new URLSearchParams(location.search).get("praia"); return q && PRAIAS.some((p) => p.id === q) ? q : "arpoador"; } catch (e) { return "arpoador"; } })(),
+    sel: (() => { try { const q = new URLSearchParams(location.search).get("praia"); return q && PRAIAS.some((p) => p.id === q) ? q : "ipanema"; } catch (e) { return "ipanema"; } })(),   // v19.25: Ipanema é a praia que abre primeiro
     modoFav: false,            // true = aberta pela tela de favoritas (arrastar passa só entre as favoritas)
     regiao: matchMedia("(max-width:640px)").matches ? "zs" : "todas",
     minuto: null               // horário escolhido no controle do sol (minutos desde 0h)
@@ -2641,7 +2641,8 @@
       const pos = (x) => { const i = COSTA_FAV.indexOf(x); return i < 0 ? 99 : i; };
       return { modo: "fav", lista: favs.slice().sort((a, b) => pos(a.p.id) - pos(b.p.id)) };
     }
-    const ids = ORLA.concat(PRAIAS.map((p) => p.id).filter((x) => !ORLA.includes(x)));
+    // v19.25: a orla segue a mesma ordem da costa das favoritas (Flamengo → Botafogo → Leme → ... → Grumari → Niterói)
+    const ids = COSTA_FAV.concat(PRAIAS.map((p) => p.id).filter((x) => !COSTA_FAV.includes(x)));
     return { modo: "orla", lista: ids.map((x) => linhas.find((l) => l.p.id === x)).filter(Boolean) };
   }
   function listaFavoritas() {
