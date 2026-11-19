@@ -907,9 +907,9 @@ body.aba-aberta .atalhos4{z-index:950}
 .atalhos4 #abrirSurfe svg{background:linear-gradient(120deg,#16A3C9,#0B6FA8);color:#fff}
 .atalhos4 #abrirTreino svg{background:linear-gradient(120deg,#2B2F6B 0%,#B0457A 55%,#FF9A5A 100%)}
 .atalhos4 #abrirSol svg{background:linear-gradient(120deg,#FF8A3D 0%,#FFB627 60%,#FFD36B 100%);color:#fff}
-/* v19.19: só os ícones, sem nome (escolha B2, como no Instagram); o nome continua para leitor de tela pelo aria-label */
-.atalhos4>button span{display:none}
-.atalhos4>button,.atalhos4.so3 #abrirTreino{padding:8px 0}
+/* v19.21: ícones do tamanho de antes com o nome completo bem pequeno embaixo (escolha 1) */
+.atalhos4>button span{display:block;flex:none;font-size:9px;font-weight:600;opacity:.85;letter-spacing:0;white-space:nowrap}
+.atalhos4>button,.atalhos4.so3 #abrirTreino{padding:6px 0 4px;gap:3px}
 .atalhos4>button small{display:none}
 .atalhos4 #favQtd{position:absolute;top:2px;right:calc(50% - 26px);min-width:17px;height:17px;font-size:10px;padding:0 4px;background:#fff;color:#10283A;border-radius:999px;display:grid;place-items:center}
 .atalhos4 #favQtd:empty{display:none}
