@@ -141,12 +141,12 @@
     const dia = x.horas.filter((y) => y.h >= HORA_INI && y.h <= HORA_FIM);
     const conta = (e) => dia.filter((y) => y.est === e).length;
     const horasSol = conta("sol"), horasParcial = conta("parcial"), horasChuva = conta("chuva");
-    // v19.x: hoje, a faixa de sol conta a partir de agora (às 14h40 o app ainda dizia "sol com nuvens das 9h às 13h")
     const hAg = x.data === diaHoje() ? +relogio.format(new Date()).slice(0, 2) : -1;
-    const horasJan = hAg >= HORA_INI && hAg <= HORA_FIM ? x.horas.filter((y) => y.h >= hAg) : x.horas;
+    // a faixa de sol olha o dia todo (como antes); só não corta por 1 hora isolada de "vai e vem"
+    const horasJan = x.horas;
     const janela = maiorSequencia(horasJan, (y) => y.est === "sol", (y) => y.est === "parcial" && !y.raio && (y.chuva || 0) < 50);
     // a faixa já começou (é agora) → "até as Xh"; senão "das Xh às Yh"
-    const faixa = (j) => j.ini <= hAg ? `até as ${j.fim}h` : `das ${j.ini}h às ${j.fim}h`;
+    const faixa = (j) => `das ${j.ini}h às ${j.fim}h`;
     // "céu limpo" só se o céu inteiro (até a nuvem alta, fininha) estiver quase sem nuvem; senão é "sol com poucas nuvens"
     const limpo = !!janela && x.horas.filter((y) => y.h >= janela.ini && y.h <= janela.fim).every((y) => (y.tot ?? y.nuvens) < LIMPO_ATE);
     const janelaParcial = maiorSequencia(horasJan, (y) => y.est === "sol" || y.est === "parcial");
@@ -171,7 +171,7 @@
     if (chuvaTarde) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol de manhã", s: `Chuva a partir das ${chuvaNuc.h}h` });
     else if (ceu === "chuva") selos.push({ cls: "neutro", ic: IC.chuva, t: "Dia de chuva", s: pancada ? `Chuva a partir das ${pancada.h}h` : "Chuva em boa parte do dia" });
     else if (tam(janela) >= 2) selos.push({ cls: "sol", ic: limpo ? IC.sol : IC.poucas, t: tam(janela) >= 5 && limpo ? "Solzão" : "Sol", s: limpo ? `Céu limpo ${faixa(janela)}` : `Sol com nuvens ${faixa(janela)}` });
-    else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol vai e vem", s: janelaParcial.ini <= hAg ? `Até as ${janelaParcial.fim}h` : `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
+    else if (tam(janelaParcial) >= 2) selos.push({ cls: "sol", ic: IC.parcial, t: "Sol vai e vem", s: `Das ${janelaParcial.ini}h às ${janelaParcial.fim}h` });
     else if (mormDia) selos.push({ cls: "neutro", ic: IC.nublado, t: "Mormaço", s: "Nublado, mas queima: use protetor" });
     else selos.push({ cls: "neutro", ic: IC.nublado, t: "Céu fechado", s: "Sem sol firme hoje" });
 
@@ -265,7 +265,7 @@
     const alerta = ventoRef > 30 ? (depois ? ` Ventania a partir das ${picoV.h}h.` : " Ventania.") : ventoRef > 22 ? (depois ? ` Ventando muito a partir das ${picoV.h}h.` : " Ventando muito.") : "";
     const veredito = ceuTxt + chuvaTxt + "." + alerta + fecho;
 
-    const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? (janela.ini <= hAg ? `Sol até ${janela.fim}h` : `Sol ${janela.ini}h–${janela.fim}h`) : tam(janelaParcial) >= 2 ? "Sol vai e vem" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
+    const resumo = [chuvaTarde ? "Sol de manhã, chuva à tarde" : ceu === "chuva" ? "Chuva" : tam(janela) >= 2 ? `Sol ${janela.ini}h–${janela.fim}h` : tam(janelaParcial) >= 2 ? "Sol vai e vem" : "Nublado", marTxt ? marTxt.replace("mar ", "") : null,
       ventoRef > 20 ? "ventania" : ventoRef > 15 ? "ventando" : null, x.propria === false ? "imprópria" : null].filter(Boolean).join(" · ");
 
     // ---- nota de 0 a 10 (ordena a lista "Praias hoje") ----
