@@ -571,6 +571,11 @@
   // 14/11 tarde Botafogo, vai e vem = textura 31–36, 59–79%. Fechado de verdade: textura 6–14 (11 e 12/11) ou 93–100% coberto (17/11 12h20–12h40).
   const SAT_BURACOS_TEX = 30, SAT_BURACOS_FRAC = 80;
   const nuvemComBuracos = (v, tex, frac) => v >= SAT_FECHADO && tex != null && frac != null && tex >= SAT_BURACOS_TEX && frac <= SAT_BURACOS_FRAC;
+  // v19.30: POUCA NUVEM NO QUADRADO. Brilho médio (115–160) com imagem lisa virava "mormaço" e depois "vai e vem", mesmo com
+  // menos da metade do quadrado de ~9 km com nuvem. 19/11 13h–14h50 Botafogo: sol com nuvens na janela; satélite 13h = brilho 136,
+  // textura 14, só 38% com nuvem → app dava vai e vem. Fechado/véu de verdade nas fotos: 72–100% coberto. Até 40% coberto = sol com nuvens.
+  const SAT_POUCA_FRAC = 40;
+  const poucaNuvem = (v, frac) => v < SAT_FECHADO && frac != null && frac <= SAT_POUCA_FRAC;
   const nuvensSoltas = (v, tex, frac) => v >= SAT_GROSSA && v < SAT_FECHADO && tex != null && frac != null && tex >= SAT_SOLTAS_TEX && frac <= SAT_SOLTAS_FRAC;
   // v17.2: histórico do robô do satélite (data/satelite.json, uma leitura a cada 10 min) para as horas que JÁ PASSARAM hoje.
   // Antes, essas horas vinham só do aeroporto, que marca "BKN" (nuvens de 5 a 7 oitavos) como céu fechado mesmo com o sol
@@ -1200,6 +1205,7 @@
           const sp = satPassado(p, diaHoje(), hr);
           if (sp != null) {
             const vp = sp.b;
+            if (poucaNuvem(vp, sp.frac)) return "sol";   // v19.30
             if (vp >= SAT_GROSSA && vp < SAT_FECHADO && sp.tex != null && sp.tex < SAT_LISO) { morm[hr] = true; return "nublado"; }
             if (nuvensSoltas(vp, sp.tex, sp.frac)) return "sol";
             if (nuvemComBuracos(vp, sp.tex, sp.frac)) return "parcial";
@@ -1219,6 +1225,7 @@
         const lerCeu = (im) => {
           const vv = im.raio && im.raio[p.id] != null ? im.raio[p.id] : im.praias[p.id]; if (vv == null) return null;
           const tx = im.tex && im.tex[p.id], fr = im.frac && im.frac[p.id];
+          if (poucaNuvem(vv, fr)) return ["sol"];   // v19.30
           if (vv >= SAT_GROSSA && vv < SAT_FECHADO && tx != null && tx < SAT_LISO) return ["nublado", true];   // véu liso = mormaço
           if (nuvensSoltas(vv, tx, fr)) return ["sol"];   // v19.4: nuvens soltas, mais azul que nuvem → sol com nuvens
           if (nuvemComBuracos(vv, tx, fr)) return ["parcial"];   // v19.4: nuvem grossa com buracos → vai e vem
