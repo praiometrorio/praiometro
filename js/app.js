@@ -1233,6 +1233,9 @@
         // Teste com o histórico (5.664 casos, todas as praias, conferido 30 min depois): acerto igual (76,8%) e
         // erros grosseiros (nublado x sol) 117 → 102. Com 3 ou 4 imagens os grosseiros caíam mais, mas o acerto caía e demorava 20–30 min pra mostrar céu fechado.
         if (c1[0] === "nublado" && satel.ant) { const c0 = lerCeu(satel.ant); if (c0 && c0[0] !== "nublado") return "parcial"; }
+        // v19.29: a mesma trava pro "vai e vem": se a imagem anterior via sol com nuvens, UMA imagem só não derruba pra "vai e vem".
+        // 19/11 14h43 Botafogo: sol com nuvens na janela; uma imagem nova leu "nuvem com buracos" e virou 14h, 15h e 16h pra vai e vem.
+        if (c1[0] === "parcial" && satel.ant) { const c0 = lerCeu(satel.ant); if (c0 && c0[0] === "sol") return "sol"; }
         if (c1[1]) morm[hr] = true;
         return c1[0];
       };
