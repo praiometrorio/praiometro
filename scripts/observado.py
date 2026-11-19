@@ -65,7 +65,11 @@ for m in dados if isinstance(dados, list) else []:
       kt = lambda x: round(float(x) * 1.852) if isinstance(x, (int, float)) else None
       vento = {"v": kt(m.get("wspd")), "raj": kt(m.get("wgst")), "vd": m.get("wdir") if isinstance(m.get("wdir"), (int, float)) else None}
       if chave not in saida["estacoes"][est] or t.minute <= 15:
-          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": chove(wx), "temp": m.get("temp"), **vento}
+          # v19.23: altura das nuvens. "alto" = todas as camadas a 20 mil pés ou mais (cirro); baseMin = a camada mais baixa (pés)
+          camadas = [c for c in (m.get("clouds") or []) if c.get("cover") in COBRE and c.get("base")]
+          alto = (min(c["base"] for c in camadas) >= 20000) if camadas else None
+          saida["estacoes"][est][chave] = {"nuvens": n, "total": n, "chuva": chove(wx), "temp": m.get("temp"), **vento,
+                                           "alto": alto, "baseMin": min(c["base"] for c in camadas) if camadas else None}
       # a observação MAIS NOVA de cada aeroporto (inclusive as extras do meio da hora), para o vento de agora
       ult = saida.setdefault("ultimo", {}).get(est)
       if vento["v"] is not None and (not ult or m["obsTime"] > ult["ts"]):
