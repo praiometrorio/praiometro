@@ -655,7 +655,9 @@
         // v19.4: pega a imagem mais nova que já saiu (começa 20 min atrás). Teste com 14 dias de satélite: a imagem de 30 min
         // atrás acerta o céu de agora 78% das vezes, a de 40 min 75%. Prever a "tendência" com as imagens anteriores PIOROU
         // (75% ou menos em todas as versões testadas): a nuvem do Rio não segue o mesmo ritmo por meia hora. Por isso não tem projeção.
-        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac, raio: r.raio, grade: r.grade, el: r.el, mascara: {} };
+        // v19.23: lê também a imagem de 10 min antes. "Nublado" só se as DUAS imagens seguidas concordarem (ver ceuSatelite)
+        let ant = null; try { const ra = await lerImagem(new Date(t0.getTime() - 600000)); if (ra) ant = { praias: ra.praias, tex: ra.tex, frac: ra.frac, raio: ra.raio }; } catch (e) {}
+        satel = { t: t0.getTime(), praias: r.praias, tex: r.tex, frac: r.frac, raio: r.raio, grade: r.grade, el: r.el, mascara: {}, ant };
         return;
       }
     } catch (e) { console.warn("Satélite indisponível agora", e); }
@@ -1203,16 +1205,26 @@
         // daqui a 1 h o "céu continua igual" acerta 71% e o modelo 60%; daqui a 2 h, 65% contra 62%; a partir de 6 h o modelo ganha.
         // Chuva continua vindo do radar e dos modelos (est === "chuva" já saiu lá em cima).
         if (hr !== hImg && (hr < hAgora || hr > hAgora + 2)) return est;
-        const tx = satel.tex && satel.tex[p.id];
-        if (v >= SAT_GROSSA && v < SAT_FECHADO && tx != null && tx < SAT_LISO) { morm[hr] = true; return "nublado"; }   // véu liso = mormaço
-        if (nuvensSoltas(v, tx, satel.frac && satel.frac[p.id])) return "sol";   // v19.4: nuvens soltas, mais azul que nuvem → sol com nuvens
-        if (nuvemComBuracos(v, tx, satel.frac && satel.frac[p.id])) return "parcial";   // v19.4: nuvem grossa com buracos → vai e vem
-        // v19.22: zona cinza (105–115) SEM nenhum pixel de nuvem grossa no quadrado de 9 km = véu de cirro fino → sol.
-        // 19/11 10h44 Botafogo: foto com sol firme e muito cirro; satélite 114, textura 13, 0% com nuvem → o app dava "vai e vem" às 11h.
-        // Nas fotos, céu fechado sempre teve 72% ou mais do quadrado com nuvem grossa; sol firme, 0 a 49%.
-        const fr = satel.frac && satel.frac[p.id];
-        if (v < SAT_GROSSA && fr != null && fr <= 10) return "sol";
-        return v <= SAT_SOL ? "sol" : v >= SAT_FECHADO ? "nublado" : v >= SAT_GROSSA ? (est === "nublado" ? "nublado" : "parcial") : est;
+        // uma imagem → [céu, mormaço?]
+        const lerCeu = (im) => {
+          const vv = im.raio && im.raio[p.id] != null ? im.raio[p.id] : im.praias[p.id]; if (vv == null) return null;
+          const tx = im.tex && im.tex[p.id], fr = im.frac && im.frac[p.id];
+          if (vv >= SAT_GROSSA && vv < SAT_FECHADO && tx != null && tx < SAT_LISO) return ["nublado", true];   // véu liso = mormaço
+          if (nuvensSoltas(vv, tx, fr)) return ["sol"];   // v19.4: nuvens soltas, mais azul que nuvem → sol com nuvens
+          if (nuvemComBuracos(vv, tx, fr)) return ["parcial"];   // v19.4: nuvem grossa com buracos → vai e vem
+          // v19.22: zona cinza (105–115) SEM nenhum pixel de nuvem grossa no quadrado de 9 km = véu de cirro fino → sol.
+          // 19/11 10h44 Botafogo: foto com sol firme e muito cirro; satélite 114, textura 13, 0% com nuvem → o app dava "vai e vem" às 11h.
+          if (vv < SAT_GROSSA && fr != null && fr <= 10) return ["sol"];
+          return [vv <= SAT_SOL ? "sol" : vv >= SAT_FECHADO ? "nublado" : vv >= SAT_GROSSA ? (est === "nublado" ? "nublado" : "parcial") : est];
+        };
+        const c1 = lerCeu(satel);
+        // v19.23: "nublado" só quando as 2 imagens seguidas (10 min de diferença) dizem nublado; se a anterior não diz, fica "vai e vem".
+        // 19/11 10h58 Botafogo: foto com sol e cirros; UMA imagem (10h20, que a NASA depois tirou do ar) virou o app pra nublado.
+        // Teste com o histórico (5.664 casos, todas as praias, conferido 30 min depois): acerto igual (76,8%) e
+        // erros grosseiros (nublado x sol) 117 → 102. Com 3 ou 4 imagens os grosseiros caíam mais, mas o acerto caía e demorava 20–30 min pra mostrar céu fechado.
+        if (c1[0] === "nublado" && satel.ant) { const c0 = lerCeu(satel.ant); if (c0 && c0[0] !== "nublado") return "parcial"; }
+        if (c1[1]) morm[hr] = true;
+        return c1[0];
       };
       const raioRadar = (d, hr) => { const r = radar.praias[p.id]; return d === 0 && !!r && r.aqui === 3 && Date.now() - radar.t <= 40 * 60000 && hr === +relogio.format(new Date()).slice(0, 2); };
       const urHoje = (d, data, hr, ur) => { if (d !== 0) return ur; const io = hr <= +relogio.format(new Date()).slice(0, 2) ? inmetEm(p, data, hr) : null; return io && io.ur != null ? io.ur : ur; };
