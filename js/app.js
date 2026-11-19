@@ -2630,10 +2630,17 @@
   // ordem da orla, de oeste para leste: arrastar para a esquerda anda para o leste (Ipanema → Arpoador → Copacabana...)
   const ORLA = ["grumari", "prainha", "recreio", "reserva", "barra", "joatinga", "saoconrado", "vidigal", "leblon", "ipanema", "arpoador", "diabo",
     "copacabana", "leme", "vermelha", "botafogo", "flamengo", "icarai", "piratininga", "itaipu", "itacoatiara"];
+  const COSTA_FAV = ORLA.filter((x) => !["icarai", "piratininga", "itaipu", "itacoatiara"].includes(x)).reverse()
+    .concat(["icarai", "piratininga", "itaipu", "itacoatiara"]);
   // por onde o arrastar passa: só as favoritas (se a praia foi aberta pela tela de favoritas) ou a orla toda
   function seqNav(id) {
     const favs = listaFavoritas();
-    if (estado.modoFav && favs.length > 1 && favs.some((q) => q.p.id === id)) return { modo: "fav", lista: favs };
+    // v19.24: arrastando entre as favoritas, a ordem é a da costa (pedido do Antônio): Flamengo → Botafogo → Vermelha → Leme →
+    // Copacabana → ... → Grumari, e depois Niterói (Icaraí → Itacoatiara). A tela das favoritas continua da melhor nota para a pior.
+    if (estado.modoFav && favs.length > 1 && favs.some((q) => q.p.id === id)) {
+      const pos = (x) => { const i = COSTA_FAV.indexOf(x); return i < 0 ? 99 : i; };
+      return { modo: "fav", lista: favs.slice().sort((a, b) => pos(a.p.id) - pos(b.p.id)) };
+    }
     const ids = ORLA.concat(PRAIAS.map((p) => p.id).filter((x) => !ORLA.includes(x)));
     return { modo: "orla", lista: ids.map((x) => linhas.find((l) => l.p.id === x)).filter(Boolean) };
   }
