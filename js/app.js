@@ -382,7 +382,7 @@
   const estado = {
     dia: 0,
     // praia aberta: a do link (praiometrorio.com.br/ipanema chega aqui como ?praia=ipanema) ou, sem link, o Arpoador
-    sel: (() => { try { const q = new URLSearchParams(location.search).get("praia"); return q && PRAIAS.some((p) => p.id === q) ? q : "ipanema"; } catch (e) { return "ipanema"; } })(),   // v19.25: Ipanema é a praia que abre primeiro
+    sel: (() => { try { const q = new URLSearchParams(location.search).get("praia"); return q && PRAIAS.some((p) => p.id === q) ? q : "arpoador"; } catch (e) { return "arpoador"; } })(),   // Arpoador é a praia que abre primeiro (19.25 testou Ipanema; Antônio voltou pro Arpoador)
     modoFav: false,            // true = aberta pela tela de favoritas (arrastar passa só entre as favoritas)
     regiao: matchMedia("(max-width:640px)").matches ? "zs" : "todas",
     minuto: null               // horário escolhido no controle do sol (minutos desde 0h)
