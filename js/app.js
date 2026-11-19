@@ -1191,6 +1191,7 @@
             if (vp >= SAT_GROSSA && vp < SAT_FECHADO && sp.tex != null && sp.tex < SAT_LISO) { morm[hr] = true; return "nublado"; }
             if (nuvensSoltas(vp, sp.tex, sp.frac)) return "sol";
             if (nuvemComBuracos(vp, sp.tex, sp.frac)) return "parcial";
+            if (vp < SAT_GROSSA && sp.frac != null && sp.frac <= 10) return "sol";   // v19.22: zona cinza sem nuvem grossa = cirro fino
             return vp <= SAT_SOL ? "sol" : vp >= SAT_FECHADO ? "nublado" : vp >= SAT_GROSSA ? "parcial" : est;
           }
         }
@@ -1206,6 +1207,11 @@
         if (v >= SAT_GROSSA && v < SAT_FECHADO && tx != null && tx < SAT_LISO) { morm[hr] = true; return "nublado"; }   // véu liso = mormaço
         if (nuvensSoltas(v, tx, satel.frac && satel.frac[p.id])) return "sol";   // v19.4: nuvens soltas, mais azul que nuvem → sol com nuvens
         if (nuvemComBuracos(v, tx, satel.frac && satel.frac[p.id])) return "parcial";   // v19.4: nuvem grossa com buracos → vai e vem
+        // v19.22: zona cinza (105–115) SEM nenhum pixel de nuvem grossa no quadrado de 9 km = véu de cirro fino → sol.
+        // 19/11 10h44 Botafogo: foto com sol firme e muito cirro; satélite 114, textura 13, 0% com nuvem → o app dava "vai e vem" às 11h.
+        // Nas fotos, céu fechado sempre teve 72% ou mais do quadrado com nuvem grossa; sol firme, 0 a 49%.
+        const fr = satel.frac && satel.frac[p.id];
+        if (v < SAT_GROSSA && fr != null && fr <= 10) return "sol";
         return v <= SAT_SOL ? "sol" : v >= SAT_FECHADO ? "nublado" : v >= SAT_GROSSA ? (est === "nublado" ? "nublado" : "parcial") : est;
       };
       const raioRadar = (d, hr) => { const r = radar.praias[p.id]; return d === 0 && !!r && r.aqui === 3 && Date.now() - radar.t <= 40 * 60000 && hr === +relogio.format(new Date()).slice(0, 2); };
