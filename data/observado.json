@@ -1,8 +1,19 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo; v/raj = vento e rajada medidos (km/h), vd = direção (graus); ultimo = observação mais nova de cada aeroporto.",
- "atualizadoEm": "2026-11-20T06:01",
+ "atualizadoEm": "2026-11-20T07:01",
  "estacoes": {
   "SBRJ": {
+   "2026-11-20T07": {
+    "nuvens": 25,
+    "total": 25,
+    "chuva": false,
+    "temp": 27,
+    "v": 6,
+    "raj": null,
+    "vd": 30,
+    "alto": false,
+    "baseMin": 600
+   },
    "2026-11-20T06": {
     "nuvens": 25,
     "total": 25,
@@ -145,20 +156,20 @@
     "vd": 170,
     "alto": false,
     "baseMin": 800
-   },
-   "2026-11-19T17": {
-    "nuvens": 44,
-    "total": 44,
-    "chuva": false,
-    "temp": 28,
-    "v": 20,
-    "raj": null,
-    "vd": 170,
-    "alto": false,
-    "baseMin": 800
    }
   },
   "SBGL": {
+   "2026-11-20T07": {
+    "nuvens": null,
+    "total": null,
+    "chuva": false,
+    "temp": 28,
+    "v": 4,
+    "raj": null,
+    "vd": null,
+    "alto": null,
+    "baseMin": null
+   },
    "2026-11-20T06": {
     "nuvens": null,
     "total": null,
@@ -301,17 +312,6 @@
     "vd": 140,
     "alto": false,
     "baseMin": 3000
-   },
-   "2026-11-19T17": {
-    "nuvens": 44,
-    "total": 44,
-    "chuva": false,
-    "temp": 29,
-    "v": 17,
-    "raj": null,
-    "vd": 140,
-    "alto": false,
-    "baseMin": 3000
    }
   },
   "SBJR": {
@@ -358,34 +358,23 @@
     "vd": 220,
     "alto": false,
     "baseMin": 1000
-   },
-   "2026-11-19T17": {
-    "nuvens": 44,
-    "total": 44,
-    "chuva": false,
-    "temp": 28,
-    "v": 9,
-    "raj": null,
-    "vd": 210,
-    "alto": false,
-    "baseMin": 2500
    }
   }
  },
  "ultimo": {
   "SBRJ": {
-   "ts": 1795165200,
-   "em": "2026-11-20T06:00",
+   "ts": 1795168800,
+   "em": "2026-11-20T07:00",
    "v": 6,
    "raj": null,
-   "vd": 340
+   "vd": 30
   },
   "SBGL": {
-   "ts": 1795165200,
-   "em": "2026-11-20T06:00",
-   "v": 6,
+   "ts": 1795168800,
+   "em": "2026-11-20T07:00",
+   "v": 4,
    "raj": null,
-   "vd": 330
+   "vd": null
   },
   "SBJR": {
    "ts": 1795132800,
