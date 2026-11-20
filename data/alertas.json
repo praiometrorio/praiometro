@@ -74,29 +74,49 @@
     "praias": [
       "Ipanema",
       "Copacabana",
-      "Barra da Tijuca",
+      "Leblon",
       "Arpoador",
       "Leme",
       "Reserva",
       "Praia Vermelha",
-      "Joatinga"
+      "Vidigal"
     ],
     "ids": [
       "ipanema",
       "copacabana",
-      "barra",
+      "leblon",
       "arpoador",
       "leme",
       "reserva",
       "vermelha",
-      "joatinga"
+      "vidigal"
     ],
-    "temp": 33
+    "temp": 33,
+    "vespera": true
   },
   "2026-11-21": {
     "pre": true,
     "pre_ids": [
       "reserva"
+    ]
+  },
+  "2026-11-22": {
+    "pre": true,
+    "pre_ids": [
+      "ipanema",
+      "copacabana",
+      "leblon",
+      "arpoador",
+      "leme",
+      "reserva",
+      "vermelha",
+      "itacoatiara",
+      "piratininga",
+      "itaipu",
+      "vidigal",
+      "diabo",
+      "flamengo",
+      "botafogo"
     ]
   }
 }
