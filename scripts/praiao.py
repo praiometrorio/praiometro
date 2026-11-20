@@ -3,7 +3,7 @@
 #  - 3 dias antes: se a previsão estiver MUITO boa, avisa "a princípio tem praião"
 #  - na véspera: confirma ou cancela o aviso; se não teve pré-aviso e virou praião, avisa também
 # Guarda o que já mandou em data/alertas.json para não repetir.
-import urllib.error, json, os, sys, datetime, urllib.request, urllib.parse
+import urllib.error, json, uuid, os, sys, datetime, urllib.request, urllib.parse
 ATE_AMANHA = (datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=-3))).date() + datetime.timedelta(days=1)).isoformat()
 
 FUSO = "America/Sao_Paulo"
