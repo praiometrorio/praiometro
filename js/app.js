@@ -299,19 +299,16 @@
     const o = p.baia ? 0.3 : x.ondas == null ? 0.8 : x.ondas;
     let s = `<svg viewBox="0 0 400 230" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="230" fill="${ceuCor}"/>`;
     if (a.ceu === "sol") s += `<circle cx="330" cy="44" r="26" fill="#FFB627"/><g stroke="#FFB627" stroke-width="5" stroke-linecap="round"><path d="M330 8v-6M330 80v6M294 44h-6M366 44h6M305 19l-4-4M355 69l4 4M305 69l-4 4M355 19l4-4"/></g>`;
-    // sol com nuvens (céu com cirro/nuvem fina): 3 fiapos bem finos e pequenos, sem tapar o sol
-    if (a.ceu === "sol" && a.poucas) s += `<g fill="none" stroke="#FFFFFF" stroke-linecap="round" opacity="0.85">` +
-      `<path d="M178 24q14-5 30-2q10 2 22-1" stroke-width="3"/><path d="M188 31q12-3 24 0" stroke-width="2"/>` +
-      `<path d="M236 50q14-4 30-1q7 2 14-1" stroke-width="2.6"/>` +
-      `<path d="M40 98q10-4 22-1q6 1 12-1" stroke-width="2.4"/></g>`;
-    if (a.ceu === "parcial") s += `<circle cx="300" cy="62" r="30" fill="#FFB627"/><path d="M250 98h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.95"/><path d="M40 70h80a18 18 0 0 0 1-36 24 24 0 0 0-45-4 16 16 0 0 0-36 40z" fill="#FFFFFF" opacity="0.85"/>`;
+    // v19.27 sol com nuvens (opção E escolhida pelo Antônio): sol inteiro sozinho + 4 nuvens pequenas espalhadas
+    if (a.ceu === "sol" && a.poucas) s += `<path transform="translate(14 22) scale(0.45)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.95"/><path transform="translate(120 54) scale(0.34)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.9"/><path transform="translate(196 14) scale(0.4)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.92"/><path transform="translate(250 70) scale(0.3)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.86"/>`;
+    // v19.27 sol vai e vem (opção C): sol grande brilhando, nuvem passando na frente de um pedaço
+    if (a.ceu === "parcial") s += `<circle cx="300" cy="50" r="32" fill="#FFB627"/><g stroke="#FFB627" stroke-width="5" stroke-linecap="round"><path d="M342 50L348 50M330 80L334 84M300 92L300 98M270 80L266 84M258 50L252 50M270 20L266 16M300 8L300 2M330 20L334 16"/></g><path transform="translate(230 58) scale(0.95)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.93"/><path transform="translate(330 34) scale(0.6)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.9"/><path transform="translate(36 40) scale(0.75)" d="M0 56h120a26 26 0 0 0 2-52 34 34 0 0 0-64-4 24 24 0 0 0-58 56z" fill="#FFFFFF" opacity="0.88"/>`;
     if (cinza) {
       s += `<path d="M-20 64h150a30 30 0 0 0 2-60 40 40 0 0 0-76-6 28 28 0 0 0-76 66z" fill="#D3DAE0"/><path d="M200 90h170a28 28 0 0 0 2-56 38 38 0 0 0-72-8 26 26 0 0 0-100 64z" fill="#C7CFD6"/><path d="M100 114h110a22 22 0 0 0 1-44 30 30 0 0 0-56-5 20 20 0 0 0-55 49z" fill="#DDE3E8"/>`;
     }
     if (escura) {
       const c = ["#45525B", "#3F4B54", "#38434B"];
       if (!a.raio) s += `<path d="M-20 64h150a30 30 0 0 0 2-60 40 40 0 0 0-76-6 28 28 0 0 0-76 66z" fill="${c[0]}"/><path d="M200 90h170a28 28 0 0 0 2-56 38 38 0 0 0-72-8 26 26 0 0 0-100 64z" fill="${c[1]}"/><path d="M100 114h110a22 22 0 0 0 1-44 30 30 0 0 0-56-5 20 20 0 0 0-55 49z" fill="${c[2]}"/>`;
-      s += `<g stroke="#9AAAB5" stroke-width="2" stroke-linecap="round" opacity="0.9"><path d="M40 86l-6 14M72 90l-6 14M240 106l-6 14M274 102l-6 14M314 108l-6 14M140 126l-5 12M180 124l-5 12M110 92l-6 14M350 96l-6 14M210 128l-5 12"/></g>`;
     }
     // paisagem da praia: silhueta real dos morros vista da areia (calculada com o relevo por satélite)
     const longeCor = escura ? "#3D4A45" : cinza ? "#7D8E86" : "#6F9C8C";
@@ -383,6 +380,17 @@
           [[-34, 14], [-26, 26], [-8, 30], [12, 28], [30, 22], [36, 8], [-38, 2]].map(([dx, dy]) =>
             `<path d="M${topoX} ${topoY} q ${dx / 2} ${-12 + dy / 4} ${dx} ${dy}"/>`).join("") + `</g>`;
       });
+    }
+    // v19.27 chuva animada: 46 gotas, cada uma com velocidade, atraso e lugar próprios (sorteio fixo), então o conjunto
+    // nunca se repete igual e não parece um ciclo. Desenhada por cima da paisagem. Sem animação (prefers-reduced-motion): riscos parados.
+    if (escura) {
+      let r = 7; const sorte = () => (r = (r * 16807) % 2147483647) / 2147483647;
+      s += `<g class="chuva" stroke="#C3D0D8" stroke-width="1.8" stroke-linecap="round">`;
+      for (let i = 0; i < 46; i++) {
+        const gx = Math.round(sorte() * 440 - 10), gy = Math.round(50 + sorte() * 60), dur = (0.62 + sorte() * 0.55).toFixed(2), atraso = (-sorte() * 3).toFixed(2);
+        s += `<path transform="translate(${gx} ${gy})" d="M0 0l-4 11"><animateTransform attributeName="transform" type="translate" additive="sum" from="0 -20" to="-26 ${150 + Math.round(sorte() * 30)}" dur="${dur}s" begin="${atraso}s" repeatCount="indefinite"/><animate attributeName="opacity" values="0;.9;.9;0" keyTimes="0;.15;.8;1" dur="${dur}s" begin="${atraso}s" repeatCount="indefinite"/></path>`;
+      }
+      s += `</g>`;
     }
     if (!escura && !cinza) s += `<path d="M0 194 C 70 188, 130 198, 200 192 C 270 186, 330 196, 400 191 V200 H0 Z" fill="#FFFFFF" opacity="0.6"/>`;
     return { svg: s + "</svg>", escura };
