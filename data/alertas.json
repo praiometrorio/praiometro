@@ -1,10 +1,4 @@
 {
-  "2026-11-16": {
-    "praiao": false,
-    "tipo": null,
-    "praias": [],
-    "ids": []
-  },
   "2026-11-17": {
     "praiao": true,
     "praia": false,
@@ -98,7 +92,32 @@
     "pre": true,
     "pre_ids": [
       "reserva"
-    ]
+    ],
+    "praiao": true,
+    "praia": false,
+    "tipo": "todo",
+    "praias": [
+      "Ipanema",
+      "Copacabana",
+      "Leblon",
+      "Arpoador",
+      "Leme",
+      "Praia Vermelha",
+      "Piratininga",
+      "Vidigal"
+    ],
+    "ids": [
+      "ipanema",
+      "copacabana",
+      "leblon",
+      "arpoador",
+      "leme",
+      "vermelha",
+      "piratininga",
+      "vidigal"
+    ],
+    "temp": 33,
+    "vespera": true
   },
   "2026-11-22": {
     "pre": true,
