@@ -227,12 +227,12 @@ def enviar(titulo, texto, chave_envio):
         print("  (sem as chaves do OneSignal: só testei, não mandei)"); return False
     for segmento in ("Total Subscriptions", "Subscribed Users"):
         corpo = {"app_id": app, "target_channel": "push", "included_segments": [segmento],
-                 "headings": {"en": titulo, "pt": titulo}, "contents": {"en": texto, "pt": texto}, "url": SITE,
+                 "headings": {"en": titulo, "pt": titulo}, "contents": {"en": texto, "pt": texto}, "url": SITE, "idempotency_key": str(uuid.uuid5(uuid.NAMESPACE_URL, "praiometro/" + chave_envio)),
                  # logo do app na notificação (Android/computador; no iPhone o sistema já usa o ícone do app instalado)
                  "chrome_web_icon": SITE + "icons/icon-192.png", "firefox_icon": SITE + "icons/icon-192.png",
                  "chrome_web_badge": SITE + "icons/icon-192.png"}
         req = urllib.request.Request("https://api.onesignal.com/notifications?c=push", data=json.dumps(corpo).encode(),
-            headers={"Content-Type": "application/json", "Authorization": "Key " + key, "idempotency_key": chave_envio[:64]}, method="POST")
+            headers={"Content-Type": "application/json", "Authorization": "Key " + key}, method="POST")
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 print("  enviado:", r.read().decode()[:200]); return True
@@ -353,11 +353,11 @@ def enviar_pessoal(titulo, texto, filtros, chave_envio, resumo):
     if not app or not key:
         print("  (sem as chaves do OneSignal: só testei, não mandei)"); return False
     corpo = {"app_id": app, "target_channel": "push", "filters": filtros,
-             "headings": {"en": titulo, "pt": titulo}, "contents": {"en": texto, "pt": texto}, "url": SITE,
+             "headings": {"en": titulo, "pt": titulo}, "contents": {"en": texto, "pt": texto}, "url": SITE, "idempotency_key": str(uuid.uuid5(uuid.NAMESPACE_URL, "praiometro/" + chave_envio)),
              "chrome_web_icon": SITE + "icons/icon-192.png", "firefox_icon": SITE + "icons/icon-192.png",
              "chrome_web_badge": SITE + "icons/icon-192.png"}
     req = urllib.request.Request("https://api.onesignal.com/notifications?c=push", data=json.dumps(corpo).encode(),
-        headers={"Content-Type": "application/json", "Authorization": "Key " + key, "idempotency_key": chave_envio[:64]}, method="POST")
+        headers={"Content-Type": "application/json", "Authorization": "Key " + key}, method="POST")
     try:
         with urllib.request.urlopen(req, timeout=60) as r:
             print("  enviado:", r.read().decode()[:200]); return True
