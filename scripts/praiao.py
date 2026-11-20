@@ -319,19 +319,24 @@ def filtros_pessoais(itens, k):
         lista.pop(); f = monta(lista)
     return f
 
-LISTA = lambda v: '{% for n in ' + v + ' %}{{ n }}{% if forloop.rindex == 2 %} e {% elsif forloop.last == false %}, {% endif %}{% endfor %}'
+# v19.28: o OneSignal NÃO aceita {% for %} no TÍTULO (19/11: "Can not use 'for' iteration in headings" e ninguém com praia
+# escolhida recebeu). A lista "A, B e C" agora é montada só com assign/if, praia por praia, dentro do liquid_base:
+# <v>A = todas menos a última (separadas por vírgula), <v>U = a última. LISTA junta as duas com " e ".
+LISTA = lambda v: '{% if ' + v + 'A != "" %}{{ ' + v + 'A }} e {% endif %}{{ ' + v + 'U }}'
 def liquid_base(itens):
     """monta, para cada pessoa, pr = praias dela com PRAIÃO, pa = praias dela com praia, det = detalhe da melhor"""
     q = lambda t: t.replace('"', "'")
-    s = '{% assign pr = "" %}{% assign pa = "" %}{% assign det = "" %}{% assign sp = false %}'
+    s = '{% assign prA = "" %}{% assign prU = "" %}{% assign paA = "" %}{% assign paU = "" %}{% assign det = "" %}{% assign sp = false %}'
     # quem escolheu "só praião" (a_pref 3, 4 ou 5) não vê as praias que só têm "vai dar praia"
     s += '{% if user.tags.a_pref == "3" or user.tags.a_pref == "4" or user.tags.a_pref == "5" %}{% assign sp = true %}{% endif %}'
     for pid, nome, nivel, det in itens:
         v = "pr" if nivel == "praiao" else "pa"
         cond = f"user.tags.a_{pid}" if nivel == "praiao" else f"user.tags.a_{pid} and sp == false"
-        s += (f'{{% if {cond} %}}{{% assign {v} = {v} | append: "|{q(nome)}" %}}'
+        s += (f'{{% if {cond} %}}'
+              f'{{% if {v}U != "" %}}{{% if {v}A != "" %}}{{% assign {v}A = {v}A | append: ", " %}}{{% endif %}}{{% assign {v}A = {v}A | append: {v}U %}}{{% endif %}}'
+              f'{{% assign {v}U = "{q(nome)}" %}}'
               f'{{% if det == "" %}}{{% assign det = "{q(det)}" %}}{{% endif %}}{{% endif %}}')
-    return s + '{% assign prl = pr | remove_first: "|" | split: "|" %}{% assign pal = pa | remove_first: "|" | split: "|" %}'
+    return s
 
 def filtros_tem(ids):
     """quem tem a etiqueta de pelo menos uma dessas praias"""
@@ -398,8 +403,8 @@ def main():
         # v19.14: o aviso é PERSONALIZADO, só das praias que cada pessoa escolheu (a decisão acima continua valendo para a faixa do app)
         itens = praias_do_dia(app, boas_de, amanha)
         base = liquid_base(itens)
-        titulo = base + ('{% if prl.size > 0 and pal.size > 0 %}☀️ Amanhã: PRAIÃO em ' + LISTA("prl") + ' · praia em ' + LISTA("pal") +
-                         '{% elsif prl.size > 0 %}☀️ Amanhã é PRAIÃO em ' + LISTA("prl") + '{% else %}🏖️ Amanhã vai dar praia em ' + LISTA("pal") + '{% endif %}')
+        titulo = base + ('{% if prU != "" and paU != "" %}☀️ Amanhã: PRAIÃO em ' + LISTA("pr") + ' · praia em ' + LISTA("pa") +
+                         '{% elsif prU != "" %}☀️ Amanhã é PRAIÃO em ' + LISTA("pr") + '{% else %}🏖️ Amanhã vai dar praia em ' + LISTA("pa") + '{% endif %}')
         texto = base + '{{ det }}'
         ok = None
         if itens:
@@ -440,7 +445,7 @@ def main():
         top = [i for i in praias_do_dia(app, boas_de, alvo) if i[2] == "praiao"]
         if top:
             base = liquid_base(top)
-            if enviar_pessoal(base + f"👀 {dia.capitalize()} pode ser PRAIÃO em " + LISTA("prl"),
+            if enviar_pessoal(base + f"👀 {dia.capitalize()} pode ser PRAIÃO em " + LISTA("pr"),
                               base + f"{{{{ det }}}}. A gente confirma na {vespera} à noite.",
                               filtros_pessoais(top, k_do_dia(alvo)), f"pre2-{alvo}", f"pré-aviso: {', '.join(n for _, n, _, _ in top)}"):
                 estado.setdefault(alvo, {}).update({"pre": True, "pre_ids": [i[0] for i in top]}); mudou = True
