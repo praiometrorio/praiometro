@@ -1,6 +1,6 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo; v/raj = vento e rajada medidos (km/h), vd = direção (graus); ultimo = observação mais nova de cada aeroporto.",
- "atualizadoEm": "2026-11-21T12:45",
+ "atualizadoEm": "2026-11-21T13:45",
  "estacoes": {
   "SBGL": {
    "2026-11-21T12": {
