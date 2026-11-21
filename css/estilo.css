@@ -308,7 +308,7 @@ div.posto{z-index:2}
 .btn-fav b:empty{display:none}
 .btn-fav b{background:#E0A100;color:#fff;border-radius:999px;min-width:20px;height:20px;display:grid;place-items:center;font-size:11px;padding:0 5px}
 @media (max-width:380px){.btn-fav span{display:none}}
-.fav-tela{position:fixed;inset:0;z-index:900;background:var(--fundo);overflow-y:auto;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px calc(env(safe-area-inset-bottom,0px) + 24px);animation:favEntra .22s ease-out}
+.fav-tela{position:fixed;inset:0;z-index:900;background:var(--fundo);overflow-y:auto;overscroll-behavior:contain;padding:calc(env(safe-area-inset-top,0px) + 14px) 16px calc(env(safe-area-inset-bottom,0px) + 24px);animation:favEntra .22s ease-out}
 .fav-tela[hidden]{display:none}
 @keyframes favEntra{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
 .fav-topo{display:flex;justify-content:space-between;align-items:center;max-width:720px;margin:0 auto 14px;color:#fff}

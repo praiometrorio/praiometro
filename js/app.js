@@ -1617,7 +1617,7 @@
     trTela = !treinos.length ? { modo: "escolher", id: null, rascunho: null }
       : treinos.length === 1 && !pendFb ? { modo: "detalhe", id: treinos[0].id, rascunho: null }
       : { modo: "lista", id: null, rascunho: null };
-    desenharTreino(); $("#treinoTela").hidden = false; document.body.style.overflow = "hidden";
+    desenharTreino(); $("#treinoTela").hidden = false;   // v19.31: sem travar a rolagem da página (ver abaixo)
   }
   function fecharTreino() { $("#treinoTela").hidden = true; document.body.style.overflow = ""; desenharBotaoTreino(); }
   const irTreino = (modo, extra) => { trTela = Object.assign({ modo, id: null, rascunho: null }, extra || {}); desenharTreino(); $("#treinoTela").scrollTop = 0; };
@@ -2784,7 +2784,7 @@
     document.querySelectorAll(".fav-card").forEach((b) => b.onclick = () => { fecharFavoritas(); abrirPraia(b.dataset.id, true); });
     desenharAvisos();
   }
-  function abrirFavoritas() { contar("abriu-favoritas"); desenharFavoritas(); $("#favTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function abrirFavoritas() { contar("abriu-favoritas"); desenharFavoritas(); $("#favTela").hidden = false; }
   function fecharFavoritas() { $("#favTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- surfe: só dados técnicos (swell, período, direção, vento, maré) ----------
@@ -3116,7 +3116,7 @@
     const ag = document.querySelector(".tab-surf td.ag");
     if (ag) $(".tab-surf").scrollLeft = Math.max(0, ag.offsetLeft - 120);
   }
-  function abrirSurfe() { contar("abriu-surfe"); surfeDia = estado.dia; surfeAberta = null; surfeHora = null; surfeVerFav = false; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; }
+  function abrirSurfe() { contar("abriu-surfe"); surfeDia = estado.dia; surfeAberta = null; surfeHora = null; surfeVerFav = false; desenharSurfe(); $("#surfeTela").hidden = false;  }
   function fecharSurfe() { pararOnd(); $("#surfeTela").hidden = true; document.body.style.overflow = ""; }
 
   // ---------- mapa de ondulação (estilo Windguru) ----------
@@ -3849,7 +3849,7 @@
     $("#relTela").classList.remove("ceu24");
     if (k === "ceu") { abrirCeu(l.p, estado.dia); return; }
     relAberto = { k, id: l.p.id, min: null };
-    if (k === "surfe" && l.p.mar != null) { surfeDia = estado.dia; surfeAberta = l.p.id; surfeHora = null; desenharSurfe(); $("#surfeTela").hidden = false; document.body.style.overflow = "hidden"; return; }
+    if (k === "surfe" && l.p.mar != null) { surfeDia = estado.dia; surfeAberta = l.p.id; surfeHora = null; desenharSurfe(); $("#surfeTela").hidden = false;  return; }
     const sh = $("#relTela"), corpo = $("#relCorpo");
     $("#relLocal").textContent = `${l.p.nome} · ${nomeDia(estado.dia)}`;
     if (k === "inea") {
@@ -4097,6 +4097,9 @@
     if ($("#mmVer")) $("#mmVer").onclick = () => { fecharMapaCheio(); setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 120); };   // espera o "voltar" do histórico terminar, senão ele desfaz a rolagem
     $("#abrirSurfe").onclick = abrirSurfe;
     $("#abrirTreino").onclick = abrirTreino;
+    // v19.31: Favoritas, Surfe e Treino NÃO travam mais a rolagem da página (body overflow hidden). No iPhone isso fazia a
+    // barra de baixo "subir" ~60 pt, deixando uma faixa azul embaixo (21/11, tela do Surfe). A tela cheia já cobre tudo e
+    // segura a rolagem sozinha (overscroll-behavior: contain no CSS).
     // v19.14: barra de baixo no estilo do Instagram. Ela fica por cima das telas Favoritas, Surfe e Treino; a aberta fica
     // marcada. Tocar em outra troca de tela; tocar de novo na marcada volta para a página principal.
     const ABAS = [["favTela", "abrirFav", fecharFavoritas], ["surfeTela", "abrirSurfe", fecharSurfe], ["treinoTela", "abrirTreino", fecharTreino]];
