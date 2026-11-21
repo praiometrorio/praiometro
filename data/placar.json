@@ -3702,7 +3702,12 @@
       "est": "nublado"
      }
     },
-    "visto": {},
+    "visto": {
+     "06": {
+      "nuvens": 81,
+      "est": "nublado"
+     }
+    },
     "previstoAs": "05:51"
    },
    "SBJR": {
@@ -3785,19 +3790,19 @@
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 152,
+   "horas": 153,
    "acertoExato": 41,
-   "acertoSolOuNao": 55,
+   "acertoSolOuNao": 56,
    "viesNuvens": 5,
    "leitura": "sem viés claro"
   },
   "ultimos30dias": {
-   "horas": 361,
+   "horas": 362,
    "acertoExato": 45,
-   "acertoSolOuNao": 66,
+   "acertoSolOuNao": 67,
    "viesNuvens": 1,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-21T05:51"
+ "atualizadoEm": "2026-11-21T06:48"
 }
