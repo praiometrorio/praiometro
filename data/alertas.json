@@ -1,31 +1,4 @@
 {
-  "2026-11-17": {
-    "praiao": true,
-    "praia": false,
-    "tipo": "tarde",
-    "praias": [
-      "Piratininga",
-      "Barra",
-      "Recreio",
-      "Prainha",
-      "Reserva",
-      "Joatinga",
-      "Ipanema",
-      "Copacabana"
-    ],
-    "ids": [
-      "piratininga",
-      "barra",
-      "recreio",
-      "prainha",
-      "reserva",
-      "joatinga",
-      "ipanema",
-      "copacabana"
-    ],
-    "temp": 27,
-    "vespera": true
-  },
   "2026-11-18": {
     "praiao": false,
     "praia": false,
@@ -136,6 +109,31 @@
       "diabo",
       "flamengo",
       "botafogo"
-    ]
+    ],
+    "praiao": true,
+    "praia": false,
+    "tipo": "manha",
+    "praias": [
+      "Reserva",
+      "Joatinga",
+      "Icaraí",
+      "Ipanema",
+      "Copacabana",
+      "Arpoador",
+      "Leme",
+      "Praia Vermelha"
+    ],
+    "ids": [
+      "reserva",
+      "joatinga",
+      "icarai",
+      "ipanema",
+      "copacabana",
+      "arpoador",
+      "leme",
+      "vermelha"
+    ],
+    "temp": 30,
+    "vespera": true
   }
 }
