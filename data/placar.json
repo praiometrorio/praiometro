@@ -3982,6 +3982,10 @@
      "18": {
       "nuvens": 86,
       "est": "nublado"
+     },
+     "19": {
+      "nuvens": 100,
+      "est": "chuva"
      }
     },
     "previstoAs": "05:51"
@@ -4103,6 +4107,10 @@
      "18": {
       "nuvens": 90,
       "est": "nublado"
+     },
+     "19": {
+      "nuvens": 100,
+      "est": "chuva"
      }
     },
     "previstoAs": "05:51"
@@ -4111,19 +4119,19 @@
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 168,
+   "horas": 170,
    "acertoExato": 38,
    "acertoSolOuNao": 56,
    "viesNuvens": 9,
    "leitura": "previsão pessimista (mais nuvem que o real)"
   },
   "ultimos30dias": {
-   "horas": 403,
+   "horas": 405,
    "acertoExato": 42,
    "acertoSolOuNao": 63,
    "viesNuvens": 5,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-22T18:42"
+ "atualizadoEm": "2026-11-22T19:44"
 }
