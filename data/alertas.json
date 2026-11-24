@@ -1,31 +1,4 @@
 {
-  "2026-11-20": {
-    "praiao": true,
-    "praia": false,
-    "tipo": "todo",
-    "praias": [
-      "Ipanema",
-      "Copacabana",
-      "Leblon",
-      "Arpoador",
-      "Leme",
-      "Reserva",
-      "Praia Vermelha",
-      "Vidigal"
-    ],
-    "ids": [
-      "ipanema",
-      "copacabana",
-      "leblon",
-      "arpoador",
-      "leme",
-      "reserva",
-      "vermelha",
-      "vidigal"
-    ],
-    "temp": 33,
-    "vespera": true
-  },
   "2026-11-21": {
     "pre": true,
     "pre_ids": [
@@ -110,6 +83,14 @@
     "temp": null
   },
   "2026-11-24": {
+    "praiao": false,
+    "praia": false,
+    "tipo": null,
+    "praias": [],
+    "ids": [],
+    "temp": null
+  },
+  "2026-11-25": {
     "praiao": false,
     "praia": false,
     "tipo": null,
