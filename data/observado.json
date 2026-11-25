@@ -1,8 +1,19 @@
 {
  "_comoFunciona": "Observação real dos aeroportos (METAR). nuvens = quanto a nuvem tapa o sol (0-100); chuva = true se estava chovendo; v/raj = vento e rajada medidos (km/h), vd = direção (graus); ultimo = observação mais nova de cada aeroporto.",
- "atualizadoEm": "2026-11-25T11:24",
+ "atualizadoEm": "2026-11-25T12:37",
  "estacoes": {
   "SBRJ": {
+   "2026-11-25T12": {
+    "nuvens": 90,
+    "total": 90,
+    "chuva": false,
+    "temp": 29,
+    "v": 9,
+    "raj": null,
+    "vd": 330,
+    "alto": false,
+    "baseMin": 2000
+   },
    "2026-11-25T11": {
     "nuvens": 90,
     "total": 90,
@@ -145,88 +156,20 @@
     "vd": null,
     "alto": false,
     "baseMin": 3000
-   },
-   "2026-11-24T22": {
-    "nuvens": 58,
-    "total": 58,
-    "chuva": true,
-    "temp": 29,
-    "v": 11,
-    "raj": null,
-    "vd": 330,
-    "alto": false,
-    "baseMin": 3000
-   },
-   "2026-11-24T21": {
-    "nuvens": 58,
-    "total": 58,
-    "chuva": false,
-    "temp": 29,
-    "v": 11,
-    "raj": null,
-    "vd": 330,
-    "alto": false,
-    "baseMin": 3000
-   }
-  },
-  "SBJR": {
-   "2026-11-25T11": {
-    "nuvens": 81,
-    "total": 81,
-    "chuva": false,
-    "temp": 33,
-    "v": 6,
-    "raj": null,
-    "vd": 20,
-    "alto": false,
-    "baseMin": 1500
-   },
-   "2026-11-25T10": {
-    "nuvens": 81,
-    "total": 81,
-    "chuva": false,
-    "temp": 29,
-    "v": 4,
-    "raj": null,
-    "vd": 350,
-    "alto": false,
-    "baseMin": 1500
-   },
-   "2026-11-25T09": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 28,
-    "v": 6,
-    "raj": null,
-    "vd": 330,
-    "alto": false,
-    "baseMin": 1500
-   },
-   "2026-11-25T08": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 27,
-    "v": 6,
-    "raj": null,
-    "vd": 190,
-    "alto": false,
-    "baseMin": 1000
-   },
-   "2026-11-25T07": {
-    "nuvens": 100,
-    "total": 100,
-    "chuva": false,
-    "temp": 26,
-    "v": 4,
-    "raj": null,
-    "vd": 250,
-    "alto": false,
-    "baseMin": 1000
    }
   },
   "SBGL": {
+   "2026-11-25T12": {
+    "nuvens": 81,
+    "total": 81,
+    "chuva": false,
+    "temp": 30,
+    "v": 19,
+    "raj": null,
+    "vd": 110,
+    "alto": false,
+    "baseMin": 2500
+   },
    "2026-11-25T11": {
     "nuvens": 81,
     "total": 81,
@@ -369,41 +312,98 @@
     "vd": 170,
     "alto": false,
     "baseMin": 4000
-   },
-   "2026-11-24T22": {
-    "nuvens": 58,
-    "total": 58,
+   }
+  },
+  "SBJR": {
+   "2026-11-25T12": {
+    "nuvens": 81,
+    "total": 81,
     "chuva": false,
-    "temp": 29,
+    "temp": 32,
+    "v": 9,
+    "raj": null,
+    "vd": 130,
+    "alto": false,
+    "baseMin": 2500
+   },
+   "2026-11-25T11": {
+    "nuvens": 81,
+    "total": 81,
+    "chuva": false,
+    "temp": 33,
     "v": 6,
     "raj": null,
-    "vd": 80,
+    "vd": 20,
     "alto": false,
-    "baseMin": 3500
+    "baseMin": 1500
+   },
+   "2026-11-25T10": {
+    "nuvens": 81,
+    "total": 81,
+    "chuva": false,
+    "temp": 29,
+    "v": 4,
+    "raj": null,
+    "vd": 350,
+    "alto": false,
+    "baseMin": 1500
+   },
+   "2026-11-25T09": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 28,
+    "v": 6,
+    "raj": null,
+    "vd": 330,
+    "alto": false,
+    "baseMin": 1500
+   },
+   "2026-11-25T08": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 27,
+    "v": 6,
+    "raj": null,
+    "vd": 190,
+    "alto": false,
+    "baseMin": 1000
+   },
+   "2026-11-25T07": {
+    "nuvens": 100,
+    "total": 100,
+    "chuva": false,
+    "temp": 26,
+    "v": 4,
+    "raj": null,
+    "vd": 250,
+    "alto": false,
+    "baseMin": 1000
    }
   }
  },
  "ultimo": {
   "SBRJ": {
-   "ts": 1795615200,
-   "em": "2026-11-25T11:00",
-   "v": 24,
+   "ts": 1795618800,
+   "em": "2026-11-25T12:00",
+   "v": 9,
    "raj": null,
-   "vd": 10
-  },
-  "SBJR": {
-   "ts": 1795615200,
-   "em": "2026-11-25T11:00",
-   "v": 6,
-   "raj": null,
-   "vd": 20
+   "vd": 330
   },
   "SBGL": {
-   "ts": 1795615200,
-   "em": "2026-11-25T11:00",
-   "v": 24,
+   "ts": 1795618800,
+   "em": "2026-11-25T12:00",
+   "v": 19,
    "raj": null,
-   "vd": 60
+   "vd": 110
+  },
+  "SBJR": {
+   "ts": 1795618800,
+   "em": "2026-11-25T12:00",
+   "v": 9,
+   "raj": null,
+   "vd": 130
   }
  }
 }
