@@ -4946,6 +4946,42 @@
      "06": {
       "nuvens": 100,
       "est": "chuva"
+     },
+     "15": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "14": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "13": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "12": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "11": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "10": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "09": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "08": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "07": {
+      "nuvens": 100,
+      "est": "chuva"
      }
     },
     "previstoAs": "06:05"
@@ -5023,26 +5059,63 @@
       "est": "nublado"
      }
     },
-    "visto": {},
+    "visto": {
+     "15": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "14": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "13": {
+      "nuvens": 100,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 100,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "10": {
+      "nuvens": 100,
+      "est": "nublado"
+     },
+     "09": {
+      "nuvens": 100,
+      "est": "nublado"
+     },
+     "08": {
+      "nuvens": 100,
+      "est": "chuva"
+     },
+     "07": {
+      "nuvens": 100,
+      "est": "nublado"
+     }
+    },
     "previstoAs": "06:05"
    }
   }
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 138,
-   "acertoExato": 33,
-   "acertoSolOuNao": 57,
-   "viesNuvens": 23,
+   "horas": 156,
+   "acertoExato": 38,
+   "acertoSolOuNao": 62,
+   "viesNuvens": 20,
    "leitura": "previsão pessimista (mais nuvem que o real)"
   },
   "ultimos30dias": {
-   "horas": 477,
-   "acertoExato": 42,
-   "acertoSolOuNao": 63,
+   "horas": 495,
+   "acertoExato": 43,
+   "acertoSolOuNao": 64,
    "viesNuvens": 7,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-26T06:05"
+ "atualizadoEm": "2026-11-26T15:57"
 }
