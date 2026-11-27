@@ -5131,23 +5131,251 @@
     },
     "previstoAs": "06:05"
    }
+  },
+  "2026-11-27": {
+   "SBRJ": {
+    "previsto": {
+     "06": {
+      "nuvens": 84,
+      "chuva": 22,
+      "est": "nublado"
+     },
+     "07": {
+      "nuvens": 78,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "08": {
+      "nuvens": 73,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "09": {
+      "nuvens": 78,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "10": {
+      "nuvens": 72,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 75,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 75,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "13": {
+      "nuvens": 75,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "14": {
+      "nuvens": 77,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "15": {
+      "nuvens": 78,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "16": {
+      "nuvens": 81,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "17": {
+      "nuvens": 82,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "18": {
+      "nuvens": 83,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "19": {
+      "nuvens": 83,
+      "chuva": 11,
+      "est": "nublado"
+     }
+    },
+    "visto": {
+     "15": {
+      "nuvens": 86,
+      "est": "nublado"
+     },
+     "14": {
+      "nuvens": 95,
+      "est": "nublado"
+     },
+     "13": {
+      "nuvens": 90,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 90,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 90,
+      "est": "nublado"
+     },
+     "10": {
+      "nuvens": 90,
+      "est": "nublado"
+     },
+     "09": {
+      "nuvens": 90,
+      "est": "nublado"
+     },
+     "08": {
+      "nuvens": 95,
+      "est": "nublado"
+     },
+     "07": {
+      "nuvens": 95,
+      "est": "nublado"
+     },
+     "06": {
+      "nuvens": 94,
+      "est": "nublado"
+     }
+    },
+    "previstoAs": "15:05"
+   },
+   "SBJR": {
+    "previsto": {
+     "06": {
+      "nuvens": 87,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "07": {
+      "nuvens": 79,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "08": {
+      "nuvens": 73,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "09": {
+      "nuvens": 74,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "10": {
+      "nuvens": 73,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 78,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 79,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "13": {
+      "nuvens": 79,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "14": {
+      "nuvens": 79,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "15": {
+      "nuvens": 78,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "16": {
+      "nuvens": 80,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "17": {
+      "nuvens": 80,
+      "chuva": 0,
+      "est": "nublado"
+     },
+     "18": {
+      "nuvens": 80,
+      "chuva": 11,
+      "est": "nublado"
+     },
+     "19": {
+      "nuvens": 79,
+      "chuva": 11,
+      "est": "nublado"
+     }
+    },
+    "visto": {
+     "14": {
+      "nuvens": 96,
+      "est": "nublado"
+     },
+     "13": {
+      "nuvens": 96,
+      "est": "nublado"
+     },
+     "12": {
+      "nuvens": 94,
+      "est": "nublado"
+     },
+     "11": {
+      "nuvens": 92,
+      "est": "nublado"
+     },
+     "10": {
+      "nuvens": 92,
+      "est": "nublado"
+     },
+     "09": {
+      "nuvens": 92,
+      "est": "nublado"
+     },
+     "08": {
+      "nuvens": 86,
+      "est": "nublado"
+     },
+     "07": {
+      "nuvens": 90,
+      "est": "nublado"
+     }
+    },
+    "previstoAs": "15:05"
+   }
   }
  },
  "resumo": {
   "ultimos7dias": {
-   "horas": 164,
-   "acertoExato": 40,
-   "acertoSolOuNao": 64,
-   "viesNuvens": 19,
+   "horas": 160,
+   "acertoExato": 46,
+   "acertoSolOuNao": 66,
+   "viesNuvens": 16,
    "leitura": "previsão pessimista (mais nuvem que o real)"
   },
   "ultimos30dias": {
-   "horas": 503,
-   "acertoExato": 44,
-   "acertoSolOuNao": 65,
-   "viesNuvens": 7,
+   "horas": 521,
+   "acertoExato": 45,
+   "acertoSolOuNao": 66,
+   "viesNuvens": 6,
    "leitura": "sem viés claro"
   }
  },
- "atualizadoEm": "2026-11-26T23:07"
+ "atualizadoEm": "2026-11-27T15:05"
 }
