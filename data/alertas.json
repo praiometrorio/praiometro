@@ -1,20 +1,4 @@
 {
-  "2026-11-23": {
-    "praiao": false,
-    "praia": false,
-    "tipo": null,
-    "praias": [],
-    "ids": [],
-    "temp": null
-  },
-  "2026-11-24": {
-    "praiao": false,
-    "praia": false,
-    "tipo": null,
-    "praias": [],
-    "ids": [],
-    "temp": null
-  },
   "2026-11-25": {
     "praiao": false,
     "praia": false,
@@ -32,6 +16,14 @@
     "temp": null
   },
   "2026-11-27": {
+    "praiao": false,
+    "praia": false,
+    "tipo": null,
+    "praias": [],
+    "ids": [],
+    "temp": null
+  },
+  "2026-11-29": {
     "praiao": false,
     "praia": false,
     "tipo": null,
